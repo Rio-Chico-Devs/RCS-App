@@ -1,30 +1,29 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-PreventivoWindow - Interfaccia calcolo preventivi con design unificato - VERSIONE SCHERMO INTERO + REVISIONI
+© 2025 RCS - Software Proprietario
+PreventivoWindow - Interfaccia calcolo preventivi con nuovi campi cliente
+Uso riservato esclusivamente a RCS
 
-Version: 2.2.0
-Last Updated: 9/19/2025
-Author: Antonio VB
+Version: 2.3.1
+Last Updated: 22/09/2025
+Author: Antonio VB Cla.ass
 
 CHANGELOG:
-v2.2.0 (9/19/2025):
-- ADDED: Sistema revisioni completo (modalità nuovo/visualizza/revisione)
-- ADDED: Caricamento preventivi esistenti con compatibilità stratifica/sviluppo
-- ADDED: Metodi salva_revisione() e supporto note revisione
-- MAINTAINED: Design system originale identico (nessuna modifica grafica)
-- MAINTAINED: Tutti i metodi e funzionalità originali
-
-v2.1.0 (9/19/2025):
-- ADDED: Apertura automatica a schermo intero con showMaximized()
-- CHANGED: Layout responsive per sfruttare tutto lo spazio disponibile
-- CHANGED: Colonne espandibili invece di larghezza fissa
-- IMPROVED: Migliore utilizzo dello schermo su monitor grandi
+v2.3.1 (22/09/2025):
+- FIXED: Problema caricamento valori mano d'opera rimossa chiamata aggiorna_totali() dal costruttore
+v2.3.0 (22/09/2025):
+- ADDED: Campi cliente (nome_cliente, numero_ordine, descrizione, codice)
+- ADDED: Sezione "Informazioni Cliente" nell'interfaccia
+- UPDATED: Metodi salvataggio per includere i nuovi campi
+- MAINTAINED: Design system e funzionalità esistenti identiche
 """
 
 from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QWidget, QLabel, QLineEdit, QFormLayout, QMessageBox,
                              QScrollArea, QGroupBox, QSpinBox, QDoubleSpinBox,
                              QDialog, QListWidget, QListWidgetItem, QGridLayout, QFrame,
-                             QSizePolicy, QApplication, QGraphicsDropShadowEffect)
+                             QSizePolicy, QApplication, QGraphicsDropShadowEffect, QTextEdit)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QDoubleValidator, QColor
 from models.preventivo import Preventivo
@@ -39,7 +38,7 @@ class PreventivoWindow(QMainWindow):
         super().__init__(parent)
         self.db_manager = db_manager
         
-        # NUOVO: Parametri per sistema revisioni
+        # Parametri per sistema revisioni
         self.preventivo_id = preventivo_id
         self.modalita = modalita  # 'nuovo', 'visualizza', 'revisione'
         self.note_revisione = note_revisione
@@ -47,29 +46,36 @@ class PreventivoWindow(QMainWindow):
         
         self.preventivo = Preventivo()
         self.materiale_windows = []
+        self.operazione_completata = False  # Flag per evitare popup se operazione completata
         
-        # NUOVO: Se stiamo caricando un preventivo esistente
+        # Se stiamo caricando un preventivo esistente
         if preventivo_id:
             self.carica_preventivo_esistente()
         
         self.init_ui()
-        self.aggiorna_totali()
+        # RIMOSSA: self.aggiorna_totali() - causava azzeramento dei valori caricati
     
     def carica_preventivo_esistente(self):
-        """NUOVO: Carica un preventivo esistente dal database"""
+        """Carica un preventivo esistente dal database"""
         preventivo_data = self.db_manager.get_preventivo_by_id(self.preventivo_id)
         if not preventivo_data:
             QMessageBox.error(self, "Errore", "Preventivo non trovato nel database.")
             return
-            
-        # Carica i dati del preventivo
-        self.preventivo.costi_accessori = preventivo_data.get('costi_accessori', 0.0)
-        self.preventivo.minuti_taglio = preventivo_data.get('minuti_taglio', 0.0)
-        self.preventivo.minuti_avvolgimento = preventivo_data.get('minuti_avvolgimento', 0.0)
-        self.preventivo.minuti_pulizia = preventivo_data.get('minuti_pulizia', 0.0)
-        self.preventivo.minuti_rettifica = preventivo_data.get('minuti_rettifica', 0.0)
-        self.preventivo.minuti_imballaggio = preventivo_data.get('minuti_imballaggio', 0.0)
-        self.preventivo.prezzo_cliente = preventivo_data.get('prezzo_cliente', 0.0)
+        
+        # Carica i dati del preventivo (inclusi i nuovi campi)
+        self.nome_cliente_data = preventivo_data.get('nome_cliente', '')
+        self.numero_ordine_data = preventivo_data.get('numero_ordine', '')
+        self.descrizione_data = preventivo_data.get('descrizione', '')
+        self.codice_data = preventivo_data.get('codice', '')
+        
+        # IMPORTANTE: Carica TUTTI i valori numerici e verifica che siano validi
+        self.preventivo.costi_accessori = float(preventivo_data.get('costi_accessori', 0.0))
+        self.preventivo.minuti_taglio = float(preventivo_data.get('minuti_taglio', 0.0))
+        self.preventivo.minuti_avvolgimento = float(preventivo_data.get('minuti_avvolgimento', 0.0))
+        self.preventivo.minuti_pulizia = float(preventivo_data.get('minuti_pulizia', 0.0))
+        self.preventivo.minuti_rettifica = float(preventivo_data.get('minuti_rettifica', 0.0))
+        self.preventivo.minuti_imballaggio = float(preventivo_data.get('minuti_imballaggio', 0.0))
+        self.preventivo.prezzo_cliente = float(preventivo_data.get('prezzo_cliente', 0.0))
         
         # Carica i materiali
         materiali_json = preventivo_data.get('materiali_utilizzati', '[]')
@@ -102,25 +108,27 @@ class PreventivoWindow(QMainWindow):
         else:
             self.preventivo_originale_id = self.preventivo_id
         
-        # Ricalcola tutto
+        # Ricalcola tutto DOPO aver caricato i dati
         self.preventivo.ricalcola_tutto()
     
     def init_ui(self):
-        """Design system unificato con MaterialeWindow - VERSIONE SCHERMO INTERO + titoli dinamici"""
-        # NUOVO: Titolo dinamico basato sulla modalità
+        """Design system unificato con nuovi campi cliente"""
+        # Titolo dinamico basato sulla modalità
         if self.modalita == 'visualizza':
             title = f"Visualizzazione Preventivo #{self.preventivo_id:03d}"
         elif self.modalita == 'revisione':
             title = f"Revisione Preventivo #{self.preventivo_originale_id:03d}"
+        elif self.modalita == 'modifica':
+            title = f"Modifica Preventivo #{self.preventivo_id:03d}"
         else:
             title = "Calcolo Preventivo"
             
         self.setWindowTitle(title)
         
-        # MODIFICA: Apertura a schermo intero invece di dimensioni fisse
-        self.showMaximized()  # Apre la finestra massimizzata
+        # Apertura a schermo intero
+        self.showMaximized()
         
-        # Stile unificato con MaterialeWindow (IDENTICO ALL'ORIGINALE)
+        # Stile unificato (IDENTICO ALL'ORIGINALE)
         self.setStyleSheet("""
             QMainWindow {
                 background-color: #fafbfc;
@@ -148,7 +156,7 @@ class PreventivoWindow(QMainWindow):
                 background-color: transparent;
                 color: #4a5568;
             }
-            QDoubleSpinBox, QSpinBox {
+            QDoubleSpinBox, QSpinBox, QLineEdit, QTextEdit {
                 border: 1px solid #e2e8f0;
                 border-radius: 6px;
                 padding: 10px 14px;
@@ -158,11 +166,11 @@ class PreventivoWindow(QMainWindow):
                 min-height: 18px;
                 font-family: system-ui, -apple-system, sans-serif;
             }
-            QDoubleSpinBox:focus, QSpinBox:focus {
+            QDoubleSpinBox:focus, QSpinBox:focus, QLineEdit:focus, QTextEdit:focus {
                 border-color: #718096;
                 outline: none;
             }
-            QDoubleSpinBox:hover, QSpinBox:hover {
+            QDoubleSpinBox:hover, QSpinBox:hover, QLineEdit:hover, QTextEdit:hover {
                 border-color: #a0aec0;
             }
             QPushButton {
@@ -187,6 +195,9 @@ class PreventivoWindow(QMainWindow):
         # Header
         self.create_header(main_layout)
         
+        # NUOVO: Sezione informazioni cliente
+        self.create_client_info_section(main_layout)
+        
         # Contenuto principale - layout responsive a tre colonne
         content_layout = QHBoxLayout()
         content_layout.setSpacing(30)
@@ -200,12 +211,69 @@ class PreventivoWindow(QMainWindow):
         # Footer
         self.create_footer(main_layout)
         
-        # NUOVO: Disabilita campi se in modalità visualizzazione
+        # IMPORTANTE: Carica i valori nei campi SOLO DOPO che tutti i controlli sono stati creati
+        if self.preventivo_id:
+            from PyQt5.QtCore import QTimer
+            QTimer.singleShot(100, self.carica_valori_con_delay)  # 100ms delay
+            
+        # DOPO il caricamento, disabilita solo se necessario
         if self.modalita == 'visualizza':
-            self.disabilita_modifiche()
+            QTimer.singleShot(150, self.disabilita_solo_controlli)  # Dopo il caricamento
     
-    def disabilita_modifiche(self):
-        """NUOVO: Disabilita tutti i campi di input in modalità visualizzazione"""
+    def create_client_info_section(self, parent_layout):
+        """NUOVO: Sezione informazioni cliente"""
+        client_group = QGroupBox("Informazioni Cliente")
+        client_group.setGraphicsEffect(self.create_shadow_effect())
+        
+        client_layout = QFormLayout(client_group)
+        client_layout.setContentsMargins(25, 28, 25, 25)
+        client_layout.setVerticalSpacing(16)
+        client_layout.setHorizontalSpacing(16)
+        
+        # Campi cliente in layout a griglia per sfruttare lo spazio
+        client_grid_widget = QWidget()
+        client_grid = QGridLayout(client_grid_widget)
+        client_grid.setSpacing(16)
+        
+        # Prima riga: Nome Cliente e Numero Ordine
+        client_grid.addWidget(self.create_standard_label("Nome Cliente:"), 0, 0)
+        self.edit_nome_cliente = QLineEdit()
+        client_grid.addWidget(self.edit_nome_cliente, 0, 1)
+        
+        client_grid.addWidget(self.create_standard_label("Numero Ordine:"), 0, 2)
+        self.edit_numero_ordine = QLineEdit()
+        client_grid.addWidget(self.edit_numero_ordine, 0, 3)
+        
+        # Seconda riga: Codice
+        client_grid.addWidget(self.create_standard_label("Codice:"), 1, 0)
+        self.edit_codice = QLineEdit()
+        client_grid.addWidget(self.edit_codice, 1, 1)
+        
+        # Terza riga: Descrizione (LineEdit semplice con limite caratteri)
+        client_grid.addWidget(self.create_standard_label("Descrizione:"), 2, 0)
+        self.edit_descrizione = QLineEdit()
+        self.edit_descrizione.setMaxLength(100)  # Limite a 100 caratteri
+        client_grid.addWidget(self.edit_descrizione, 2, 1, 1, 3)  # Span su 3 colonne
+        
+        client_layout.addRow(client_grid_widget)
+        
+        # Carica i dati se esistenti
+        if hasattr(self, 'nome_cliente_data'):
+            self.edit_nome_cliente.setText(self.nome_cliente_data)
+            self.edit_numero_ordine.setText(self.numero_ordine_data)
+            self.edit_descrizione.setText(self.descrizione_data)
+            self.edit_codice.setText(self.codice_data)
+        
+        parent_layout.addWidget(client_group)
+    
+    def disabilita_solo_controlli(self):
+        """Disabilita solo i controlli senza ricaricare i valori (per modalità visualizzazione)"""
+        # Disabilita i campi cliente
+        self.edit_nome_cliente.setEnabled(False)
+        self.edit_numero_ordine.setEnabled(False)
+        self.edit_descrizione.setEnabled(False)
+        self.edit_codice.setEnabled(False)
+        
         # Disabilita tutti i SpinBox
         self.edit_minuti_taglio.setEnabled(False)
         self.edit_minuti_avvolgimento.setEnabled(False)
@@ -216,19 +284,8 @@ class PreventivoWindow(QMainWindow):
         self.edit_prezzo_cliente.setEnabled(False)
         
         # Disabilita pulsanti di modifica
-        self.btn_aggiungi_materiale.setEnabled(False)
-        
-        # Aggiorna i valori dai dati caricati
-        self.edit_costi_accessori.setValue(self.preventivo.costi_accessori)
-        self.edit_minuti_taglio.setValue(self.preventivo.minuti_taglio)
-        self.edit_minuti_avvolgimento.setValue(self.preventivo.minuti_avvolgimento)
-        self.edit_minuti_pulizia.setValue(self.preventivo.minuti_pulizia)
-        self.edit_minuti_rettifica.setValue(self.preventivo.minuti_rettifica)
-        self.edit_minuti_imballaggio.setValue(self.preventivo.minuti_imballaggio)
-        self.edit_prezzo_cliente.setValue(self.preventivo.prezzo_cliente)
-        
-        # Aggiorna le informazioni sui materiali
-        self.aggiorna_materiali_info()
+        if hasattr(self, 'btn_aggiungi_materiale'):
+            self.btn_aggiungi_materiale.setEnabled(False)
     
     def create_shadow_effect(self, blur=10, opacity=12):
         """Effetto ombra standardizzato"""
@@ -244,6 +301,8 @@ class PreventivoWindow(QMainWindow):
             title_text = f"Visualizzazione Preventivo #{self.preventivo_id:03d}"
         elif self.modalita == 'revisione':
             title_text = f"Revisione Preventivo #{self.preventivo_originale_id:03d}"
+        elif self.modalita == 'modifica':
+            title_text = f"Modifica Preventivo #{self.preventivo_id:03d}"
         else:
             title_text = "Calcolo Preventivo"
             
@@ -259,9 +318,8 @@ class PreventivoWindow(QMainWindow):
         parent_layout.addWidget(title_label)
     
     def create_left_column(self, parent_layout):
-        """Colonna materiali - stile unificato e responsive (IDENTICA ALL'ORIGINALE)"""
+        """Colonna materiali - stile unificato e responsive"""
         column_widget = QWidget()
-        # MODIFICA: Colonna espandibile per sfruttare lo spazio disponibile
         column_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
         layout = QVBoxLayout(column_widget)
@@ -287,9 +345,8 @@ class PreventivoWindow(QMainWindow):
         parent_layout.addWidget(column_widget)
     
     def create_middle_column(self, parent_layout):
-        """Colonna tempi - stile unificato e responsive (IDENTICA ALL'ORIGINALE)"""
+        """Colonna tempi - stile unificato e responsive"""
         column_widget = QWidget()
-        # MODIFICA: Colonna espandibile per sfruttare lo spazio disponibile
         column_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
         layout = QVBoxLayout(column_widget)
@@ -315,9 +372,8 @@ class PreventivoWindow(QMainWindow):
         parent_layout.addWidget(column_widget)
     
     def create_right_column(self, parent_layout):
-        """Colonna costi e totali - stile unificato e responsive (IDENTICA ALL'ORIGINALE)"""
+        """Colonna costi e totali - stile unificato e responsive"""
         column_widget = QWidget()
-        # MODIFICA: Colonna espandibile per sfruttare lo spazio disponibile
         column_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
         layout = QVBoxLayout(column_widget)
@@ -351,7 +407,7 @@ class PreventivoWindow(QMainWindow):
         parent_layout.addWidget(column_widget)
     
     def create_cost_info_card(self, parent_layout):
-        """Card info costo materiali (IDENTICA ALL'ORIGINALE)"""
+        """Card info costo materiali"""
         container = QFrame()
         container.setStyleSheet("""
             QFrame {
@@ -407,7 +463,6 @@ class PreventivoWindow(QMainWindow):
         buttons_layout = QVBoxLayout()
         buttons_layout.setSpacing(12)
         
-        # MODIFICA: Pulsanti diversi per modalità visualizzazione
         if self.modalita != 'visualizza':
             # Aggiungi materiale
             self.btn_aggiungi_materiale = QPushButton("Aggiungi Materiale")
@@ -466,7 +521,7 @@ class PreventivoWindow(QMainWindow):
         parent_layout.addLayout(buttons_layout)
     
     def create_time_form(self, parent_layout):
-        """Form tempi standardizzato (IDENTICO ALL'ORIGINALE)"""
+        """Form tempi standardizzato"""
         # Layout a griglia per i tempi
         grid_layout = QGridLayout()
         grid_layout.setSpacing(12)
@@ -494,7 +549,7 @@ class PreventivoWindow(QMainWindow):
         parent_layout.addLayout(grid_layout)
     
     def create_total_time_card(self, parent_layout):
-        """Card totale mano d'opera (IDENTICA ALL'ORIGINALE)"""
+        """Card totale mano d'opera"""
         container = QFrame()
         container.setStyleSheet("""
             QFrame {
@@ -535,7 +590,7 @@ class PreventivoWindow(QMainWindow):
         parent_layout.addWidget(container)
     
     def create_accessory_costs_form(self, parent_layout):
-        """Form costi accessori (IDENTICO ALL'ORIGINALE)"""
+        """Form costi accessori"""
         form_layout = QFormLayout()
         form_layout.setVerticalSpacing(16)
         form_layout.setHorizontalSpacing(16)
@@ -546,7 +601,7 @@ class PreventivoWindow(QMainWindow):
         parent_layout.addLayout(form_layout)
     
     def create_totals_summary(self, parent_layout):
-        """Riepilogo totali (IDENTICO ALL'ORIGINALE)"""
+        """Riepilogo totali"""
         # Totali intermedi
         self.create_summary_row("Subtotale:", "lbl_subtotale", "€ 0,00", parent_layout)
         self.create_summary_row("Maggiorazione 25%:", "lbl_maggiorazione_25", "€ 0,00", parent_layout)
@@ -602,7 +657,7 @@ class PreventivoWindow(QMainWindow):
         parent_layout.addLayout(client_form)
     
     def create_summary_row(self, title, attr_name, default_value, parent_layout):
-        """Riga riepilogo standardizzata (IDENTICA ALL'ORIGINALE)"""
+        """Riga riepilogo standardizzata"""
         container = QFrame()
         container.setStyleSheet("""
             QFrame {
@@ -643,7 +698,7 @@ class PreventivoWindow(QMainWindow):
         parent_layout.addWidget(container)
     
     def create_standard_spinbox(self, suffix="€"):
-        """SpinBox standardizzato (IDENTICO ALL'ORIGINALE)"""
+        """SpinBox standardizzato"""
         spinbox = QDoubleSpinBox()
         spinbox.setMaximum(999999.99)
         spinbox.setDecimals(2)
@@ -654,7 +709,7 @@ class PreventivoWindow(QMainWindow):
         return spinbox
     
     def create_standard_label(self, text):
-        """Label standardizzata (IDENTICA ALL'ORIGINALE)"""
+        """Label standardizzata"""
         label = QLabel(text)
         label.setStyleSheet("""
             QLabel {
@@ -670,7 +725,6 @@ class PreventivoWindow(QMainWindow):
         footer_layout = QHBoxLayout()
         footer_layout.addStretch()
         
-        # NUOVO: Pulsanti diversi per modalità
         if self.modalita == 'visualizza':
             # Solo pulsante Chiudi
             btn_chiudi = QPushButton("Chiudi")
@@ -679,7 +733,8 @@ class PreventivoWindow(QMainWindow):
                     background-color: #f7fafc;
                     color: #4a5568;
                     border: 1px solid #e2e8f0;
-                    min-height: 40px;
+                    min-height: 32px;
+                    max-width: 120px;
                 }
                 QPushButton:hover {
                     background-color: #edf2f7;
@@ -695,7 +750,8 @@ class PreventivoWindow(QMainWindow):
                     background-color: #f7fafc;
                     color: #4a5568;
                     border: 1px solid #e2e8f0;
-                    min-height: 40px;
+                    min-height: 32px;
+                    max-width: 120px;
                 }
                 QPushButton:hover {
                     background-color: #edf2f7;
@@ -703,7 +759,7 @@ class PreventivoWindow(QMainWindow):
             """)
             self.btn_annulla.clicked.connect(self.close)
             
-            # NUOVO: Salva/Salva Revisione
+            # Salva/Salva Revisione
             if self.modalita == 'revisione':
                 btn_text = "Salva Revisione"
                 btn_method = self.salva_revisione
@@ -716,8 +772,8 @@ class PreventivoWindow(QMainWindow):
                 QPushButton {
                     background-color: #4a5568;
                     color: #ffffff;
-                    min-height: 40px;
-                    min-width: 160px;
+                    min-height: 32px;
+                    max-width: 160px;
                 }
                 QPushButton:hover {
                     background-color: #2d3748;
@@ -731,10 +787,153 @@ class PreventivoWindow(QMainWindow):
         
         parent_layout.addLayout(footer_layout)
     
-    # =================== METODI FUNZIONALI (ORIGINALI + REVISIONI) ===================
+    # =================== METODI FUNZIONALI ===================
+    
+    def get_dati_cliente(self):
+        """Raccoglie i dati cliente dai campi"""
+        return {
+            'nome_cliente': self.edit_nome_cliente.text().strip(),
+            'numero_ordine': self.edit_numero_ordine.text().strip(),
+            'descrizione': self.edit_descrizione.text().strip(),
+            'codice': self.edit_codice.text().strip()
+        }
+    
+    def carica_valori_con_delay(self):
+        """Carica i valori con delay per assicurarsi che l'interfaccia sia pronta"""
+        # Forza elaborazione eventi
+        QApplication.processEvents()
+        
+        # Carica dati cliente
+        if hasattr(self, 'nome_cliente_data'):
+            self.edit_nome_cliente.setText(self.nome_cliente_data or "")
+            self.edit_numero_ordine.setText(self.numero_ordine_data or "")
+            self.edit_descrizione.setText(self.descrizione_data or "")
+            self.edit_codice.setText(self.codice_data or "")
+        
+        # Imposta valori mano d'opera
+        try:
+            # Blocca segnali
+            self.edit_minuti_taglio.blockSignals(True)
+            self.edit_minuti_avvolgimento.blockSignals(True)
+            self.edit_minuti_pulizia.blockSignals(True)
+            self.edit_minuti_rettifica.blockSignals(True)
+            self.edit_minuti_imballaggio.blockSignals(True)
+            self.edit_costi_accessori.blockSignals(True)
+            self.edit_prezzo_cliente.blockSignals(True)
+            
+            # Imposta valori
+            self.edit_minuti_taglio.setValue(float(self.preventivo.minuti_taglio or 0))
+            self.edit_minuti_avvolgimento.setValue(float(self.preventivo.minuti_avvolgimento or 0))
+            self.edit_minuti_pulizia.setValue(float(self.preventivo.minuti_pulizia or 0))
+            self.edit_minuti_rettifica.setValue(float(self.preventivo.minuti_rettifica or 0))
+            self.edit_minuti_imballaggio.setValue(float(self.preventivo.minuti_imballaggio or 0))
+            self.edit_costi_accessori.setValue(float(self.preventivo.costi_accessori or 0))
+            self.edit_prezzo_cliente.setValue(float(self.preventivo.prezzo_cliente or 0))
+            
+            # Sblocca segnali
+            self.edit_minuti_taglio.blockSignals(False)
+            self.edit_minuti_avvolgimento.blockSignals(False)
+            self.edit_minuti_pulizia.blockSignals(False)
+            self.edit_minuti_rettifica.blockSignals(False)
+            self.edit_minuti_imballaggio.blockSignals(False)
+            self.edit_costi_accessori.blockSignals(False)
+            self.edit_prezzo_cliente.blockSignals(False)
+            
+            # Aggiorna interfaccia
+            self.aggiorna_materiali_info()
+            self.aggiorna_totali()
+            
+        except Exception as e:
+            QMessageBox.error(self, "Errore", f"Errore nel caricamento valori: {str(e)}")
+    
+    def salva_preventivo(self):
+        """Salva preventivo"""
+        if not self.preventivo.materiali_calcolati:
+            QMessageBox.warning(self, "Attenzione", 
+                              "Aggiungi almeno un materiale prima di salvare il preventivo.")
+            return
+        
+        # Aggiorna valori dall'interfaccia
+        self.preventivo.prezzo_cliente = self.edit_prezzo_cliente.value()
+        self.preventivo.costi_accessori = self.edit_costi_accessori.value()
+        self.preventivo.minuti_taglio = self.edit_minuti_taglio.value()
+        self.preventivo.minuti_avvolgimento = self.edit_minuti_avvolgimento.value()
+        self.preventivo.minuti_pulizia = self.edit_minuti_pulizia.value()
+        self.preventivo.minuti_rettifica = self.edit_minuti_rettifica.value()
+        self.preventivo.minuti_imballaggio = self.edit_minuti_imballaggio.value()
+        
+        # Ricalcola totali
+        self.preventivo.ricalcola_tutto()
+        
+        try:
+            # Unisci dati preventivo con dati cliente
+            preventivo_data = self.preventivo.to_dict()
+            preventivo_data.update(self.get_dati_cliente())
+            
+            # Se modifica preventivo esistente
+            if hasattr(self, 'preventivo_id') and self.preventivo_id and self.modalita == 'modifica':
+                success = self.db_manager.update_preventivo(self.preventivo_id, preventivo_data)
+                if success:
+                    QMessageBox.information(self, "Successo!", 
+                                          f"Preventivo #{self.preventivo_id:03d} modificato con successo!")
+                    self.operazione_completata = True
+                    self.preventivo_salvato.emit()
+                    self.close()
+                else:
+                    QMessageBox.error(self, "Errore", "Errore durante la modifica del preventivo.")
+            else:
+                # Crea nuovo preventivo
+                preventivo_id = self.db_manager.save_preventivo(preventivo_data)
+                QMessageBox.information(self, "Successo!", 
+                                      f"Preventivo salvato con successo\n\nID: #{preventivo_id:03d}")
+                self.operazione_completata = True
+                self.preventivo_salvato.emit()
+                self.close()
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
+    
+    def salva_revisione(self):
+        """Salva revisione"""
+        if not self.preventivo.materiali_calcolati:
+            QMessageBox.warning(self, "Attenzione", "Aggiungi almeno un materiale prima di salvare.")
+            return
+        
+        # Aggiorna valori dall'interfaccia
+        self.preventivo.prezzo_cliente = self.edit_prezzo_cliente.value()
+        self.preventivo.costi_accessori = self.edit_costi_accessori.value()
+        self.preventivo.minuti_taglio = self.edit_minuti_taglio.value()
+        self.preventivo.minuti_avvolgimento = self.edit_minuti_avvolgimento.value()
+        self.preventivo.minuti_pulizia = self.edit_minuti_pulizia.value()
+        self.preventivo.minuti_rettifica = self.edit_minuti_rettifica.value()
+        self.preventivo.minuti_imballaggio = self.edit_minuti_imballaggio.value()
+        
+        # Ricalcola totali
+        self.preventivo.ricalcola_tutto()
+        
+        try:
+            # Unisci dati preventivo con dati cliente
+            preventivo_data = self.preventivo.to_dict()
+            preventivo_data.update(self.get_dati_cliente())
+            
+            revisione_id = self.db_manager.add_revisione_preventivo(
+                self.preventivo_originale_id,
+                preventivo_data,
+                self.note_revisione
+            )
+            if revisione_id:
+                QMessageBox.information(self, "Revisione Salvata", 
+                                      f"Revisione salvata con successo!\nID: #{revisione_id:03d}")
+                self.operazione_completata = True
+                self.preventivo_salvato.emit()
+                self.close()
+            else:
+                QMessageBox.error(self, "Errore", "Errore durante il salvataggio della revisione.")
+        except Exception as e:
+            QMessageBox.error(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
     
     def aggiungi_materiale(self):
-        """Metodo originale IDENTICO"""
+        """Aggiungi nuovo materiale"""
         if len(self.preventivo.materiali_calcolati) >= 10:
             QMessageBox.warning(self, "Limite Raggiunto", 
                               "Hai raggiunto il limite massimo di 10 materiali.")
@@ -755,15 +954,10 @@ class PreventivoWindow(QMainWindow):
         self.materiale_windows.append(materiale_window)
     
     def materiale_aggiunto(self, materiale_calcolato, indice=None):
-        """Metodo originale IDENTICO"""
-        print(f"DEBUG: materiale_aggiunto chiamato con indice={indice}")
-        
+        """Gestisce aggiunta/modifica materiale"""
         if indice is not None:
-            print(f"DEBUG: Modificando materiale esistente all'indice {indice}")
-            print(f"DEBUG: Nuovo costo materiale: €{materiale_calcolato.maggiorazione:.2f}")
             self.materiale_modificato(materiale_calcolato, indice)
         else:
-            print(f"DEBUG: Aggiungendo nuovo materiale")
             if self.preventivo.aggiungi_materiale(materiale_calcolato):
                 self.aggiorna_materiali_info()
                 self.aggiorna_totali()
@@ -771,7 +965,7 @@ class PreventivoWindow(QMainWindow):
                 QMessageBox.error(self, "Errore", "Impossibile aggiungere il materiale.")
     
     def visualizza_materiali(self):
-        """Metodo originale ADATTATO per modalità visualizzazione"""
+        """Visualizza lista materiali"""
         if not self.preventivo.materiali_calcolati:
             QMessageBox.information(self, "Info", "Nessun materiale inserito.")
             return
@@ -779,59 +973,18 @@ class PreventivoWindow(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("Materiali Inseriti")
         dialog.setGeometry(300, 300, 700, 550)
-        dialog.setStyleSheet("""
-            QDialog {
-                background-color: #fafbfc;
-            }
-            QListWidget {
-                background-color: #ffffff;
-                border: 1px solid #e2e8f0;
-                border-radius: 8px;
-                font-size: 14px;
-                padding: 12px;
-            }
-            QListWidget::item {
-                border-radius: 6px;
-                padding: 12px;
-                margin: 2px;
-                border-bottom: 1px solid #f7fafc;
-            }
-            QListWidget::item:hover {
-                background-color: #f7fafc;
-            }
-            QListWidget::item:selected {
-                background-color: #edf2f7;
-                color: #2d3748;
-            }
-        """)
         
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(25, 25, 25, 25)
         layout.setSpacing(20)
         
         title_label = QLabel("Materiali Inseriti")
-        title_label.setStyleSheet("""
-            QLabel {
-                font-size: 20px;
-                font-weight: 700;
-                color: #2d3748;
-            }
-        """)
+        title_label.setStyleSheet("font-size: 20px; font-weight: 700; color: #2d3748;")
         layout.addWidget(title_label)
         
-        # MODIFICA: Testo diverso per modalità visualizzazione
-        if self.modalita == 'visualizza':
-            info_text = "Dettagli dei materiali utilizzati nel preventivo"
-        else:
-            info_text = "Seleziona un materiale per modificarlo o eliminarlo"
-            
+        info_text = "Dettagli dei materiali utilizzati nel preventivo" if self.modalita == 'visualizza' else "Seleziona un materiale per modificarlo o eliminarlo"
         info_label = QLabel(info_text)
-        info_label.setStyleSheet("""
-            QLabel {
-                font-size: 14px;
-                color: #718096;
-            }
-        """)
+        info_label.setStyleSheet("font-size: 14px; color: #718096;")
         layout.addWidget(info_label)
         
         lista_materiali = QListWidget()
@@ -845,57 +998,24 @@ class PreventivoWindow(QMainWindow):
             item.setData(Qt.UserRole, i)
             lista_materiali.addItem(item)
         
-        # MODIFICA: Disabilita doppio clic se in modalità visualizzazione
         if self.modalita != 'visualizza':
             lista_materiali.itemDoubleClicked.connect(lambda item: self.modifica_materiale_selezionato(dialog, lista_materiali))
         layout.addWidget(lista_materiali)
         
+        # Pulsanti
         buttons_layout = QHBoxLayout()
-        buttons_layout.setSpacing(12)
         
-        # MODIFICA: Pulsanti solo se non in modalità visualizzazione
         if self.modalita != 'visualizza':
             btn_modifica = QPushButton("Modifica")
-            btn_modifica.setStyleSheet("""
-                QPushButton {
-                    background-color: #4a5568;
-                    color: #ffffff;
-                    min-height: 36px;
-                }
-                QPushButton:hover {
-                    background-color: #2d3748;
-                }
-            """)
             btn_modifica.clicked.connect(lambda: self.modifica_materiale_selezionato(dialog, lista_materiali))
             
             btn_elimina = QPushButton("Elimina")
-            btn_elimina.setStyleSheet("""
-                QPushButton {
-                    background-color: #e53e3e;
-                    color: #ffffff;
-                    min-height: 36px;
-                }
-                QPushButton:hover {
-                    background-color: #c53030;
-                }
-            """)
             btn_elimina.clicked.connect(lambda: self.elimina_materiale_selezionato(dialog, lista_materiali))
             
             buttons_layout.addWidget(btn_modifica)
             buttons_layout.addWidget(btn_elimina)
         
         btn_chiudi = QPushButton("Chiudi")
-        btn_chiudi.setStyleSheet("""
-            QPushButton {
-                background-color: #f7fafc;
-                color: #4a5568;
-                border: 1px solid #e2e8f0;
-                min-height: 36px;
-            }
-            QPushButton:hover {
-                background-color: #edf2f7;
-            }
-        """)
         btn_chiudi.clicked.connect(dialog.accept)
         
         buttons_layout.addStretch()
@@ -905,7 +1025,7 @@ class PreventivoWindow(QMainWindow):
         dialog.exec_()
     
     def modifica_materiale_selezionato(self, dialog, lista_materiali):
-        """Metodo originale IDENTICO"""
+        """Modifica materiale selezionato"""
         current_item = lista_materiali.currentItem()
         if not current_item:
             QMessageBox.warning(self, "Attenzione", "Seleziona un materiale da modificare.")
@@ -917,7 +1037,7 @@ class PreventivoWindow(QMainWindow):
         self.apri_finestra_modifica_materiale(indice, materiale_da_modificare)
     
     def elimina_materiale_selezionato(self, dialog, lista_materiali):
-        """Metodo originale IDENTICO"""
+        """Elimina materiale selezionato"""
         current_item = lista_materiali.currentItem()
         if not current_item:
             QMessageBox.warning(self, "Attenzione", "Seleziona un materiale da eliminare.")
@@ -941,7 +1061,7 @@ class PreventivoWindow(QMainWindow):
                 dialog.accept()
     
     def apri_finestra_modifica_materiale(self, indice, materiale_esistente):
-        """Metodo originale IDENTICO"""
+        """Apri finestra modifica materiale"""
         diametro_iniziale = 0.0
         if indice > 0:
             materiale_precedente = self.preventivo.materiali_calcolati[indice - 1]
@@ -959,21 +1079,16 @@ class PreventivoWindow(QMainWindow):
         self.materiale_windows.append(materiale_window)
     
     def materiale_modificato(self, materiale_calcolato, indice):
-        """Metodo originale IDENTICO"""
+        """Gestisce modifica materiale"""
         self.preventivo.materiali_calcolati[indice] = materiale_calcolato
         self.ricalcola_diametri_successivi(indice)
-        
-        # IMPORTANTE: Forza il ricalcolo del costo totale materiali
         self.preventivo.ricalcola_costo_totale_materiali()
-        
         self.aggiorna_materiali_info()
         self.aggiorna_totali()
-        
-        # Forza un refresh immediato dell'interfaccia
         self.repaint()
     
     def ricalcola_diametri_successivi(self, indice_modificato):
-        """Metodo originale IDENTICO"""
+        """Ricalcola diametri successivi"""
         for i in range(indice_modificato + 1, len(self.preventivo.materiali_calcolati)):
             materiale_precedente = self.preventivo.materiali_calcolati[i - 1]
             materiale_corrente = self.preventivo.materiali_calcolati[i]
@@ -981,7 +1096,7 @@ class PreventivoWindow(QMainWindow):
             materiale_corrente.ricalcola_tutto()
     
     def aggiorna_materiali_info(self):
-        """Metodo originale IDENTICO"""
+        """Aggiorna informazioni materiali"""
         num_materiali = len(self.preventivo.materiali_calcolati)
         
         if num_materiali == 0:
@@ -989,23 +1104,17 @@ class PreventivoWindow(QMainWindow):
         else:
             self.lbl_num_materiali.setText(f"{num_materiali}/10 materiali inseriti")
         
-        # MODIFICA: Gestione pulsanti per modalità
+        # Gestione pulsanti
         if hasattr(self, 'btn_aggiungi_materiale'):
             self.btn_aggiungi_materiale.setEnabled(num_materiali < 10 and self.modalita != 'visualizza')
         if hasattr(self, 'btn_visualizza_materiali'):
             self.btn_visualizza_materiali.setEnabled(num_materiali > 0)
         
         costo_totale = self.preventivo.costo_totale_materiali
-        print(f"DEBUG aggiorna_materiali_info: Costo totale calcolato: €{costo_totale:.2f}")
-        
-        # Debug: mostra i costi individuali
-        for i, mat in enumerate(self.preventivo.materiali_calcolati):
-            print(f"  Materiale {i+1}: {mat.materiale_nome} = €{mat.maggiorazione:.2f}")
-        
         self.lbl_costo_totale_materiali.setText(f"€ {costo_totale:,.2f}")
     
     def aggiorna_totali(self):
-        """Metodo originale IDENTICO"""
+        """Aggiorna totali preventivo"""
         self.preventivo.costi_accessori = self.edit_costi_accessori.value()
         self.preventivo.minuti_taglio = self.edit_minuti_taglio.value()
         self.preventivo.minuti_avvolgimento = self.edit_minuti_avvolgimento.value()
@@ -1015,115 +1124,66 @@ class PreventivoWindow(QMainWindow):
         
         self.preventivo.ricalcola_tutto()
         
-        # Formatazione con separatori migliaia
+        # Aggiorna interfaccia
         self.lbl_tot_mano_opera.setText(f"{self.preventivo.tot_mano_opera:.2f} min")
         self.lbl_subtotale.setText(f"€ {self.preventivo.subtotale:,.2f}")
         self.lbl_maggiorazione_25.setText(f"€ {self.preventivo.maggiorazione_25:,.2f}")
         self.lbl_preventivo_finale.setText(f"€ {self.preventivo.preventivo_finale:,.2f}")
         
-        # MODIFICA: Solo se non in modalità visualizzazione
+        # Aggiorna prezzo cliente se vuoto
         if self.modalita != 'visualizza' and self.edit_prezzo_cliente.value() == 0:
             self.edit_prezzo_cliente.setValue(self.preventivo.preventivo_finale)
     
     def aggiorna_prezzi_materiali(self):
-        """NUOVO: Aggiorna i prezzi dei materiali già inseriti nel preventivo"""
-        materiali_aggiornati = False
+        """Aggiorna prezzi materiali dal database"""
         materiali_modificati = []
         
         for materiale_calcolato in self.preventivo.materiali_calcolati:
-            # Recupera il prezzo aggiornato dal database
             materiale_db = self.db_manager.get_materiale_by_nome(materiale_calcolato.materiale_nome)
             if materiale_db:
-                # materiale_db = (id, nome, spessore, prezzo)
                 nuovo_prezzo = materiale_db[3]
-                prezzo_precedente = materiale_calcolato.prezzo if hasattr(materiale_calcolato, 'prezzo') else materiale_calcolato.costo_materiale
+                prezzo_precedente = materiale_calcolato.costo_materiale
                 
-                # Debug: stampa i prezzi per verificare
-                print(f"Materiale {materiale_calcolato.materiale_nome}: Prezzo precedente: {prezzo_precedente}, Nuovo prezzo: {nuovo_prezzo}")
-                
-                # Aggiorna sempre il prezzo e ricalcola
                 materiale_calcolato.costo_materiale = nuovo_prezzo
-                if hasattr(materiale_calcolato, 'prezzo'):
-                    materiale_calcolato.prezzo = nuovo_prezzo
                 materiale_calcolato.ricalcola_tutto()
                 
-                if abs(prezzo_precedente - nuovo_prezzo) > 0.01:  # Controllo con tolleranza
+                if abs(prezzo_precedente - nuovo_prezzo) > 0.01:
                     materiali_modificati.append(f"{materiale_calcolato.materiale_nome}: €{prezzo_precedente:.2f} → €{nuovo_prezzo:.2f}")
-                    materiali_aggiornati = True
         
-        # Forza sempre l'aggiornamento dei totali
+        # Aggiorna totali
         self.preventivo.ricalcola_costo_totale_materiali()
         self.aggiorna_materiali_info()
         self.aggiorna_totali()
         
-        # Mostra messaggio solo se ci sono stati cambiamenti effettivi
-        if materiali_aggiornati and materiali_modificati:
+        # Mostra messaggio se ci sono stati aggiornamenti
+        if materiali_modificati:
             messaggio = "Prezzi aggiornati:\n\n" + "\n".join(materiali_modificati)
             QMessageBox.information(self, "Prezzi Aggiornati", messaggio)
     
-    def salva_preventivo(self):
-        """Metodo originale IDENTICO"""
-        if not self.preventivo.materiali_calcolati:
-            QMessageBox.warning(self, "Attenzione", 
-                              "Aggiungi almeno un materiale prima di salvare il preventivo.")
-            return
-        
-        self.preventivo.prezzo_cliente = self.edit_prezzo_cliente.value()
-        
-        try:
-            preventivo_id = self.db_manager.save_preventivo(self.preventivo.to_dict())
-            
-            QMessageBox.information(self, "Successo!", 
-                                  f"Preventivo salvato con successo\n\nID: {preventivo_id}")
-            
-            self.preventivo_salvato.emit()
-            self.close()
-            
-        except Exception as e:
-            QMessageBox.critical(self, "Errore", 
-                               f"Errore durante il salvataggio:\n{str(e)}")
-    
-    def salva_revisione(self):
-        """NUOVO: Salva una revisione del preventivo esistente"""
-        if not self.preventivo.materiali_calcolati:
-            QMessageBox.warning(self, "Attenzione", 
-                              "Aggiungi almeno un materiale prima di salvare.")
-            return
-        
-        # Aggiorna il prezzo cliente
-        self.preventivo.prezzo_cliente = self.edit_prezzo_cliente.value()
-        
-        try:
-            revisione_id = self.db_manager.add_revisione_preventivo(
-                self.preventivo_originale_id,
-                self.preventivo.to_dict(),
-                self.note_revisione
-            )
-            if revisione_id:
-                QMessageBox.information(self, "Revisione Salvata", 
-                                      f"Revisione salvata con successo!\nID: #{revisione_id:03d}")
-                self.preventivo_salvato.emit()
-                self.close()
-            else:
-                QMessageBox.error(self, "Errore", "Errore durante il salvataggio della revisione.")
-        except Exception as e:
-            QMessageBox.error(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
-    
     def closeEvent(self, event):
-        """Gestisce la chiusura della finestra - AGGIORNATO con controllo modalità"""
+        """Gestisce chiusura finestra"""
         for window in self.materiale_windows:
             if window.isVisible():
                 window.close()
         
-        # NUOVO: Controllo modifiche non salvate solo se non in modalità visualizzazione
-        if self.modalita != 'visualizza':
+        # Non mostrare popup se operazione completata o in modalità visualizzazione
+        if self.operazione_completata or self.modalita == 'visualizza':
+            event.accept()
+            return
+        
+        # Controllo modifiche non salvate
+        if self.modalita in ['nuovo', 'modifica', 'revisione']:
+            dati_cliente = self.get_dati_cliente()
+            dati_modificati = any(dati_cliente.values())
+            
             if (self.preventivo.materiali_calcolati or 
                 self.edit_costi_accessori.value() > 0 or
                 self.edit_minuti_taglio.value() > 0 or
                 self.edit_minuti_avvolgimento.value() > 0 or
                 self.edit_minuti_pulizia.value() > 0 or
                 self.edit_minuti_rettifica.value() > 0 or
-                self.edit_minuti_imballaggio.value() > 0):
+                self.edit_minuti_imballaggio.value() > 0 or
+                dati_modificati):
                 
                 risposta = QMessageBox.question(self, "Conferma Chiusura",
                                               "Ci sono dati non salvati. Vuoi chiudere comunque?",
@@ -1133,5 +1193,3 @@ class PreventivoWindow(QMainWindow):
                     return
         
         event.accept()
-        
-    

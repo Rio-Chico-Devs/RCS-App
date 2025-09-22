@@ -3,7 +3,7 @@ MaterialeWindow - Interfaccia di calcolo materiali per preventivi
 
 Version: 2.1.1
 Last Updated: 9/19/2025
-Author: Antonio VB
+Author: Antonio VB & Cla.ass
 
 CHANGELOG:
 v2.1.1 (9/19/2025):

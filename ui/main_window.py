@@ -1,26 +1,27 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
-MainWindow - Interfaccia principale con design system unificato
+© 2025 RCS - Software Proprietario
+MainWindow - Interfaccia principale con gestione completa preventivi e revisioni
+Uso riservato esclusivamente a RCS
 
-Version: 2.0.0
-Last Updated: 2024-12-19
-Author: Sviluppatore PyQt5
+Version: 2.2.0
+Last Updated: 22/09/2025
+Author: Sviluppatore PyQt5 + Claude
 
 CHANGELOG:
-v2.0.0 (2024-12-19):
-- MAJOR: Design system unificato con PreventivoWindow e MaterialeWindow
-- CHANGED: Scala di grigi minimale (#fafbfc, #ffffff, #4a5568)
-- CHANGED: Font system-ui uniformato per tutti gli elementi
-- CHANGED: Apertura a schermo intero con showMaximized()
-- CHANGED: Layout responsive per migliore utilizzo dello spazio
-- CHANGED: Pulsanti standardizzati con stile coerente
-- ADDED: Effetti ombra e bordi arrotondati
-- ADDED: Cards moderne per sezioni principali
-- REMOVED: Colori vivaci inconsistenti, layout rigido
+v2.2.0 (22/09/2025):
+- ADDED: Toggle per visualizzare separatamente Preventivi e Revisioni
+- ADDED: Sezione dedicata per consultare le revisioni
+- FIXED: Colori pulsanti coerenti con palette generale
+- IMPROVED: Visualizzazione lista preventivi più leggibile
+- MAINTAINED: Design system originale identico
 """
 
 from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QWidget, QLabel, QListWidget, QMessageBox, QListWidgetItem,
-                             QGroupBox, QFrame, QSizePolicy, QGraphicsDropShadowEffect)
+                             QGroupBox, QFrame, QSizePolicy, QGraphicsDropShadowEffect,
+                             QDialog, QTextEdit, QFormLayout, QDialogButtonBox)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QColor
 from database.db_manager import DatabaseManager
@@ -254,7 +255,7 @@ class MainWindow(QMainWindow):
         """)
         self.btn_visualizza_preventivi.clicked.connect(self.mostra_nascondi_preventivi)
         
-        # Pulsante Gestisci Materiali - nuovo
+        # Pulsante Gestisci Materiali
         self.btn_gestisci_materiali = QPushButton("Gestisci Materiali")
         self.btn_gestisci_materiali.setMinimumHeight(50)
         self.btn_gestisci_materiali.setStyleSheet("""
@@ -282,7 +283,7 @@ class MainWindow(QMainWindow):
         parent_layout.addLayout(buttons_layout)
     
     def create_preventivi_column(self, parent_layout):
-        """Colonna preventivi salvati"""
+        """Colonna preventivi salvati CON TOGGLE PREVENTIVI/REVISIONI"""
         self.preventivi_column = QWidget()
         self.preventivi_column.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         
@@ -300,13 +301,16 @@ class MainWindow(QMainWindow):
         # Info preventivi
         self.create_preventivi_info_card(preventivi_layout)
         
+        # Toggle per visualizzare Preventivi o Revisioni
+        self.create_view_toggle(preventivi_layout)
+        
         # Lista preventivi
         self.lista_preventivi = QListWidget()
         self.lista_preventivi.setMinimumHeight(300)
         self.lista_preventivi.itemDoubleClicked.connect(self.visualizza_preventivo)
         preventivi_layout.addWidget(self.lista_preventivi)
         
-        # Pulsanti gestione preventivi
+        # Pulsanti gestione preventivi aggiornati
         self.create_preventivi_buttons(preventivi_layout)
         
         layout.addWidget(preventivi_group)
@@ -317,6 +321,7 @@ class MainWindow(QMainWindow):
         # Inizialmente nascondi la colonna preventivi
         self.preventivi_column.hide()
         self.preventivi_visibili = False
+        self.modalita_visualizzazione = 'preventivi'  # 'preventivi' o 'revisioni'
     
     def create_preventivi_info_card(self, parent_layout):
         """Card informativa preventivi"""
@@ -334,7 +339,7 @@ class MainWindow(QMainWindow):
         layout = QHBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        info_label = QLabel("Fai doppio clic su un preventivo per visualizzarne i dettagli")
+        info_label = QLabel("Seleziona un preventivo per visualizzarlo, modificarlo o crearne una revisione")
         info_label.setStyleSheet("""
             QLabel {
                 color: #2d3748;
@@ -348,10 +353,77 @@ class MainWindow(QMainWindow):
         
         parent_layout.addWidget(container)
     
+    def create_view_toggle(self, parent_layout):
+        """Toggle per cambiare visualizzazione tra Preventivi e Revisioni"""
+        toggle_container = QFrame()
+        toggle_container.setStyleSheet("""
+            QFrame {
+                background-color: #f7fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 8px;
+                margin: 2px 0px;
+            }
+        """)
+        
+        toggle_layout = QHBoxLayout(toggle_container)
+        toggle_layout.setContentsMargins(0, 0, 0, 0)
+        toggle_layout.setSpacing(8)
+        
+        # Label
+        toggle_label = QLabel("Visualizza:")
+        toggle_label.setStyleSheet("""
+            QLabel {
+                color: #4a5568;
+                font-size: 14px;
+                font-weight: 600;
+            }
+        """)
+        toggle_layout.addWidget(toggle_label)
+        
+        # Pulsante Preventivi
+        self.btn_mostra_preventivi = QPushButton("Preventivi")
+        self.btn_mostra_preventivi.setStyleSheet("""
+            QPushButton {
+                background-color: #4a5568;
+                color: #ffffff;
+                min-height: 28px;
+                min-width: 100px;
+                padding: 6px 16px;
+            }
+            QPushButton:hover {
+                background-color: #2d3748;
+            }
+        """)
+        self.btn_mostra_preventivi.clicked.connect(lambda: self.cambia_visualizzazione('preventivi'))
+        toggle_layout.addWidget(self.btn_mostra_preventivi)
+        
+        # Pulsante Revisioni
+        self.btn_mostra_revisioni = QPushButton("Revisioni")
+        self.btn_mostra_revisioni.setStyleSheet("""
+            QPushButton {
+                background-color: #f7fafc;
+                color: #4a5568;
+                border: 1px solid #e2e8f0;
+                min-height: 28px;
+                min-width: 100px;
+                padding: 6px 16px;
+            }
+            QPushButton:hover {
+                background-color: #edf2f7;
+            }
+        """)
+        self.btn_mostra_revisioni.clicked.connect(lambda: self.cambia_visualizzazione('revisioni'))
+        toggle_layout.addWidget(self.btn_mostra_revisioni)
+        
+        toggle_layout.addStretch()
+        parent_layout.addWidget(toggle_container)
+    
     def create_preventivi_buttons(self, parent_layout):
-        """Pulsanti gestione preventivi"""
-        buttons_layout = QHBoxLayout()
-        buttons_layout.setSpacing(12)
+        """Pulsanti gestione preventivi con nuove funzionalità e colori migliorati"""
+        # Prima riga di pulsanti
+        buttons_layout_1 = QHBoxLayout()
+        buttons_layout_1.setSpacing(12)
         
         # Visualizza dettagli
         self.btn_visualizza_dettagli = QPushButton("Visualizza Dettagli")
@@ -366,6 +438,43 @@ class MainWindow(QMainWindow):
             }
         """)
         self.btn_visualizza_dettagli.clicked.connect(self.visualizza_preventivo)
+        
+        # Modifica preventivo - colore più coerente con la palette
+        self.btn_modifica_preventivo = QPushButton("Modifica")
+        self.btn_modifica_preventivo.setStyleSheet("""
+            QPushButton {
+                background-color: #718096;
+                color: #ffffff;
+                min-height: 36px;
+            }
+            QPushButton:hover {
+                background-color: #4a5568;
+            }
+        """)
+        self.btn_modifica_preventivo.clicked.connect(self.modifica_preventivo)
+        
+        # Crea revisione - colore più coerente con la palette
+        self.btn_crea_revisione = QPushButton("Crea Revisione")
+        self.btn_crea_revisione.setStyleSheet("""
+            QPushButton {
+                background-color: #a0aec0;
+                color: #2d3748;
+                min-height: 36px;
+            }
+            QPushButton:hover {
+                background-color: #718096;
+                color: #ffffff;
+            }
+        """)
+        self.btn_crea_revisione.clicked.connect(self.crea_revisione)
+        
+        buttons_layout_1.addWidget(self.btn_visualizza_dettagli)
+        buttons_layout_1.addWidget(self.btn_modifica_preventivo)
+        buttons_layout_1.addWidget(self.btn_crea_revisione)
+        
+        # Seconda riga di pulsanti
+        buttons_layout_2 = QHBoxLayout()
+        buttons_layout_2.setSpacing(12)
         
         # Elimina preventivo
         self.btn_elimina_preventivo = QPushButton("Elimina")
@@ -396,12 +505,12 @@ class MainWindow(QMainWindow):
         """)
         self.btn_nascondi_preventivi.clicked.connect(self.mostra_nascondi_preventivi)
         
-        buttons_layout.addWidget(self.btn_visualizza_dettagli)
-        buttons_layout.addWidget(self.btn_elimina_preventivo)
-        buttons_layout.addStretch()
-        buttons_layout.addWidget(self.btn_nascondi_preventivi)
+        buttons_layout_2.addWidget(self.btn_elimina_preventivo)
+        buttons_layout_2.addStretch()
+        buttons_layout_2.addWidget(self.btn_nascondi_preventivi)
         
-        parent_layout.addLayout(buttons_layout)
+        parent_layout.addLayout(buttons_layout_1)
+        parent_layout.addLayout(buttons_layout_2)
     
     def create_footer(self, parent_layout):
         """Footer informativo"""
@@ -417,7 +526,7 @@ class MainWindow(QMainWindow):
         footer_layout = QHBoxLayout(footer_container)
         footer_layout.setContentsMargins(0, 0, 0, 0)
         
-        footer_label = QLabel("Software Aziendale RCS v2.0 | Sistema di calcolo preventivi e statistiche RCS")
+        footer_label = QLabel("Software Aziendale RCS v2.2 | Sistema di calcolo preventivi e gestione revisioni")
         footer_label.setStyleSheet("""
             QLabel {
                 color: #a0aec0;
@@ -431,18 +540,122 @@ class MainWindow(QMainWindow):
         
         parent_layout.addWidget(footer_container)
     
+    def cambia_visualizzazione(self, modalita):
+        """Cambia tra visualizzazione Preventivi e Revisioni"""
+        self.modalita_visualizzazione = modalita
+        
+        # Aggiorna stili pulsanti
+        if modalita == 'preventivi':
+            self.btn_mostra_preventivi.setStyleSheet("""
+                QPushButton {
+                    background-color: #4a5568;
+                    color: #ffffff;
+                    min-height: 28px;
+                    min-width: 100px;
+                    padding: 6px 16px;
+                }
+                QPushButton:hover {
+                    background-color: #2d3748;
+                }
+            """)
+            self.btn_mostra_revisioni.setStyleSheet("""
+                QPushButton {
+                    background-color: #f7fafc;
+                    color: #4a5568;
+                    border: 1px solid #e2e8f0;
+                    min-height: 28px;
+                    min-width: 100px;
+                    padding: 6px 16px;
+                }
+                QPushButton:hover {
+                    background-color: #edf2f7;
+                }
+            """)
+        else:  # revisioni
+            self.btn_mostra_revisioni.setStyleSheet("""
+                QPushButton {
+                    background-color: #4a5568;
+                    color: #ffffff;
+                    min-height: 28px;
+                    min-width: 100px;
+                    padding: 6px 16px;
+                }
+                QPushButton:hover {
+                    background-color: #2d3748;
+                }
+            """)
+            self.btn_mostra_preventivi.setStyleSheet("""
+                QPushButton {
+                    background-color: #f7fafc;
+                    color: #4a5568;
+                    border: 1px solid #e2e8f0;
+                    min-height: 28px;
+                    min-width: 100px;
+                    padding: 6px 16px;
+                }
+                QPushButton:hover {
+                    background-color: #edf2f7;
+                }
+            """)
+        
+        # Ricarica la lista con la modalità corretta
+        self.load_preventivi()
+    
     def load_preventivi(self):
-        """Carica i preventivi dal database"""
+        """Carica preventivi o revisioni in base alla modalità di visualizzazione"""
         self.lista_preventivi.clear()
-        preventivi = self.db_manager.get_all_preventivi()
+        
+        if self.modalita_visualizzazione == 'preventivi':
+            # Mostra solo preventivi originali (ultima revisione di ogni gruppo)
+            preventivi = self.db_manager.get_all_preventivi_latest()
+        else:
+            # Mostra solo le revisioni (escludendo i preventivi originali)
+            preventivi = self.db_manager.get_all_preventivi()  # Tutti i preventivi
+            # Filtra per mostrare solo le revisioni (numero_revisione > 1)
+            preventivi_filtrati = []
+            for prev in preventivi:
+                if len(prev) >= 9:
+                    numero_revisione = prev[8] if len(prev) > 8 else 1
+                    if numero_revisione > 1:
+                        preventivi_filtrati.append(prev)
+                
+            preventivi = preventivi_filtrati
         
         for preventivo in preventivi:
-            id_prev, data_creazione, preventivo_finale, prezzo_cliente = preventivo
+            # Nuovo formato: id, data_creazione, preventivo_finale, prezzo_cliente, 
+            # nome_cliente, numero_ordine, descrizione, codice, numero_revisione
+            if len(preventivo) >= 9:
+                id_prev, data_creazione, preventivo_finale, prezzo_cliente, nome_cliente, numero_ordine, descrizione, codice, numero_revisione = preventivo[:9]
+                tipo = 'R' if numero_revisione > 1 else 'O'
+            else:
+                # Fallback per compatibilità
+                id_prev, data_creazione, preventivo_finale, prezzo_cliente = preventivo[:4]
+                nome_cliente, numero_ordine, descrizione, codice, numero_revisione, tipo = "", "", "", "", 1, 'O'
+            
             # Formatta la data
             data_formattata = data_creazione.split('T')[0] if 'T' in data_creazione else data_creazione
             
-            # Crea il testo per la lista con formattazione migliorata
-            testo = f"#{id_prev:03d} • {data_formattata} • Preventivo: €{preventivo_finale:,.2f} • Cliente: €{prezzo_cliente:,.2f}"
+            # Crea il testo per la lista
+            if self.modalita_visualizzazione == 'revisioni':
+                # Per revisioni, mostra anche il numero di revisione
+                prefisso_tipo = f"REV {numero_revisione}"
+                cliente_info = nome_cliente if nome_cliente else "Cliente non specificato"
+                ordine_info = f" | {numero_ordine}" if numero_ordine else ""
+                
+                testo = f"#{id_prev:03d} [{prefisso_tipo}] • {data_formattata} • {cliente_info}{ordine_info}"
+                testo += f"\n💰 Preventivo: €{preventivo_finale:,.2f} • Cliente: €{prezzo_cliente:,.2f}"
+                if descrizione:
+                    testo += f"\n📝 {descrizione[:60]}{'...' if len(descrizione) > 60 else ''}"
+            else:
+                # Per preventivi originali, usa la visualizzazione standard
+                prefisso_tipo = "REV" if tipo == 'R' else "ORG"
+                cliente_info = nome_cliente if nome_cliente else "Cliente non specificato"
+                ordine_info = f" | {numero_ordine}" if numero_ordine else ""
+                
+                testo = f"#{id_prev:03d} [{prefisso_tipo}] • {data_formattata} • {cliente_info}{ordine_info}"
+                testo += f"\n💰 Preventivo: €{preventivo_finale:,.2f} • Cliente: €{prezzo_cliente:,.2f}"
+                if descrizione:
+                    testo += f"\n📝 {descrizione[:60]}{'...' if len(descrizione) > 60 else ''}"
             
             item = QListWidgetItem(testo)
             item.setData(Qt.UserRole, id_prev)  # Salva l'ID del preventivo
@@ -450,9 +663,99 @@ class MainWindow(QMainWindow):
     
     def apri_preventivo(self):
         """Apre la finestra per creare un nuovo preventivo"""
-        self.preventivo_window = PreventivoWindow(self.db_manager, self)
+        self.preventivo_window = PreventivoWindow(self.db_manager, self, modalita='nuovo')
         self.preventivo_window.preventivo_salvato.connect(self.preventivo_salvato)
         self.preventivo_window.show()
+    
+    def modifica_preventivo(self):
+        """Apre un preventivo esistente per la modifica DIRETTA (sovrascrive)"""
+        current_item = self.lista_preventivi.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "Attenzione", "Seleziona un preventivo da modificare.")
+            return
+        
+        preventivo_id = current_item.data(Qt.UserRole)
+        self.preventivo_window = PreventivoWindow(
+            self.db_manager, 
+            self, 
+            preventivo_id=preventivo_id, 
+            modalita='modifica'  # Nuova modalità specifica per modifiche
+        )
+        self.preventivo_window.preventivo_salvato.connect(self.preventivo_salvato)
+        self.preventivo_window.show()
+    
+    def crea_revisione(self):
+        """Crea una revisione di un preventivo esistente"""
+        current_item = self.lista_preventivi.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "Attenzione", "Seleziona un preventivo per creare una revisione.")
+            return
+        
+        preventivo_id = current_item.data(Qt.UserRole)
+        
+        # Dialog per inserire note sulla revisione
+        note_revisione = self.richiedi_note_revisione()
+        if note_revisione is None:  # L'utente ha annullato
+            return
+        
+        self.preventivo_window = PreventivoWindow(
+            self.db_manager, 
+            self, 
+            preventivo_id=preventivo_id, 
+            modalita='revisione',
+            note_revisione=note_revisione
+        )
+        self.preventivo_window.preventivo_salvato.connect(self.preventivo_salvato)
+        self.preventivo_window.show()
+    
+    def richiedi_note_revisione(self):
+        """Dialog per inserire note sulla revisione"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Note Revisione")
+        dialog.setFixedSize(400, 250)
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #fafbfc;
+            }
+            QLabel {
+                color: #2d3748;
+                font-size: 14px;
+                font-weight: 500;
+                font-family: system-ui, -apple-system, sans-serif;
+            }
+            QTextEdit {
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                padding: 10px;
+                font-size: 14px;
+                background-color: #ffffff;
+                color: #2d3748;
+                font-family: system-ui, -apple-system, sans-serif;
+            }
+        """)
+        
+        layout = QVBoxLayout(dialog)
+        layout.setSpacing(16)
+        
+        # Label descrittiva
+        label = QLabel("Inserisci le note per questa revisione (opzionale):")
+        layout.addWidget(label)
+        
+        # Campo di testo per le note
+        text_edit = QTextEdit()
+        text_edit.setPlaceholderText("Describe le modifiche apportate o il motivo della revisione...")
+        layout.addWidget(text_edit)
+        
+        # Pulsanti
+        button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+        
+        if dialog.exec_() == QDialog.Accepted:
+            return text_edit.toPlainText().strip()
+        else:
+            return None
     
     def apri_gestione_materiali(self):
         """Apre la finestra per gestire i materiali"""
@@ -490,16 +793,18 @@ class MainWindow(QMainWindow):
             return
         
         preventivo_id = current_item.data(Qt.UserRole)
-        preventivo = self.db_manager.get_preventivo_by_id(preventivo_id)
         
-        if preventivo:
-            self.mostra_dettagli_preventivo(preventivo)
-        else:
-            QMessageBox.error(self, "Errore", "Impossibile caricare i dettagli del preventivo.")
+        # Apre in modalità visualizzazione (sola lettura)
+        self.preventivo_window = PreventivoWindow(
+            self.db_manager, 
+            self, 
+            preventivo_id=preventivo_id, 
+            modalita='visualizza'
+        )
+        self.preventivo_window.show()
     
     def mostra_dettagli_preventivo(self, preventivo):
-        """Mostra una finestra con i dettagli del preventivo - stile unificato"""
-        # Crea dialog personalizzato con stile coerente
+        """Mostra dettagli preventivo con nuovi campi"""
         dialog = QMessageBox(self)
         dialog.setWindowTitle("Dettagli Preventivo")
         dialog.setStyleSheet("""
@@ -529,8 +834,19 @@ class MainWindow(QMainWindow):
         
         data_formattata = preventivo['data_creazione'].split('T')[0] if 'T' in preventivo['data_creazione'] else preventivo['data_creazione']
         
+        # Include i nuovi campi se disponibili
+        cliente_info = ""
+        if preventivo.get('nome_cliente'):
+            cliente_info = f"""<b>👤 INFORMAZIONI CLIENTE</b><br>
+• Nome: {preventivo.get('nome_cliente', 'N/A')}<br>
+• Numero Ordine: {preventivo.get('numero_ordine', 'N/A')}<br>
+• Codice: {preventivo.get('codice', 'N/A')}<br>
+• Descrizione: {preventivo.get('descrizione', 'N/A')}<br><br>"""
+        
         dettagli = f"""<b>PREVENTIVO #{preventivo['id']:03d}</b><br>
 <b>Data Creazione:</b> {data_formattata}<br><br>
+
+{cliente_info}
 
 <b>💰 COSTI</b><br>
 • Costo Totale Materiali: €{preventivo['costo_totale_materiali']:,.2f}<br>
@@ -558,7 +874,7 @@ class MainWindow(QMainWindow):
         dialog.exec_()
     
     def elimina_preventivo(self):
-        """Elimina il preventivo selezionato"""
+        """Elimina preventivo utilizzando il nuovo metodo del database"""
         current_item = self.lista_preventivi.currentItem()
         if not current_item:
             QMessageBox.warning(self, "Attenzione", "Seleziona un preventivo da eliminare.")
@@ -567,7 +883,7 @@ class MainWindow(QMainWindow):
         # Dialog di conferma con stile unificato
         dialog = QMessageBox(self)
         dialog.setWindowTitle("Conferma Eliminazione")
-        dialog.setText("Sei sicuro di voler eliminare questo preventivo?\n\nQuesta azione non può essere annullata.")
+        dialog.setText("Sei sicuro di voler eliminare questo preventivo?\n\nQuesta azione eliminerà anche tutte le sue revisioni e non può essere annullata.")
         dialog.setIcon(QMessageBox.Question)
         dialog.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         dialog.setDefaultButton(QMessageBox.No)
@@ -609,8 +925,16 @@ class MainWindow(QMainWindow):
         risposta = dialog.exec_()
         
         if risposta == QMessageBox.Yes:
-            # Implementare la funzione di eliminazione nel database
-            QMessageBox.information(self, "Info", "Funzione di eliminazione non ancora implementata nel database.")
+            preventivo_id = current_item.data(Qt.UserRole)
+            
+            # Usa il nuovo metodo per eliminare preventivo e revisioni
+            if self.db_manager.delete_preventivo_e_revisioni(preventivo_id):
+                QMessageBox.information(self, "Successo", 
+                                      "Preventivo e tutte le sue revisioni sono stati eliminati con successo.")
+                self.load_preventivi()  # Ricarica la lista
+            else:
+                QMessageBox.error(self, "Errore", 
+                                "Errore durante l'eliminazione del preventivo.")
     
     def preventivo_salvato(self):
         """Callback chiamato quando un preventivo viene salvato"""
@@ -623,3 +947,4 @@ class MainWindow(QMainWindow):
             # Mostra un messaggio di successo
             QMessageBox.information(self, "Successo", 
                                   "Preventivo salvato con successo!\n\nUsa 'Visualizza Preventivi Salvati' per vederlo nella lista.")
+        

@@ -1,3 +1,11 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+© 2025 RCS - Software Proprietario
+Database Manager per Sistema Preventivi RCS
+Uso riservato esclusivamente a RCS
+"""
+
 import sqlite3
 import os
 import json
@@ -24,13 +32,17 @@ class DatabaseManager:
                 )
             """)
             
-            # Tabella preventivi - AGGIORNATA con colonne per revisioni
+            # Tabella preventivi - AGGIORNATA con nuovi campi richiesti
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS preventivi (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     data_creazione TEXT NOT NULL,
                     numero_revisione INTEGER NOT NULL DEFAULT 1,
                     preventivo_originale_id INTEGER,
+                    nome_cliente TEXT NOT NULL DEFAULT '',
+                    numero_ordine TEXT NOT NULL DEFAULT '',
+                    descrizione TEXT NOT NULL DEFAULT '',
+                    codice TEXT NOT NULL DEFAULT '',
                     costo_totale_materiali REAL,
                     costi_accessori REAL,
                     minuti_taglio REAL,
@@ -48,6 +60,9 @@ class DatabaseManager:
                     FOREIGN KEY (preventivo_originale_id) REFERENCES preventivi(id)
                 )
             """)
+            
+            # Migrazione automatica per aggiungere le nuove colonne se non esistono
+            self._migrate_database(cursor)
             
             # Inserimento materiali di esempio se la tabella è vuota (IDENTICO ALL'ORIGINALE)
             cursor.execute("SELECT COUNT(*) FROM materiali")
@@ -83,6 +98,28 @@ class DatabaseManager:
                 )
             
             conn.commit()
+    
+    def _migrate_database(self, cursor):
+        """Migrazione automatica per aggiungere i nuovi campi"""
+        # Controlla se le nuove colonne esistono già
+        cursor.execute("PRAGMA table_info(preventivi)")
+        columns = [column[1] for column in cursor.fetchall()]
+        
+        # Aggiungi le colonne mancanti
+        new_columns = [
+            ("nome_cliente", "TEXT NOT NULL DEFAULT ''"),
+            ("numero_ordine", "TEXT NOT NULL DEFAULT ''"),
+            ("descrizione", "TEXT NOT NULL DEFAULT ''"),
+            ("codice", "TEXT NOT NULL DEFAULT ''")
+        ]
+        
+        for column_name, column_def in new_columns:
+            if column_name not in columns:
+                try:
+                    cursor.execute(f"ALTER TABLE preventivi ADD COLUMN {column_name} {column_def}")
+                    print(f"Aggiunta colonna {column_name} alla tabella preventivi")
+                except sqlite3.OperationalError as e:
+                    print(f"Errore durante l'aggiunta della colonna {column_name}: {e}")
     
     # =================== METODI MATERIALI (IDENTICI ALL'ORIGINALE) ===================
     
@@ -154,27 +191,32 @@ class DatabaseManager:
             conn.commit()
             return cursor.rowcount > 0
     
-    # =================== METODI PREVENTIVI (ORIGINALI + REVISIONI) ===================
+    # =================== METODI PREVENTIVI (AGGIORNATI CON NUOVI CAMPI) ===================
     
     def save_preventivo(self, preventivo_data):
-        """Salva un preventivo nel database - COMPATIBILITÀ ORIGINALE"""
+        """Salva un preventivo nel database - COMPATIBILITÀ ORIGINALE con nuovi campi"""
         return self.add_preventivo(preventivo_data)
     
     def add_preventivo(self, preventivo_data):
-        """Aggiunge un nuovo preventivo originale"""
+        """Aggiunge un nuovo preventivo originale con i nuovi campi"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO preventivi (
                     data_creazione, numero_revisione, preventivo_originale_id,
+                    nome_cliente, numero_ordine, descrizione, codice,
                     costo_totale_materiali, costi_accessori, minuti_taglio,
                     minuti_avvolgimento, minuti_pulizia, minuti_rettifica,
                     minuti_imballaggio, tot_mano_opera, subtotale,
                     maggiorazione_25, preventivo_finale, prezzo_cliente,
                     materiali_utilizzati, note_revisione
-                ) VALUES (?, 1, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, 1, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 datetime.now().isoformat(),
+                preventivo_data.get('nome_cliente', ''),
+                preventivo_data.get('numero_ordine', ''),
+                preventivo_data.get('descrizione', ''),
+                preventivo_data.get('codice', ''),
                 preventivo_data['costo_totale_materiali'],
                 preventivo_data['costi_accessori'],
                 preventivo_data['minuti_taglio'],
@@ -193,8 +235,44 @@ class DatabaseManager:
             conn.commit()
             return cursor.lastrowid
     
+    def update_preventivo(self, preventivo_id, preventivo_data):
+        """NUOVO: Aggiorna un preventivo esistente (modifica diretta)"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE preventivi SET 
+                    nome_cliente = ?, numero_ordine = ?, descrizione = ?, codice = ?,
+                    costo_totale_materiali = ?, costi_accessori = ?, minuti_taglio = ?,
+                    minuti_avvolgimento = ?, minuti_pulizia = ?, minuti_rettifica = ?,
+                    minuti_imballaggio = ?, tot_mano_opera = ?, subtotale = ?,
+                    maggiorazione_25 = ?, preventivo_finale = ?, prezzo_cliente = ?,
+                    materiali_utilizzati = ?
+                WHERE id = ?
+            """, (
+                preventivo_data.get('nome_cliente', ''),
+                preventivo_data.get('numero_ordine', ''),
+                preventivo_data.get('descrizione', ''),
+                preventivo_data.get('codice', ''),
+                preventivo_data['costo_totale_materiali'],
+                preventivo_data['costi_accessori'],
+                preventivo_data['minuti_taglio'],
+                preventivo_data['minuti_avvolgimento'],
+                preventivo_data['minuti_pulizia'],
+                preventivo_data['minuti_rettifica'],
+                preventivo_data['minuti_imballaggio'],
+                preventivo_data['tot_mano_opera'],
+                preventivo_data['subtotale'],
+                preventivo_data['maggiorazione_25'],
+                preventivo_data['preventivo_finale'],
+                preventivo_data['prezzo_cliente'],
+                json.dumps(preventivo_data['materiali_utilizzati']),
+                preventivo_id
+            ))
+            conn.commit()
+            return cursor.rowcount > 0
+    
     def add_revisione_preventivo(self, preventivo_originale_id, preventivo_data, note_revisione=""):
-        """NUOVO: Aggiunge una revisione a un preventivo esistente"""
+        """NUOVO: Aggiunge una revisione a un preventivo esistente con i nuovi campi"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             
@@ -210,16 +288,21 @@ class DatabaseManager:
             cursor.execute("""
                 INSERT INTO preventivi (
                     data_creazione, numero_revisione, preventivo_originale_id,
+                    nome_cliente, numero_ordine, descrizione, codice,
                     costo_totale_materiali, costi_accessori, minuti_taglio,
                     minuti_avvolgimento, minuti_pulizia, minuti_rettifica,
                     minuti_imballaggio, tot_mano_opera, subtotale,
                     maggiorazione_25, preventivo_finale, prezzo_cliente,
                     materiali_utilizzati, note_revisione
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 datetime.now().isoformat(),
                 nuovo_numero_revisione,
                 preventivo_originale_id,
+                preventivo_data.get('nome_cliente', ''),
+                preventivo_data.get('numero_ordine', ''),
+                preventivo_data.get('descrizione', ''),
+                preventivo_data.get('codice', ''),
                 preventivo_data['costo_totale_materiali'],
                 preventivo_data['costi_accessori'],
                 preventivo_data['minuti_taglio'],
@@ -239,17 +322,18 @@ class DatabaseManager:
             return cursor.lastrowid
     
     def get_all_preventivi(self):
-        """Restituisce tutti i preventivi salvati - COMPATIBILITÀ ORIGINALE"""
+        """Restituisce tutti i preventivi salvati - AGGIORNATO con nuovi campi"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, data_creazione, preventivo_finale, prezzo_cliente
+                SELECT id, data_creazione, preventivo_finale, prezzo_cliente,
+                       nome_cliente, numero_ordine, descrizione, codice, numero_revisione
                 FROM preventivi ORDER BY data_creazione DESC
             """)
             return cursor.fetchall()
     
     def get_all_preventivi_latest(self):
-        """NUOVO: Restituisce solo l'ultima revisione di ogni preventivo"""
+        """NUOVO: Restituisce solo l'ultima revisione di ogni preventivo con i nuovi campi"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -260,7 +344,11 @@ class DatabaseManager:
                     FROM preventivi 
                     GROUP BY COALESCE(preventivo_originale_id, id)
                 )
-                SELECT p.* FROM preventivi p
+                SELECT p.id, p.data_creazione, p.preventivo_finale, p.prezzo_cliente,
+                       p.nome_cliente, p.numero_ordine, p.descrizione, p.codice, 
+                       p.numero_revisione,
+                       CASE WHEN p.numero_revisione > 1 THEN 'R' ELSE 'O' END as tipo
+                FROM preventivi p
                 INNER JOIN latest_preventivi lp ON 
                     COALESCE(p.preventivo_originale_id, p.id) = lp.gruppo_id 
                     AND p.numero_revisione = lp.max_revisione
@@ -269,7 +357,7 @@ class DatabaseManager:
             return cursor.fetchall()
     
     def get_preventivo_by_id(self, preventivo_id):
-        """Restituisce un preventivo specifico con tutti i dettagli - COMPATIBILITÀ ORIGINALE"""
+        """Restituisce un preventivo specifico con tutti i dettagli - AGGIORNATO"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT * FROM preventivi WHERE id = ?", (preventivo_id,))
@@ -289,15 +377,23 @@ class DatabaseManager:
                 else:
                     preventivo['materiali_utilizzati'] = []
                 
+                # Assicurati che i nuovi campi esistano (compatibilità)
+                for campo in ['nome_cliente', 'numero_ordine', 'descrizione', 'codice']:
+                    if campo not in preventivo:
+                        preventivo[campo] = ''
+                
                 return preventivo
             return None
     
     def get_revisioni_preventivo(self, preventivo_originale_id):
-        """NUOVO: Restituisce tutte le revisioni di un preventivo"""
+        """NUOVO: Restituisce tutte le revisioni di un preventivo con i nuovi campi"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT * FROM preventivi 
+                SELECT id, data_creazione, preventivo_finale, prezzo_cliente,
+                       nome_cliente, numero_ordine, descrizione, codice, 
+                       numero_revisione, note_revisione
+                FROM preventivi 
                 WHERE preventivo_originale_id = ? OR id = ?
                 ORDER BY numero_revisione DESC
             """, (preventivo_originale_id, preventivo_originale_id))
