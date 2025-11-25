@@ -7,7 +7,7 @@ Uso riservato esclusivamente a RCS
 
 Version: 2.3.1
 Last Updated: 22/09/2025
-Author: Antonio VB Cla.ass
+Author: Antonio VB C.ass
 
 CHANGELOG:
 v2.3.1 (22/09/2025):
