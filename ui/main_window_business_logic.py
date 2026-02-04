@@ -392,11 +392,22 @@ class MainWindowBusinessLogic:
     def apri_gestione_materiali(window_instance):
         """Apre la finestra per gestire i materiali"""
         window_instance.gestione_materiali_window = GestioneMaterialiWindow(window_instance.db_manager, window_instance)
-        
+
         # Collega il signal per aggiornare i preventivi aperti
         window_instance.gestione_materiali_window.materiali_modificati.connect(window_instance.aggiorna_preventivi_aperti)
-        
+
         window_instance.gestione_materiali_window.show()
+
+    @staticmethod
+    def apri_confronto_preventivi(window_instance):
+        """NUOVO: Apre la finestra per confrontare due preventivi"""
+        from ui.confronto_preventivi_window import ConfrontoPreventiviWindow
+
+        window_instance.confronto_preventivi_window = ConfrontoPreventiviWindow(
+            window_instance.db_manager,
+            window_instance
+        )
+        window_instance.confronto_preventivi_window.show()
     
     @staticmethod
     def mostra_nascondi_preventivi(window_instance):

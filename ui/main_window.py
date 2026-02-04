@@ -87,7 +87,11 @@ class MainWindow(QMainWindow):
     def genera_documento_preventivo(self):
         """NUOVO: Genera documento di produzione dal preventivo selezionato"""
         MainWindowBusinessLogic.genera_documento_preventivo(self)
-    
+
+    def apri_confronto_preventivi(self):
+        """NUOVO: Apre la finestra per confrontare due preventivi"""
+        MainWindowBusinessLogic.apri_confronto_preventivi(self)
+
     # =============================================================================
     # COMPATIBILITY METHODS - Per retrocompatibilità
     # =============================================================================

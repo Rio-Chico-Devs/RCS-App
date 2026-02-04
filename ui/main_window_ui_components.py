@@ -410,11 +410,11 @@ class MainWindowUIComponents:
     
     @staticmethod
     def create_preventivi_buttons(window_instance, parent_layout):
-        """Pulsanti gestione preventivi CON NUOVO PULSANTE GENERA DOCUMENTO"""
+        """Pulsanti gestione preventivi CON NUOVO PULSANTE GENERA DOCUMENTO E CONFRONTA"""
         # Prima riga di pulsanti - aggiunta Genera Documento
         buttons_layout_1 = QHBoxLayout()
         buttons_layout_1.setSpacing(12)
-        
+
         # Visualizza dettagli
         window_instance.btn_visualizza_dettagli = QPushButton("Visualizza")
         window_instance.btn_visualizza_dettagli.setStyleSheet("""
@@ -428,7 +428,7 @@ class MainWindowUIComponents:
             }
         """)
         window_instance.btn_visualizza_dettagli.clicked.connect(window_instance.visualizza_preventivo)
-        
+
         # Modifica preventivo
         window_instance.btn_modifica_preventivo = QPushButton("Modifica")
         window_instance.btn_modifica_preventivo.setStyleSheet("""
@@ -442,9 +442,9 @@ class MainWindowUIComponents:
             }
         """)
         window_instance.btn_modifica_preventivo.clicked.connect(window_instance.modifica_preventivo)
-        
+
         # NUOVO: Genera Documento
-        window_instance.btn_genera_documento = QPushButton("📄 Genera Documento")
+        window_instance.btn_genera_documento = QPushButton("Genera Documento")
         window_instance.btn_genera_documento.setStyleSheet("""
             QPushButton {
                 background-color: #48bb78;
@@ -460,7 +460,7 @@ class MainWindowUIComponents:
             }
         """)
         window_instance.btn_genera_documento.clicked.connect(window_instance.genera_documento_preventivo)
-        
+
         # Crea revisione
         window_instance.btn_crea_revisione = QPushButton("Crea Revisione")
         window_instance.btn_crea_revisione.setStyleSheet("""
@@ -475,16 +475,30 @@ class MainWindowUIComponents:
             }
         """)
         window_instance.btn_crea_revisione.clicked.connect(window_instance.crea_revisione)
-        
+
         buttons_layout_1.addWidget(window_instance.btn_visualizza_dettagli)
         buttons_layout_1.addWidget(window_instance.btn_modifica_preventivo)
         buttons_layout_1.addWidget(window_instance.btn_genera_documento)
         buttons_layout_1.addWidget(window_instance.btn_crea_revisione)
-        
+
         # Seconda riga di pulsanti
         buttons_layout_2 = QHBoxLayout()
         buttons_layout_2.setSpacing(12)
-        
+
+        # NUOVO: Confronta Preventivi
+        window_instance.btn_confronta_preventivi = QPushButton("Confronta Preventivi")
+        window_instance.btn_confronta_preventivi.setStyleSheet("""
+            QPushButton {
+                background-color: #805ad5;
+                color: #ffffff;
+                min-height: 36px;
+            }
+            QPushButton:hover {
+                background-color: #6b46c1;
+            }
+        """)
+        window_instance.btn_confronta_preventivi.clicked.connect(window_instance.apri_confronto_preventivi)
+
         # Elimina preventivo
         window_instance.btn_elimina_preventivo = QPushButton("Elimina")
         window_instance.btn_elimina_preventivo.setStyleSheet("""
@@ -498,7 +512,7 @@ class MainWindowUIComponents:
             }
         """)
         window_instance.btn_elimina_preventivo.clicked.connect(window_instance.elimina_preventivo)
-        
+
         # Nascondi preventivi
         window_instance.btn_nascondi_preventivi = QPushButton("Nascondi Preventivi")
         window_instance.btn_nascondi_preventivi.setStyleSheet("""
@@ -513,11 +527,12 @@ class MainWindowUIComponents:
             }
         """)
         window_instance.btn_nascondi_preventivi.clicked.connect(window_instance.mostra_nascondi_preventivi)
-        
+
+        buttons_layout_2.addWidget(window_instance.btn_confronta_preventivi)
         buttons_layout_2.addWidget(window_instance.btn_elimina_preventivo)
         buttons_layout_2.addStretch()
         buttons_layout_2.addWidget(window_instance.btn_nascondi_preventivi)
-        
+
         parent_layout.addLayout(buttons_layout_1)
         parent_layout.addLayout(buttons_layout_2)
     
