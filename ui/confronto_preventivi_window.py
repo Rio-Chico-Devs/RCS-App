@@ -698,7 +698,8 @@ class ConfrontoPreventiviWindow(QMainWindow):
 
         # Materiali preventivo 1
         materiali1 = self.preventivo1_data.get('materiali_utilizzati', [])
-        col1 = self.crea_colonna_materiali(materiali1, 1)
+        materiali2 = self.preventivo2_data.get('materiali_utilizzati', [])
+        col1 = self.crea_colonna_materiali(materiali1, materiali2, 1)
         materiali_layout.addWidget(col1, 1)
 
         # Separatore
@@ -710,15 +711,14 @@ class ConfrontoPreventiviWindow(QMainWindow):
         materiali_layout.addWidget(separatore)
 
         # Materiali preventivo 2
-        materiali2 = self.preventivo2_data.get('materiali_utilizzati', [])
-        col2 = self.crea_colonna_materiali(materiali2, 2)
+        col2 = self.crea_colonna_materiali(materiali2, materiali1, 2)
         materiali_layout.addWidget(col2, 1)
 
         sezione_layout.addLayout(materiali_layout)
         parent_layout.addWidget(sezione_frame)
 
-    def crea_colonna_materiali(self, materiali, numero_preventivo):
-        """Crea una colonna con la lista dei materiali"""
+    def crea_colonna_materiali(self, materiali, materiali_altro_preventivo, numero_preventivo):
+        """Crea una colonna con la lista dei materiali, evidenziando le differenze"""
         col_widget = QWidget()
         col_layout = QVBoxLayout(col_widget)
         col_layout.setContentsMargins(0, 0, 0, 0)
@@ -732,15 +732,31 @@ class ConfrontoPreventiviWindow(QMainWindow):
             col_layout.addWidget(no_materiali)
         else:
             for i, materiale in enumerate(materiali):
+                # Verifica se questo materiale è diverso dall'altro preventivo
+                is_different = self.materiale_e_diverso(materiale, materiali_altro_preventivo, i)
+
                 materiale_frame = QFrame()
-                materiale_frame.setStyleSheet("""
-                    QFrame {
-                        background-color: #f7fafc;
-                        border: 1px solid #e2e8f0;
-                        border-radius: 6px;
-                        padding: 10px;
-                    }
-                """)
+
+                # Applica stile evidenziato se diverso
+                if is_different:
+                    materiale_frame.setStyleSheet("""
+                        QFrame {
+                            background-color: #fef5e7;
+                            border: 2px solid #f39c12;
+                            border-radius: 6px;
+                            padding: 10px;
+                        }
+                    """)
+                else:
+                    materiale_frame.setStyleSheet("""
+                        QFrame {
+                            background-color: #f7fafc;
+                            border: 1px solid #e2e8f0;
+                            border-radius: 6px;
+                            padding: 10px;
+                        }
+                    """)
+
                 materiale_layout = QVBoxLayout(materiale_frame)
                 materiale_layout.setSpacing(3)
 
@@ -774,6 +790,35 @@ class ConfrontoPreventiviWindow(QMainWindow):
 
         col_layout.addStretch()
         return col_widget
+
+    def materiale_e_diverso(self, materiale, materiali_altro_preventivo, indice):
+        """Verifica se un materiale è diverso rispetto all'altro preventivo"""
+        # Se l'altro preventivo non ha materiali a questo indice, è diverso
+        if not materiali_altro_preventivo or indice >= len(materiali_altro_preventivo):
+            return True
+
+        materiale_altro = materiali_altro_preventivo[indice]
+
+        # Campi da confrontare
+        campi_da_confrontare = [
+            'materiale_nome', 'diametro', 'lunghezza', 'giri', 'spessore',
+            'diametro_finale', 'sviluppo', 'lunghezza_utilizzata',
+            'costo_materiale', 'costo_totale', 'maggiorazione'
+        ]
+
+        for campo in campi_da_confrontare:
+            valore1 = materiale.get(campo)
+            valore2 = materiale_altro.get(campo)
+
+            # Confronto numerico per float/int
+            if isinstance(valore1, (int, float)) and isinstance(valore2, (int, float)):
+                if abs(valore1 - valore2) > 0.01:
+                    return True
+            # Confronto standard per altri tipi
+            elif valore1 != valore2:
+                return True
+
+        return False
 
     def reset_confronto(self):
         """Reset per iniziare un nuovo confronto"""
