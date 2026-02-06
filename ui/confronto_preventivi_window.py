@@ -728,7 +728,7 @@ class ConfrontoPreventiviWindow(QMainWindow):
         parent_layout.addWidget(sezione_frame)
 
     def crea_colonna_materiali(self, materiali, materiali_altro_preventivo, numero_preventivo):
-        """Crea una colonna con la lista dei materiali, evidenziando le differenze"""
+        """Crea una colonna con la lista dei materiali, evidenziando le differenze nei singoli campi"""
         col_widget = QWidget()
         col_layout = QVBoxLayout(col_widget)
         col_layout.setContentsMargins(0, 0, 0, 0)
@@ -742,64 +742,88 @@ class ConfrontoPreventiviWindow(QMainWindow):
             col_layout.addWidget(no_materiali)
         else:
             for i, materiale in enumerate(materiali):
-                # Verifica se questo materiale è diverso dall'altro preventivo
-                is_different = self.materiale_e_diverso(materiale, materiali_altro_preventivo, i)
-
                 materiale_frame = QFrame()
-
-                # Applica stile evidenziato se diverso
-                if is_different:
-                    materiale_frame.setStyleSheet("""
-                        QFrame {
-                            background-color: #fef5e7;
-                            border: 2px solid #f39c12;
-                            border-radius: 6px;
-                            padding: 10px;
-                        }
-                    """)
-                else:
-                    materiale_frame.setStyleSheet("""
-                        QFrame {
-                            background-color: #f7fafc;
-                            border: 1px solid #e2e8f0;
-                            border-radius: 6px;
-                            padding: 10px;
-                        }
-                    """)
+                materiale_frame.setStyleSheet("""
+                    QFrame {
+                        background-color: #f7fafc;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 6px;
+                        padding: 10px;
+                    }
+                """)
 
                 materiale_layout = QVBoxLayout(materiale_frame)
                 materiale_layout.setSpacing(3)
 
-                # Titolo materiale
+                # Ottieni il materiale corrispondente dall'altro preventivo
+                materiale_altro = None
+                if materiali_altro_preventivo and i < len(materiali_altro_preventivo):
+                    materiale_altro = materiali_altro_preventivo[i]
+
+                # Titolo materiale con evidenziazione se nome diverso
+                nome_diverso = self.campo_materiale_diverso(materiale, materiale_altro, 'materiale_nome')
                 titolo_mat = QLabel(f"Materiale {i+1}: {materiale.get('materiale_nome', 'N/A')}")
                 titolo_mat.setFont(QFont("Segoe UI", 11, QFont.Bold))
-                titolo_mat.setStyleSheet("color: #2d3748; border: none;")
+                if nome_diverso:
+                    titolo_mat.setStyleSheet("color: #2d3748; border: none; background-color: #fef5e7; padding: 3px; border-radius: 3px;")
+                else:
+                    titolo_mat.setStyleSheet("color: #2d3748; border: none;")
                 materiale_layout.addWidget(titolo_mat)
 
-                # Dettagli
-                dettagli = [
-                    f"Diametro: {materiale.get('diametro', 0)} mm",
-                    f"Lunghezza: {materiale.get('lunghezza', 0)} mm",
-                    f"Giri: {materiale.get('giri', 0)}",
-                    f"Spessore: {materiale.get('spessore', 0)} mm",
-                    f"Diametro Finale: {materiale.get('diametro_finale', 0):.2f} mm",
-                    f"Sviluppo: {materiale.get('sviluppo', 0):.2f}",
-                    f"Lunghezza Utilizzata: {materiale.get('lunghezza_utilizzata', 0):.4f} m²",
-                    f"Costo Materiale: € {materiale.get('costo_materiale', 0):.2f}/m²",
-                    f"Costo Totale: € {materiale.get('costo_totale', 0):.2f}",
-                    f"Maggiorazione: € {materiale.get('maggiorazione', 0):.2f}"
+                # Dettagli con evidenziazione individuale
+                campi_dettaglio = [
+                    ('diametro', f"Diametro: {materiale.get('diametro', 0)} mm"),
+                    ('lunghezza', f"Lunghezza: {materiale.get('lunghezza', 0)} mm"),
+                    ('giri', f"Giri: {materiale.get('giri', 0)}"),
+                    ('spessore', f"Spessore: {materiale.get('spessore', 0)} mm"),
+                    ('diametro_finale', f"Diametro Finale: {materiale.get('diametro_finale', 0):.2f} mm"),
+                    ('sviluppo', f"Sviluppo: {materiale.get('sviluppo', 0):.2f}"),
+                    ('lunghezza_utilizzata', f"Lunghezza Utilizzata: {materiale.get('lunghezza_utilizzata', 0):.4f} m²"),
+                    ('costo_materiale', f"Costo Materiale: € {materiale.get('costo_materiale', 0):.2f}/m²"),
+                    ('costo_totale', f"Costo Totale: € {materiale.get('costo_totale', 0):.2f}"),
+                    ('maggiorazione', f"Maggiorazione: € {materiale.get('maggiorazione', 0):.2f}")
                 ]
 
-                for dettaglio in dettagli:
-                    label = QLabel(dettaglio)
+                for campo_nome, testo_dettaglio in campi_dettaglio:
+                    is_diverso = self.campo_materiale_diverso(materiale, materiale_altro, campo_nome)
+
+                    label = QLabel(testo_dettaglio)
                     label.setFont(QFont("Segoe UI", 9))
-                    label.setStyleSheet("color: #4a5568; border: none;")
+
+                    if is_diverso:
+                        label.setStyleSheet("""
+                            color: #2d3748;
+                            border: none;
+                            background-color: #fef5e7;
+                            border-left: 3px solid #f39c12;
+                            padding: 2px 5px;
+                            border-radius: 3px;
+                        """)
+                    else:
+                        label.setStyleSheet("color: #4a5568; border: none;")
+
                     materiale_layout.addWidget(label)
 
                 col_layout.addWidget(materiale_frame)
 
         col_layout.addStretch()
         return col_widget
+
+    def campo_materiale_diverso(self, materiale, materiale_altro, campo_nome):
+        """Verifica se un singolo campo del materiale è diverso"""
+        # Se l'altro materiale non esiste, considera diverso
+        if not materiale_altro:
+            return True
+
+        valore1 = materiale.get(campo_nome)
+        valore2 = materiale_altro.get(campo_nome)
+
+        # Confronto numerico per float/int
+        if isinstance(valore1, (int, float)) and isinstance(valore2, (int, float)):
+            return abs(valore1 - valore2) > 0.01
+
+        # Confronto standard per altri tipi
+        return valore1 != valore2
 
     def materiale_e_diverso(self, materiale, materiali_altro_preventivo, indice):
         """Verifica se un materiale è diverso rispetto all'altro preventivo"""
