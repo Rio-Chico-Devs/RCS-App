@@ -16,15 +16,16 @@ v1.0.0 (2026-02-06):
 
 from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
                              QWidget, QLabel, QListWidget, QMessageBox, QListWidgetItem,
-                             QGroupBox, QFrame, QSizePolicy, QGraphicsDropShadowEffect,
+                             QGroupBox, QFrame, QGraphicsDropShadowEffect,
                              QLineEdit, QComboBox)
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtGui import QColor
+from typing import Optional, Any
 
 class VisualizzaPreventiviWindow(QMainWindow):
     preventivo_modificato = pyqtSignal()  # Signal per notificare modifiche
 
-    def __init__(self, db_manager, parent=None):
+    def __init__(self, db_manager: Any, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.db_manager = db_manager
         self.parent_window = parent
@@ -33,7 +34,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         self.load_clienti_filtro()
         self.load_preventivi()
 
-    def init_ui(self):
+    def init_ui(self) -> None:
         """Design system unificato - apertura a schermo intero"""
         self.setWindowTitle("Visualizza Preventivi - Software Aziendale RCS")
 
@@ -157,7 +158,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         # Footer
         self.create_footer(main_layout)
 
-    def create_shadow_effect(self, blur=10, opacity=12):
+    def create_shadow_effect(self, blur: int = 10, opacity: int = 12) -> QGraphicsDropShadowEffect:
         """Effetto ombra standardizzato"""
         shadow = QGraphicsDropShadowEffect()
         shadow.setBlurRadius(blur)
@@ -165,7 +166,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         shadow.setOffset(0, 2)
         return shadow
 
-    def create_header(self, parent_layout):
+    def create_header(self, parent_layout: QVBoxLayout) -> None:
         """Header unificato"""
         header_container = QFrame()
         header_container.setStyleSheet("""
@@ -208,7 +209,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
         parent_layout.addWidget(header_container)
 
-    def create_view_toggle(self, parent_layout):
+    def create_view_toggle(self, parent_layout: QVBoxLayout) -> None:
         """Toggle per cambiare tra preventivi e revisioni"""
         toggle_container = QFrame()
         toggle_container.setStyleSheet("""
@@ -274,7 +275,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
         parent_layout.addWidget(toggle_container)
 
-    def create_filters_section(self, parent_layout):
+    def create_filters_section(self, parent_layout: QVBoxLayout) -> None:
         """Sezione filtri per preventivi"""
         filters_container = QFrame()
         filters_container.setStyleSheet("""
@@ -344,7 +345,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
         parent_layout.addWidget(filters_container)
 
-    def create_lista_preventivi(self, parent_layout):
+    def create_lista_preventivi(self, parent_layout: QVBoxLayout) -> None:
         """Lista preventivi con conteggio"""
         lista_group = QGroupBox("Preventivi")
         lista_group.setGraphicsEffect(self.create_shadow_effect())
@@ -372,7 +373,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
         parent_layout.addWidget(lista_group, 1)
 
-    def create_action_buttons(self, parent_layout):
+    def create_action_buttons(self, parent_layout: QVBoxLayout) -> None:
         """Pulsanti azioni preventivi"""
         buttons_container = QFrame()
         buttons_container.setStyleSheet("""
@@ -385,7 +386,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         """)
         buttons_container.setGraphicsEffect(self.create_shadow_effect())
 
-        buttons_layout = QGridLayout = QVBoxLayout(buttons_container)
+        buttons_layout = QVBoxLayout(buttons_container)
         buttons_layout.setSpacing(12)
 
         # Prima riga
@@ -495,7 +496,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
         parent_layout.addWidget(buttons_container)
 
-    def create_footer(self, parent_layout):
+    def create_footer(self, parent_layout: QVBoxLayout) -> None:
         """Footer con pulsante chiudi"""
         footer_layout = QHBoxLayout()
         footer_layout.addStretch()
@@ -514,7 +515,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
                 background-color: #edf2f7;
             }
         """)
-        btn_chiudi.clicked.connect(self.close)
+        btn_chiudi.clicked.connect(lambda: self.close())
 
         footer_layout.addWidget(btn_chiudi)
         parent_layout.addLayout(footer_layout)
@@ -523,7 +524,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
     # METODI FUNZIONALI
     # =============================================================================
 
-    def load_clienti_filtro(self):
+    def load_clienti_filtro(self) -> None:
         """Carica la lista dei clienti nel filtro"""
         self.filtro_cliente.clear()
         self.filtro_cliente.addItem("Tutti i clienti", None)
@@ -542,7 +543,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         except Exception as e:
             print(f"Errore nel caricamento clienti filtro: {str(e)}")
 
-    def load_preventivi(self):
+    def load_preventivi(self) -> None:
         """Carica preventivi in base alla modalità e ai filtri attivi"""
         self.lista_preventivi.clear()
 
@@ -626,7 +627,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         # Aggiorna conteggio
         self.lbl_conteggio.setText(f"{count} preventivi visualizzati")
 
-    def cambia_visualizzazione(self, modalita):
+    def cambia_visualizzazione(self, modalita: str) -> None:
         """Cambia tra visualizzazione Preventivi e Revisioni"""
         self.modalita_visualizzazione = modalita
 
@@ -687,7 +688,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         # Ricarica lista
         self.load_preventivi()
 
-    def visualizza_preventivo(self):
+    def visualizza_preventivo(self) -> None:
         """Visualizza i dettagli del preventivo selezionato"""
         current_item = self.lista_preventivi.currentItem()
         if not current_item:
@@ -708,7 +709,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         preventivo_window.preventivo_salvato.connect(self.on_preventivo_modificato)
         preventivo_window.show()
 
-    def modifica_preventivo(self):
+    def modifica_preventivo(self) -> None:
         """Apre un preventivo per la modifica DIRETTA"""
         current_item = self.lista_preventivi.currentItem()
         if not current_item:
@@ -728,7 +729,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         preventivo_window.preventivo_salvato.connect(self.on_preventivo_modificato)
         preventivo_window.show()
 
-    def crea_revisione(self):
+    def crea_revisione(self) -> None:
         """Crea una revisione di un preventivo esistente"""
         current_item = self.lista_preventivi.currentItem()
         if not current_item:
@@ -755,14 +756,14 @@ class VisualizzaPreventiviWindow(QMainWindow):
         preventivo_window.preventivo_salvato.connect(self.on_preventivo_modificato)
         preventivo_window.show()
 
-    def confronta_preventivi(self):
+    def confronta_preventivi(self) -> None:
         """Apre la finestra confronto preventivi"""
         from ui.confronto_preventivi_window import ConfrontoPreventiviWindow
 
         confronto_window = ConfrontoPreventiviWindow(self.db_manager, self)
         confronto_window.show()
 
-    def genera_documento(self):
+    def genera_documento(self) -> None:
         """Genera documento dal preventivo selezionato"""
         current_item = self.lista_preventivi.currentItem()
         if not current_item:
@@ -781,7 +782,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         temp_window = TempWindow(self.db_manager, self.lista_preventivi)
         MainWindowBusinessLogic.genera_documento_preventivo(temp_window)
 
-    def elimina_preventivo(self):
+    def elimina_preventivo(self) -> None:
         """Elimina il preventivo selezionato"""
         current_item = self.lista_preventivi.currentItem()
         if not current_item:
@@ -810,7 +811,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
                 QMessageBox.error(self, "Errore",
                                 "Errore durante l'eliminazione del preventivo.")
 
-    def on_preventivo_modificato(self):
+    def on_preventivo_modificato(self) -> None:
         """Callback quando un preventivo viene modificato"""
         self.load_preventivi()
         self.load_clienti_filtro()  # Ricarica anche i clienti nel caso ne sia stato aggiunto uno nuovo
