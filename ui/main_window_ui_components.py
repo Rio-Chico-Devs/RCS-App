@@ -10,9 +10,9 @@ Last Updated: 24/09/2025
 Author: Sviluppatore PyQt5 + Claude
 """
 
-from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QWidget, 
-                             QLabel, QListWidget, QGroupBox, QFrame, QSizePolicy, 
-                             QGraphicsDropShadowEffect)
+from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QWidget,
+                             QLabel, QListWidget, QGroupBox, QFrame, QSizePolicy,
+                             QGraphicsDropShadowEffect, QComboBox, QLineEdit)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QColor
 
@@ -292,7 +292,10 @@ class MainWindowUIComponents:
         
         # Toggle per visualizzare Preventivi o Revisioni
         MainWindowUIComponents.create_view_toggle(window_instance, preventivi_layout)
-        
+
+        # Filtri preventivi
+        MainWindowUIComponents.create_filters_section(window_instance, preventivi_layout)
+
         # Lista preventivi
         window_instance.lista_preventivi = QListWidget()
         window_instance.lista_preventivi.setMinimumHeight(300)
@@ -407,7 +410,139 @@ class MainWindowUIComponents:
         
         toggle_layout.addStretch()
         parent_layout.addWidget(toggle_container)
-    
+
+    @staticmethod
+    def create_filters_section(window_instance, parent_layout):
+        """Sezione filtri per preventivi"""
+        filters_container = QFrame()
+        filters_container.setStyleSheet("""
+            QFrame {
+                background-color: #ffffff;
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                padding: 12px;
+                margin: 4px 0px;
+            }
+        """)
+
+        filters_layout = QVBoxLayout(filters_container)
+        filters_layout.setContentsMargins(0, 0, 0, 0)
+        filters_layout.setSpacing(12)
+
+        # Prima riga: Filtro Origine e Filtro Cliente
+        row1_layout = QHBoxLayout()
+        row1_layout.setSpacing(12)
+
+        # Filtro Origine
+        origine_layout = QVBoxLayout()
+        origine_layout.setSpacing(4)
+
+        origine_label = QLabel("Tipo:")
+        origine_label.setStyleSheet("""
+            QLabel {
+                color: #4a5568;
+                font-size: 12px;
+                font-weight: 600;
+            }
+        """)
+        origine_layout.addWidget(origine_label)
+
+        window_instance.filtro_origine = QComboBox()
+        window_instance.filtro_origine.addItems(["Tutti", "Originali", "Revisionati", "Modificati"])
+        window_instance.filtro_origine.setStyleSheet("""
+            QComboBox {
+                background-color: #f7fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                padding: 6px 10px;
+                min-height: 32px;
+                font-size: 13px;
+            }
+            QComboBox:hover {
+                border-color: #cbd5e0;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+        """)
+        origine_layout.addWidget(window_instance.filtro_origine)
+
+        row1_layout.addLayout(origine_layout, 1)
+
+        # Filtro Cliente
+        cliente_layout = QVBoxLayout()
+        cliente_layout.setSpacing(4)
+
+        cliente_label = QLabel("Cliente:")
+        cliente_label.setStyleSheet("""
+            QLabel {
+                color: #4a5568;
+                font-size: 12px;
+                font-weight: 600;
+            }
+        """)
+        cliente_layout.addWidget(cliente_label)
+
+        window_instance.filtro_cliente = QComboBox()
+        window_instance.filtro_cliente.addItem("Tutti i clienti", None)
+        window_instance.filtro_cliente.setStyleSheet("""
+            QComboBox {
+                background-color: #f7fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                padding: 6px 10px;
+                min-height: 32px;
+                font-size: 13px;
+            }
+            QComboBox:hover {
+                border-color: #cbd5e0;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+        """)
+        cliente_layout.addWidget(window_instance.filtro_cliente)
+
+        row1_layout.addLayout(cliente_layout, 1)
+
+        filters_layout.addLayout(row1_layout)
+
+        # Seconda riga: Filtro Keyword
+        keyword_layout = QVBoxLayout()
+        keyword_layout.setSpacing(4)
+
+        keyword_label = QLabel("Cerca:")
+        keyword_label.setStyleSheet("""
+            QLabel {
+                color: #4a5568;
+                font-size: 12px;
+                font-weight: 600;
+            }
+        """)
+        keyword_layout.addWidget(keyword_label)
+
+        window_instance.filtro_keyword = QLineEdit()
+        window_instance.filtro_keyword.setPlaceholderText("Cerca per parola chiave (es. 30x60, descrizione, codice...)")
+        window_instance.filtro_keyword.setStyleSheet("""
+            QLineEdit {
+                background-color: #f7fafc;
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                padding: 8px 12px;
+                min-height: 32px;
+                font-size: 13px;
+            }
+            QLineEdit:focus {
+                border-color: #4299e1;
+                background-color: #ffffff;
+            }
+        """)
+        keyword_layout.addWidget(window_instance.filtro_keyword)
+
+        filters_layout.addLayout(keyword_layout)
+
+        parent_layout.addWidget(filters_container)
+
     @staticmethod
     def create_preventivi_buttons(window_instance, parent_layout):
         """Pulsanti gestione preventivi CON NUOVO PULSANTE GENERA DOCUMENTO E CONFRONTA"""
