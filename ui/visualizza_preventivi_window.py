@@ -135,10 +135,10 @@ class VisualizzaPreventiviWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        # Layout principale
+        # Layout principale - margini ridotti per mostrare tutto
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(40, 30, 40, 30)
-        main_layout.setSpacing(30)
+        main_layout.setContentsMargins(20, 15, 20, 15)
+        main_layout.setSpacing(12)
 
         # Header
         self.create_header(main_layout)
@@ -167,25 +167,25 @@ class VisualizzaPreventiviWindow(QMainWindow):
         return shadow
 
     def create_header(self, parent_layout: QVBoxLayout) -> None:
-        """Header unificato"""
+        """Header unificato - compatto"""
         header_container = QFrame()
         header_container.setStyleSheet("""
             QFrame {
                 background-color: transparent;
                 border: none;
-                padding: 20px 0px;
+                padding: 5px 0px;
             }
         """)
 
         header_layout = QVBoxLayout(header_container)
-        header_layout.setSpacing(8)
+        header_layout.setSpacing(4)
 
         # Titolo principale
         title_label = QLabel("Visualizza Preventivi")
         title_label.setAlignment(Qt.AlignCenter)
         title_label.setStyleSheet("""
             QLabel {
-                font-size: 32px;
+                font-size: 24px;
                 font-weight: 700;
                 color: #2d3748;
                 padding: 0;
@@ -197,7 +197,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         subtitle_label.setAlignment(Qt.AlignCenter)
         subtitle_label.setStyleSheet("""
             QLabel {
-                font-size: 16px;
+                font-size: 13px;
                 font-weight: 400;
                 color: #718096;
                 padding: 0;
@@ -210,20 +210,20 @@ class VisualizzaPreventiviWindow(QMainWindow):
         parent_layout.addWidget(header_container)
 
     def create_view_toggle(self, parent_layout: QVBoxLayout) -> None:
-        """Toggle per cambiare tra preventivi e revisioni"""
+        """Toggle per cambiare tra preventivi e revisioni - compatto"""
         toggle_container = QFrame()
         toggle_container.setStyleSheet("""
             QFrame {
                 background-color: #ffffff;
                 border: 1px solid #e2e8f0;
                 border-radius: 8px;
-                padding: 12px;
+                padding: 8px;
             }
         """)
         toggle_container.setGraphicsEffect(self.create_shadow_effect())
 
         toggle_layout = QHBoxLayout(toggle_container)
-        toggle_layout.setSpacing(12)
+        toggle_layout.setSpacing(10)
 
         # Label
         label = QLabel("Visualizza:")
@@ -276,20 +276,20 @@ class VisualizzaPreventiviWindow(QMainWindow):
         parent_layout.addWidget(toggle_container)
 
     def create_filters_section(self, parent_layout: QVBoxLayout) -> None:
-        """Sezione filtri per preventivi"""
+        """Sezione filtri per preventivi - compatta"""
         filters_container = QFrame()
         filters_container.setStyleSheet("""
             QFrame {
                 background-color: #ffffff;
                 border: 1px solid #e2e8f0;
                 border-radius: 8px;
-                padding: 20px;
+                padding: 12px;
             }
         """)
         filters_container.setGraphicsEffect(self.create_shadow_effect())
 
         filters_layout = QVBoxLayout(filters_container)
-        filters_layout.setSpacing(16)
+        filters_layout.setSpacing(10)
 
         # Titolo sezione
         title_label = QLabel("Filtri Avanzati")
@@ -346,17 +346,18 @@ class VisualizzaPreventiviWindow(QMainWindow):
         parent_layout.addWidget(filters_container)
 
     def create_lista_preventivi(self, parent_layout: QVBoxLayout) -> None:
-        """Lista preventivi con conteggio"""
+        """Lista preventivi con conteggio - compatta"""
         lista_group = QGroupBox("Preventivi")
         lista_group.setGraphicsEffect(self.create_shadow_effect())
 
         lista_layout = QVBoxLayout(lista_group)
-        lista_layout.setContentsMargins(30, 35, 30, 30)
-        lista_layout.setSpacing(16)
+        lista_layout.setContentsMargins(15, 20, 15, 15)
+        lista_layout.setSpacing(8)
 
-        # Lista
+        # Lista - altezza ridotta per mostrare i pulsanti
         self.lista_preventivi = QListWidget()
-        self.lista_preventivi.setMinimumHeight(400)
+        self.lista_preventivi.setMinimumHeight(180)
+        self.lista_preventivi.setMaximumHeight(250)
         self.lista_preventivi.itemDoubleClicked.connect(self.visualizza_preventivo)
         lista_layout.addWidget(self.lista_preventivi)
 
@@ -371,23 +372,23 @@ class VisualizzaPreventiviWindow(QMainWindow):
         """)
         lista_layout.addWidget(self.lbl_conteggio)
 
-        parent_layout.addWidget(lista_group, 1)
+        parent_layout.addWidget(lista_group)
 
     def create_action_buttons(self, parent_layout: QVBoxLayout) -> None:
-        """Pulsanti azioni preventivi"""
+        """Pulsanti azioni preventivi - compatti"""
         buttons_container = QFrame()
         buttons_container.setStyleSheet("""
             QFrame {
                 background-color: #ffffff;
                 border: 1px solid #e2e8f0;
                 border-radius: 8px;
-                padding: 20px;
+                padding: 12px;
             }
         """)
         buttons_container.setGraphicsEffect(self.create_shadow_effect())
 
         buttons_layout = QVBoxLayout(buttons_container)
-        buttons_layout.setSpacing(12)
+        buttons_layout.setSpacing(8)
 
         # Prima riga
         row1 = QHBoxLayout()
@@ -399,7 +400,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
             QPushButton {
                 background-color: #4a5568;
                 color: #ffffff;
-                min-height: 36px;
+                min-height: 32px;
+                padding: 8px 16px;
             }
             QPushButton:hover {
                 background-color: #2d3748;
@@ -413,7 +415,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
             QPushButton {
                 background-color: #4a5568;
                 color: #ffffff;
-                min-height: 36px;
+                min-height: 32px;
+                padding: 8px 16px;
             }
             QPushButton:hover {
                 background-color: #2d3748;
@@ -427,7 +430,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
             QPushButton {
                 background-color: #4a5568;
                 color: #ffffff;
-                min-height: 36px;
+                min-height: 32px;
+                padding: 8px 16px;
             }
             QPushButton:hover {
                 background-color: #2d3748;
@@ -450,7 +454,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
                 background-color: #f7fafc;
                 color: #4a5568;
                 border: 1px solid #e2e8f0;
-                min-height: 36px;
+                min-height: 32px;
+                padding: 8px 16px;
             }
             QPushButton:hover {
                 background-color: #edf2f7;
@@ -465,7 +470,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
                 background-color: #f7fafc;
                 color: #4a5568;
                 border: 1px solid #e2e8f0;
-                min-height: 36px;
+                min-height: 32px;
+                padding: 8px 16px;
             }
             QPushButton:hover {
                 background-color: #edf2f7;
@@ -479,7 +485,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
             QPushButton {
                 background-color: #e53e3e;
                 color: #ffffff;
-                min-height: 36px;
+                min-height: 32px;
+                padding: 8px 16px;
             }
             QPushButton:hover {
                 background-color: #c53030;
@@ -497,19 +504,20 @@ class VisualizzaPreventiviWindow(QMainWindow):
         parent_layout.addWidget(buttons_container)
 
     def create_footer(self, parent_layout: QVBoxLayout) -> None:
-        """Footer con pulsante chiudi"""
+        """Footer con pulsante chiudi - compatto"""
         footer_layout = QHBoxLayout()
         footer_layout.addStretch()
 
         # Chiudi finestra
-        btn_chiudi = QPushButton("Chiudi Visualizzazione")
+        btn_chiudi = QPushButton("Chiudi")
         btn_chiudi.setStyleSheet("""
             QPushButton {
                 background-color: #f7fafc;
                 color: #4a5568;
                 border: 1px solid #e2e8f0;
-                min-height: 40px;
-                min-width: 200px;
+                min-height: 32px;
+                min-width: 120px;
+                padding: 8px 16px;
             }
             QPushButton:hover {
                 background-color: #edf2f7;
