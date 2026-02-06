@@ -466,36 +466,17 @@ class MainWindowBusinessLogic:
     
     @staticmethod
     def mostra_nascondi_preventivi(window_instance):
-        """Mostra o nasconde la sezione dei preventivi"""
-        if window_instance.preventivi_visibili:
-            # Nascondi preventivi
-            window_instance.preventivi_column.hide()
-            window_instance.btn_visualizza_preventivi.setText("Visualizza Preventivi Salvati")
-            window_instance.preventivi_visibili = False
-        else:
-            # Mostra preventivi
-            window_instance.preventivi_column.show()
-            window_instance.btn_visualizza_preventivi.setText("Nascondi Preventivi")
-            window_instance.preventivi_visibili = True
+        """Apre la finestra per visualizzare i preventivi"""
+        from ui.visualizza_preventivi_window import VisualizzaPreventiviWindow
 
-            # Carica i clienti nel filtro (solo la prima volta)
-            if not hasattr(window_instance, '_filtri_inizializzati'):
-                MainWindowBusinessLogic.load_clienti_filtro(window_instance)
-
-                # Connetti i segnali dei filtri per ricaricare i preventivi quando cambiano
-                window_instance.filtro_origine.currentIndexChanged.connect(
-                    lambda: MainWindowBusinessLogic.load_preventivi(window_instance)
-                )
-                window_instance.filtro_cliente.currentIndexChanged.connect(
-                    lambda: MainWindowBusinessLogic.load_preventivi(window_instance)
-                )
-                window_instance.filtro_keyword.textChanged.connect(
-                    lambda: MainWindowBusinessLogic.load_preventivi(window_instance)
-                )
-
-                window_instance._filtri_inizializzati = True
-
-            MainWindowBusinessLogic.load_preventivi(window_instance)
+        window_instance.visualizza_preventivi_window = VisualizzaPreventiviWindow(
+            window_instance.db_manager,
+            window_instance
+        )
+        window_instance.visualizza_preventivi_window.preventivo_modificato.connect(
+            window_instance.preventivo_salvato
+        )
+        window_instance.visualizza_preventivi_window.show()
     
     @staticmethod
     def visualizza_preventivo(window_instance):

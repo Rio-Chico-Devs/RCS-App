@@ -39,14 +39,10 @@ class MainWindow(QMainWindow):
         self.db_manager = DatabaseManager()
         self.preventivo_window = None
         self.gestione_materiali_window = None
-        self.preventivi_visibili = False
-        self.modalita_visualizzazione = 'preventivi'
-        
+        self.visualizza_preventivi_window = None
+
         # Inizializzazione UI delegata al modulo
         MainWindowUIComponents.init_ui(self)
-        
-        # Caricamento preventivi delegato alla business logic
-        MainWindowBusinessLogic.load_preventivi(self)
     
     # =============================================================================
     # CALLBACK METHODS - Delegano alla business logic
