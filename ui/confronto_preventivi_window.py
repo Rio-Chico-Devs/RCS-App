@@ -273,10 +273,12 @@ class ConfrontoPreventiviWindow(QMainWindow):
         self.combo_clienti.addItem("-- Tutti i clienti --", None)
 
         try:
-            preventivi = self.db_manager.get_all_preventivi()
+            preventivi_raw = self.db_manager.get_all_preventivi()
             clienti = set()
-            for prev in preventivi:
-                nome_cliente = prev.get('nome_cliente', '').strip()
+            for prev_tuple in preventivi_raw:
+                # prev_tuple è (id, data_creazione, preventivo_finale, prezzo_cliente,
+                #               nome_cliente, numero_ordine, descrizione, codice, numero_revisione)
+                nome_cliente = prev_tuple[4].strip() if len(prev_tuple) > 4 and prev_tuple[4] else ''
                 if nome_cliente:
                     clienti.add(nome_cliente)
 
@@ -296,27 +298,29 @@ class ConfrontoPreventiviWindow(QMainWindow):
         testo_filtro = self.input_filtro.text().lower().strip()
 
         try:
-            preventivi = self.db_manager.get_all_preventivi()
+            preventivi_raw = self.db_manager.get_all_preventivi()
             preventivi_filtrati = []
 
-            for prev in preventivi:
+            for prev_tuple in preventivi_raw:
+                # prev_tuple è (id, data_creazione, preventivo_finale, prezzo_cliente,
+                #               nome_cliente, numero_ordine, descrizione, codice, numero_revisione)
+                id_prev = prev_tuple[0]
+                data_creazione = prev_tuple[1]
+                preventivo_finale = prev_tuple[2]
+                prezzo_cliente = prev_tuple[3]
+                nome_cliente = prev_tuple[4] if len(prev_tuple) > 4 else ''
+                numero_ordine = prev_tuple[5] if len(prev_tuple) > 5 else ''
+                descrizione = prev_tuple[6] if len(prev_tuple) > 6 else ''
+                codice = prev_tuple[7] if len(prev_tuple) > 7 else ''
+                numero_revisione = prev_tuple[8] if len(prev_tuple) > 8 else 1
+
                 # Filtro per cliente
                 if cliente_selezionato:
-                    if prev.get('nome_cliente', '').strip() != cliente_selezionato:
+                    if nome_cliente.strip() != cliente_selezionato:
                         continue
 
                 # Filtro per testo (cerca in TUTTI i campi)
                 if testo_filtro:
-                    id_prev = prev.get('id', '')
-                    data_creazione = prev.get('data_creazione', '')
-                    preventivo_finale = prev.get('preventivo_finale', 0)
-                    prezzo_cliente = prev.get('prezzo_cliente', 0)
-                    nome_cliente = prev.get('nome_cliente', '')
-                    numero_ordine = prev.get('numero_ordine', '')
-                    descrizione = prev.get('descrizione', '')
-                    codice = prev.get('codice', '')
-                    numero_revisione = prev.get('numero_revisione', 1)
-
                     # Crea una stringa con tutti i valori
                     valori_da_cercare = [
                         str(id_prev),
@@ -337,7 +341,7 @@ class ConfrontoPreventiviWindow(QMainWindow):
                     if testo_filtro not in testo_completo:
                         continue
 
-                preventivi_filtrati.append(prev)
+                preventivi_filtrati.append(prev_tuple)
 
             # Mostra/nascondi label "nessun preventivo"
             if len(preventivi_filtrati) == 0:
@@ -348,19 +352,25 @@ class ConfrontoPreventiviWindow(QMainWindow):
                 self.label_nessun_preventivo.setVisible(False)
 
                 # Popola la lista
-                for prev in preventivi_filtrati:
-                    numero_revisione = prev.get('numero_revisione', 1)
+                for prev_tuple in preventivi_filtrati:
+                    id_prev = prev_tuple[0]
+                    data_creazione = prev_tuple[1]
+                    preventivo_finale = prev_tuple[2]
+                    nome_cliente = prev_tuple[4] if len(prev_tuple) > 4 else 'N/A'
+                    descrizione = prev_tuple[6] if len(prev_tuple) > 6 else 'N/A'
+                    numero_revisione = prev_tuple[8] if len(prev_tuple) > 8 else 1
+
                     tipo_preventivo = "Originale" if numero_revisione == 1 else f"Revisione {numero_revisione}"
 
-                    testo = (f"ID: {prev.get('id')} - "
-                            f"{prev.get('nome_cliente', 'N/A')} - "
-                            f"{prev.get('descrizione', 'N/A')} - "
-                            f"€{prev.get('preventivo_finale', 0):.2f} - "
-                            f"{prev.get('data_creazione', 'N/A')} - "
+                    testo = (f"ID: {id_prev} - "
+                            f"{nome_cliente} - "
+                            f"{descrizione} - "
+                            f"€{preventivo_finale:.2f} - "
+                            f"{data_creazione} - "
                             f"{tipo_preventivo}")
 
                     item = QListWidgetItem(testo)
-                    item.setData(Qt.UserRole, prev.get('id'))
+                    item.setData(Qt.UserRole, id_prev)
                     self.lista_preventivi.addItem(item)
 
         except Exception as e:
