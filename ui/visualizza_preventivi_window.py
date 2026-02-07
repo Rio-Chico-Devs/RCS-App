@@ -33,7 +33,6 @@ class VisualizzaPreventiviWindow(QMainWindow):
         super().__init__(parent)
         self.db_manager = db_manager
         self.parent_window = parent
-        self.modalita_visualizzazione = 'preventivi'  # 'preventivi' o 'revisioni'
         self.init_ui()
         self.load_clienti_filtro()
         self.load_preventivi()
@@ -147,9 +146,6 @@ class VisualizzaPreventiviWindow(QMainWindow):
         # Header
         self.create_header(main_layout)
 
-        # Toggle visualizzazione preventivi/revisioni
-        self.create_view_toggle(main_layout)
-
         # Filtri
         self.create_filters_section(main_layout)
 
@@ -213,72 +209,6 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
         parent_layout.addWidget(header_container)
 
-    def create_view_toggle(self, parent_layout: QVBoxLayout) -> None:
-        """Toggle per cambiare tra preventivi e revisioni - compatto"""
-        toggle_container = QFrame()
-        toggle_container.setStyleSheet("""
-            QFrame {
-                background-color: #ffffff;
-                border: 1px solid #e2e8f0;
-                border-radius: 8px;
-                padding: 8px;
-            }
-        """)
-        toggle_container.setGraphicsEffect(self.create_shadow_effect())
-
-        toggle_layout = QHBoxLayout(toggle_container)
-        toggle_layout.setSpacing(10)
-
-        # Label
-        label = QLabel("Visualizza:")
-        label.setStyleSheet("""
-            QLabel {
-                color: #4a5568;
-                font-size: 14px;
-                font-weight: 600;
-            }
-        """)
-
-        # Pulsante Preventivi
-        self.btn_mostra_preventivi = QPushButton("Preventivi")
-        self.btn_mostra_preventivi.setStyleSheet("""
-            QPushButton {
-                background-color: #4a5568;
-                color: #ffffff;
-                min-height: 28px;
-                min-width: 100px;
-                padding: 6px 16px;
-            }
-            QPushButton:hover {
-                background-color: #2d3748;
-            }
-        """)
-        self.btn_mostra_preventivi.clicked.connect(lambda: self.cambia_visualizzazione('preventivi'))
-
-        # Pulsante Revisioni
-        self.btn_mostra_revisioni = QPushButton("Revisioni")
-        self.btn_mostra_revisioni.setStyleSheet("""
-            QPushButton {
-                background-color: #f7fafc;
-                color: #4a5568;
-                border: 1px solid #e2e8f0;
-                min-height: 28px;
-                min-width: 100px;
-                padding: 6px 16px;
-            }
-            QPushButton:hover {
-                background-color: #edf2f7;
-            }
-        """)
-        self.btn_mostra_revisioni.clicked.connect(lambda: self.cambia_visualizzazione('revisioni'))
-
-        toggle_layout.addWidget(label)
-        toggle_layout.addWidget(self.btn_mostra_preventivi)
-        toggle_layout.addWidget(self.btn_mostra_revisioni)
-        toggle_layout.addStretch()
-
-        parent_layout.addWidget(toggle_container)
-
     def create_filters_section(self, parent_layout: QVBoxLayout) -> None:
         """Sezione filtri per preventivi - inline compatto CON FILTRO "CON MODIFICHE" """
         filters_container = QFrame()
@@ -296,19 +226,15 @@ class VisualizzaPreventiviWindow(QMainWindow):
         filters_layout = QHBoxLayout(filters_container)
         filters_layout.setSpacing(15)
 
-        # Filtro Tipo Preventivo (AGGIORNATO con "Con modifiche")
-        self.label_tipo = QLabel("Tipo Preventivo:")
-        self.label_tipo.setStyleSheet("QLabel { font-weight: 500; color: #4a5568; }")
+        # Filtro Tipo Preventivo (sempre visibile)
+        tipo_label = QLabel("Tipo:")
+        tipo_label.setStyleSheet("QLabel { font-weight: 500; color: #4a5568; }")
         self.filtro_origine = QComboBox()
         self.filtro_origine.addItems(["Tutti", "Originali", "Revisionati", "Con modifiche"])
         self.filtro_origine.currentIndexChanged.connect(self.load_preventivi)
         self.filtro_origine.setMinimumWidth(140)
 
-        # Nascosto di default (si mostra solo in modalità revisioni)
-        self.label_tipo.setVisible(False)
-        self.filtro_origine.setVisible(False)
-
-        filters_layout.addWidget(self.label_tipo)
+        filters_layout.addWidget(tipo_label)
         filters_layout.addWidget(self.filtro_origine)
 
         # Filtro Cliente
@@ -557,7 +483,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
             print(f"Errore nel caricamento clienti filtro: {str(e)}")
 
     def load_preventivi(self) -> None:
-        """Carica preventivi in base alla modalità e ai filtri attivi"""
+        """Carica TUTTI i preventivi con filtri"""
         self.lista_preventivi.clear()
 
         # Ottieni i valori dei filtri
@@ -565,42 +491,31 @@ class VisualizzaPreventiviWindow(QMainWindow):
         filtro_cliente_data = self.filtro_cliente.currentData()
         filtro_keyword_text = self.filtro_keyword.text().lower().strip()
 
-        # GESTIONE FILTRO "CON MODIFICHE"
+        # Carica SEMPRE tutti i preventivi
         if filtro_origine_text == "Con modifiche":
-            # Mostra solo preventivi con storico modifiche
             preventivi = self.db_manager.get_preventivi_con_modifiche()
-        elif self.modalita_visualizzazione == 'preventivi':
-            # Mostra solo preventivi (ultima revisione di ogni gruppo)
-            preventivi = self.db_manager.get_all_preventivi_latest()
         else:
-            # Mostra solo le revisioni (numero_revisione > 1)
             preventivi = self.db_manager.get_all_preventivi()
-            preventivi_filtrati = []
-            for prev in preventivi:
-                if len(prev) >= 9:
-                    numero_revisione = prev[8] if len(prev) > 8 else 1
-                    if numero_revisione > 1:
-                        preventivi_filtrati.append(prev)
-            preventivi = preventivi_filtrati
 
         count = 0
         for preventivo in preventivi:
-            # Formato: id, data_creazione, preventivo_finale, prezzo_cliente,
-            # nome_cliente, numero_ordine, descrizione, codice, numero_revisione, [storico_modifiche]
-            if len(preventivo) >= 9:
-                id_prev, data_creazione, preventivo_finale, prezzo_cliente, nome_cliente, numero_ordine, descrizione, codice, numero_revisione = preventivo[:9]
-                storico_modifiche = preventivo[10] if len(preventivo) > 10 else '[]'
-            else:
-                id_prev, data_creazione, preventivo_finale, prezzo_cliente = preventivo[:4]
-                nome_cliente, numero_ordine, descrizione, codice, numero_revisione = "", "", "", "", 1
-                storico_modifiche = '[]'
+            # Ottieni i dati del preventivo - LEGGI MISURA DAL DB
+            prev_completo = self.db_manager.get_preventivo_by_id(preventivo[0])
+            if not prev_completo:
+                continue
 
-            # APPLICA FILTRO ORIGINE (solo se non è "Con modifiche")
-            if filtro_origine_text != "Con modifiche":
-                if filtro_origine_text == "Originali" and numero_revisione != 1:
-                    continue
-                elif filtro_origine_text == "Revisionati" and numero_revisione == 1:
-                    continue
+            id_prev = prev_completo['id']
+            nome_cliente = prev_completo.get('nome_cliente', '')
+            misura = prev_completo.get('misura', '')
+            descrizione = prev_completo.get('descrizione', '')
+            numero_revisione = prev_completo.get('numero_revisione', 1)
+            storico_modifiche = prev_completo.get('storico_modifiche', [])
+
+            # APPLICA FILTRO TIPO
+            if filtro_origine_text == "Originali" and numero_revisione != 1:
+                continue
+            elif filtro_origine_text == "Revisionati" and numero_revisione == 1:
+                continue
 
             # APPLICA FILTRO CLIENTE
             if filtro_cliente_data and nome_cliente.strip() != filtro_cliente_data:
@@ -609,46 +524,32 @@ class VisualizzaPreventiviWindow(QMainWindow):
             # APPLICA FILTRO KEYWORD
             if filtro_keyword_text:
                 campi_ricerca = [
-                    str(id_prev), str(data_creazione), str(preventivo_finale),
-                    str(prezzo_cliente), str(nome_cliente), str(numero_ordine),
-                    str(descrizione), str(codice), str(numero_revisione)
+                    str(id_prev), str(nome_cliente), str(misura), str(descrizione)
                 ]
                 testo_completo = " ".join(campi_ricerca).lower()
                 if filtro_keyword_text not in testo_completo:
                     continue
 
-            # Formatta la data
-            data_formattata = data_creazione.split('T')[0] if 'T' in data_creazione else data_creazione
+            # Determina il tipo tra parentesi
+            tipo_preventivo = "Originale" if numero_revisione == 1 else "Revisionato"
 
-            # Formatta il testo
-            if filtro_origine_text == "Con modifiche":
-                prefisso_tipo = "Con modifiche"
-            elif self.modalita_visualizzazione == 'revisioni':
-                prefisso_tipo = "Revisione"
-            else:
-                if numero_revisione == 1:
-                    prefisso_tipo = "Originale"
-                else:
-                    prefisso_tipo = "Revisionato"
-
-            cliente_info = nome_cliente if nome_cliente else "Cliente non specificato"
-            ordine_info = f" | {numero_ordine}" if numero_ordine else ""
-
-            # Aggiungi badge se ha modifiche nello storico
+            # Aggiungi badge modifiche se presenti
             badge_modifiche = ""
-            if storico_modifiche and storico_modifiche != '[]':
-                try:
-                    import json
-                    storico_list = json.loads(storico_modifiche) if isinstance(storico_modifiche, str) else []
-                    if storico_list:
-                        badge_modifiche = f" 📝({len(storico_list)})"
-                except Exception:
-                    pass
+            if storico_modifiche and len(storico_modifiche) > 0:
+                badge_modifiche = f"/Con modifiche"
 
-            testo = f"#{id_prev:03d} [{prefisso_tipo}]{badge_modifiche} - {data_formattata} - {cliente_info}{ordine_info}"
-            testo += f"\nPreventivo: EUR {preventivo_finale:,.2f} | Cliente: EUR {prezzo_cliente:,.2f}"
-            if descrizione:
-                testo += f"\nDescrizione: {descrizione[:60]}{'...' if len(descrizione) > 60 else ''}"
+            # Formatta visualizzazione PULITA
+            # Riga 1: #ID [Tipo] - Cliente: NOME
+            cliente_display = nome_cliente if nome_cliente else "Senza nome"
+            riga1 = f"#{id_prev:03d} [{tipo_preventivo}{badge_modifiche}] - Cliente: {cliente_display}"
+
+            # Riga 2: Misura: XXX | Descrizione: YYY
+            misura_display = misura if misura else "N/D"
+            desc_display = descrizione[:80] + "..." if len(descrizione) > 80 else descrizione
+            desc_display = desc_display if desc_display else "Nessuna descrizione"
+            riga2 = f"Misura: {misura_display} | Descrizione: {desc_display}"
+
+            testo = f"{riga1}\n{riga2}"
 
             item = QListWidgetItem(testo)
             item.setData(Qt.UserRole, id_prev)
@@ -657,77 +558,6 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
         # Aggiorna conteggio
         self.lbl_conteggio.setText(f"{count} preventivi visualizzati")
-
-    def cambia_visualizzazione(self, modalita: str) -> None:
-        """Cambia tra visualizzazione Preventivi e Revisioni"""
-        self.modalita_visualizzazione = modalita
-
-        # Mostra/nascondi filtro Tipo Preventivo in base alla modalità
-        if modalita == 'preventivi':
-            # Nascondi filtro tipo (non ha senso per preventivi che mostrano solo ultime versioni)
-            self.label_tipo.setVisible(False)
-            self.filtro_origine.setVisible(False)
-        else:
-            # Mostra filtro tipo per revisioni
-            self.label_tipo.setVisible(True)
-            self.filtro_origine.setVisible(True)
-
-        # Aggiorna stili pulsanti
-        if modalita == 'preventivi':
-            self.btn_mostra_preventivi.setStyleSheet("""
-                QPushButton {
-                    background-color: #4a5568;
-                    color: #ffffff;
-                    min-height: 28px;
-                    min-width: 100px;
-                    padding: 6px 16px;
-                }
-                QPushButton:hover {
-                    background-color: #2d3748;
-                }
-            """)
-            self.btn_mostra_revisioni.setStyleSheet("""
-                QPushButton {
-                    background-color: #f7fafc;
-                    color: #4a5568;
-                    border: 1px solid #e2e8f0;
-                    min-height: 28px;
-                    min-width: 100px;
-                    padding: 6px 16px;
-                }
-                QPushButton:hover {
-                    background-color: #edf2f7;
-                }
-            """)
-        else:
-            self.btn_mostra_revisioni.setStyleSheet("""
-                QPushButton {
-                    background-color: #4a5568;
-                    color: #ffffff;
-                    min-height: 28px;
-                    min-width: 100px;
-                    padding: 6px 16px;
-                }
-                QPushButton:hover {
-                    background-color: #2d3748;
-                }
-            """)
-            self.btn_mostra_preventivi.setStyleSheet("""
-                QPushButton {
-                    background-color: #f7fafc;
-                    color: #4a5568;
-                    border: 1px solid #e2e8f0;
-                    min-height: 28px;
-                    min-width: 100px;
-                    padding: 6px 16px;
-                }
-                QPushButton:hover {
-                    background-color: #edf2f7;
-                }
-            """)
-
-        # Ricarica lista
-        self.load_preventivi()
 
     def visualizza_preventivo(self) -> None:
         """Visualizza i dettagli del preventivo selezionato"""

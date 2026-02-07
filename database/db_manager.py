@@ -32,7 +32,7 @@ class DatabaseManager:
                 )
             """)
 
-            # Tabella preventivi - AGGIORNATA con campo storico_modifiche
+            # Tabella preventivi - AGGIORNATA con campo storico_modifiche e misura
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS preventivi (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,6 +41,7 @@ class DatabaseManager:
                     preventivo_originale_id INTEGER,
                     nome_cliente TEXT NOT NULL DEFAULT '',
                     numero_ordine TEXT NOT NULL DEFAULT '',
+                    misura TEXT NOT NULL DEFAULT '',
                     descrizione TEXT NOT NULL DEFAULT '',
                     codice TEXT NOT NULL DEFAULT '',
                     costo_totale_materiali REAL,
@@ -110,6 +111,7 @@ class DatabaseManager:
         new_columns = [
             ("nome_cliente", "TEXT NOT NULL DEFAULT ''"),
             ("numero_ordine", "TEXT NOT NULL DEFAULT ''"),
+            ("misura", "TEXT NOT NULL DEFAULT ''"),
             ("descrizione", "TEXT NOT NULL DEFAULT ''"),
             ("codice", "TEXT NOT NULL DEFAULT ''"),
             ("storico_modifiche", "TEXT DEFAULT '[]'")
@@ -206,17 +208,18 @@ class DatabaseManager:
             cursor.execute("""
                 INSERT INTO preventivi (
                     data_creazione, numero_revisione, preventivo_originale_id,
-                    nome_cliente, numero_ordine, descrizione, codice,
+                    nome_cliente, numero_ordine, misura, descrizione, codice,
                     costo_totale_materiali, costi_accessori, minuti_taglio,
                     minuti_avvolgimento, minuti_pulizia, minuti_rettifica,
                     minuti_imballaggio, tot_mano_opera, subtotale,
                     maggiorazione_25, preventivo_finale, prezzo_cliente,
                     materiali_utilizzati, note_revisione, storico_modifiche
-                ) VALUES (?, 1, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')
+                ) VALUES (?, 1, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')
             """, (
                 datetime.now().isoformat(),
                 preventivo_data.get('nome_cliente', ''),
                 preventivo_data.get('numero_ordine', ''),
+                preventivo_data.get('misura', ''),
                 preventivo_data.get('descrizione', ''),
                 preventivo_data.get('codice', ''),
                 preventivo_data['costo_totale_materiali'],
@@ -267,6 +270,7 @@ class DatabaseManager:
                     'data': {
                         'nome_cliente': preventivo_attuale.get('nome_cliente', ''),
                         'numero_ordine': preventivo_attuale.get('numero_ordine', ''),
+                        'misura': preventivo_attuale.get('misura', ''),
                         'descrizione': preventivo_attuale.get('descrizione', ''),
                         'codice': preventivo_attuale.get('codice', ''),
                         'costo_totale_materiali': preventivo_attuale.get('costo_totale_materiali', 0.0),
@@ -292,7 +296,7 @@ class DatabaseManager:
                 # 2. Ora aggiorna il preventivo con i nuovi dati
                 cursor.execute("""
                     UPDATE preventivi SET
-                        nome_cliente = ?, numero_ordine = ?, descrizione = ?, codice = ?,
+                        nome_cliente = ?, numero_ordine = ?, misura = ?, descrizione = ?, codice = ?,
                         costo_totale_materiali = ?, costi_accessori = ?, minuti_taglio = ?,
                         minuti_avvolgimento = ?, minuti_pulizia = ?, minuti_rettifica = ?,
                         minuti_imballaggio = ?, tot_mano_opera = ?, subtotale = ?,
@@ -302,6 +306,7 @@ class DatabaseManager:
                 """, (
                     preventivo_data.get('nome_cliente', ''),
                     preventivo_data.get('numero_ordine', ''),
+                    preventivo_data.get('misura', ''),
                     preventivo_data.get('descrizione', ''),
                     preventivo_data.get('codice', ''),
                     preventivo_data['costo_totale_materiali'],
@@ -372,6 +377,7 @@ class DatabaseManager:
                     'data': {
                         'nome_cliente': preventivo_attuale.get('nome_cliente', ''),
                         'numero_ordine': preventivo_attuale.get('numero_ordine', ''),
+                        'misura': preventivo_attuale.get('misura', ''),
                         'descrizione': preventivo_attuale.get('descrizione', ''),
                         'codice': preventivo_attuale.get('codice', ''),
                         'costo_totale_materiali': preventivo_attuale.get('costo_totale_materiali', 0.0),
@@ -396,7 +402,7 @@ class DatabaseManager:
                 # Ripristina la versione selezionata
                 cursor.execute("""
                     UPDATE preventivi SET
-                        nome_cliente = ?, numero_ordine = ?, descrizione = ?, codice = ?,
+                        nome_cliente = ?, numero_ordine = ?, misura = ?, descrizione = ?, codice = ?,
                         costo_totale_materiali = ?, costi_accessori = ?, minuti_taglio = ?,
                         minuti_avvolgimento = ?, minuti_pulizia = ?, minuti_rettifica = ?,
                         minuti_imballaggio = ?, tot_mano_opera = ?, subtotale = ?,
@@ -406,6 +412,7 @@ class DatabaseManager:
                 """, (
                     versione_da_ripristinare['nome_cliente'],
                     versione_da_ripristinare['numero_ordine'],
+                    versione_da_ripristinare.get('misura', ''),
                     versione_da_ripristinare['descrizione'],
                     versione_da_ripristinare['codice'],
                     versione_da_ripristinare['costo_totale_materiali'],
@@ -446,19 +453,20 @@ class DatabaseManager:
             cursor.execute("""
                 INSERT INTO preventivi (
                     data_creazione, numero_revisione, preventivo_originale_id,
-                    nome_cliente, numero_ordine, descrizione, codice,
+                    nome_cliente, numero_ordine, misura, descrizione, codice,
                     costo_totale_materiali, costi_accessori, minuti_taglio,
                     minuti_avvolgimento, minuti_pulizia, minuti_rettifica,
                     minuti_imballaggio, tot_mano_opera, subtotale,
                     maggiorazione_25, preventivo_finale, prezzo_cliente,
                     materiali_utilizzati, note_revisione, storico_modifiche
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')
             """, (
                 datetime.now().isoformat(),
                 nuovo_numero_revisione,
                 preventivo_originale_id,
                 preventivo_data.get('nome_cliente', ''),
                 preventivo_data.get('numero_ordine', ''),
+                preventivo_data.get('misura', ''),
                 preventivo_data.get('descrizione', ''),
                 preventivo_data.get('codice', ''),
                 preventivo_data['costo_totale_materiali'],
@@ -552,7 +560,7 @@ class DatabaseManager:
                     preventivo['materiali_utilizzati'] = []
 
                 # Assicurati che i nuovi campi esistano (compatibilità)
-                for campo in ['nome_cliente', 'numero_ordine', 'descrizione', 'codice']:
+                for campo in ['nome_cliente', 'numero_ordine', 'misura', 'descrizione', 'codice']:
                     if campo not in preventivo:
                         preventivo[campo] = ''
 

@@ -65,6 +65,7 @@ class PreventivoWindow(QMainWindow):
         # Carica i dati del preventivo (inclusi i nuovi campi)
         self.nome_cliente_data = preventivo_data.get('nome_cliente', '')
         self.numero_ordine_data = preventivo_data.get('numero_ordine', '')
+        self.misura_data = preventivo_data.get('misura', '')
         self.descrizione_data = preventivo_data.get('descrizione', '')
         self.codice_data = preventivo_data.get('codice', '')
         
@@ -243,12 +244,16 @@ class PreventivoWindow(QMainWindow):
         client_grid.addWidget(self.create_standard_label("Numero Ordine:"), 0, 2)
         self.edit_numero_ordine = QLineEdit()
         client_grid.addWidget(self.edit_numero_ordine, 0, 3)
-        
-        # Seconda riga: Codice
+
+        # Seconda riga: Codice e Misura
         client_grid.addWidget(self.create_standard_label("Codice:"), 1, 0)
         self.edit_codice = QLineEdit()
         client_grid.addWidget(self.edit_codice, 1, 1)
-        
+
+        client_grid.addWidget(self.create_standard_label("Misura:"), 1, 2)
+        self.edit_misura = QLineEdit()
+        client_grid.addWidget(self.edit_misura, 1, 3)
+
         # Terza riga: Descrizione (LineEdit semplice con limite caratteri)
         client_grid.addWidget(self.create_standard_label("Descrizione:"), 2, 0)
         self.edit_descrizione = QLineEdit()
@@ -261,6 +266,7 @@ class PreventivoWindow(QMainWindow):
         if hasattr(self, 'nome_cliente_data'):
             self.edit_nome_cliente.setText(self.nome_cliente_data)
             self.edit_numero_ordine.setText(self.numero_ordine_data)
+            self.edit_misura.setText(self.misura_data)
             self.edit_descrizione.setText(self.descrizione_data)
             self.edit_codice.setText(self.codice_data)
         
@@ -271,6 +277,7 @@ class PreventivoWindow(QMainWindow):
         # Disabilita i campi cliente
         self.edit_nome_cliente.setEnabled(False)
         self.edit_numero_ordine.setEnabled(False)
+        self.edit_misura.setEnabled(False)
         self.edit_descrizione.setEnabled(False)
         self.edit_codice.setEnabled(False)
         
@@ -794,6 +801,7 @@ class PreventivoWindow(QMainWindow):
         return {
             'nome_cliente': self.edit_nome_cliente.text().strip(),
             'numero_ordine': self.edit_numero_ordine.text().strip(),
+            'misura': self.edit_misura.text().strip(),
             'descrizione': self.edit_descrizione.text().strip(),
             'codice': self.edit_codice.text().strip()
         }
@@ -807,6 +815,7 @@ class PreventivoWindow(QMainWindow):
         if hasattr(self, 'nome_cliente_data'):
             self.edit_nome_cliente.setText(self.nome_cliente_data or "")
             self.edit_numero_ordine.setText(self.numero_ordine_data or "")
+            self.edit_misura.setText(self.misura_data or "")
             self.edit_descrizione.setText(self.descrizione_data or "")
             self.edit_codice.setText(self.codice_data or "")
         
