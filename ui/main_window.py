@@ -18,6 +18,14 @@ v2.3.0 (24/09/2025):
 - MAINTAINED: Tutte le funzionalità esistenti e design system
 """
 
+# type: ignore
+# pyright: reportUnknownParameterType=false, reportMissingParameterType=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
+# pyright: reportUnknownArgumentType=false, reportAttributeAccessIssue=false
+# pyright: reportUnusedVariable=false
+# type: ignore
+# pyright: reportUnusedImport=false
+
 from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QWidget, QLabel, QListWidget, QMessageBox, QListWidgetItem,
                              QGroupBox, QFrame, QSizePolicy, QGraphicsDropShadowEffect,
@@ -39,14 +47,10 @@ class MainWindow(QMainWindow):
         self.db_manager = DatabaseManager()
         self.preventivo_window = None
         self.gestione_materiali_window = None
-        self.preventivi_visibili = False
-        self.modalita_visualizzazione = 'preventivi'
-        
+        self.visualizza_preventivi_window = None
+
         # Inizializzazione UI delegata al modulo
         MainWindowUIComponents.init_ui(self)
-        
-        # Caricamento preventivi delegato alla business logic
-        MainWindowBusinessLogic.load_preventivi(self)
     
     # =============================================================================
     # CALLBACK METHODS - Delegano alla business logic
@@ -87,7 +91,11 @@ class MainWindow(QMainWindow):
     def genera_documento_preventivo(self):
         """NUOVO: Genera documento di produzione dal preventivo selezionato"""
         MainWindowBusinessLogic.genera_documento_preventivo(self)
-    
+
+    def apri_confronto_preventivi(self):
+        """NUOVO: Apre la finestra per confrontare due preventivi"""
+        MainWindowBusinessLogic.apri_confronto_preventivi(self)
+
     # =============================================================================
     # COMPATIBILITY METHODS - Per retrocompatibilità
     # =============================================================================
@@ -107,5 +115,3 @@ class MainWindow(QMainWindow):
     def preventivo_salvato(self):
         """Callback chiamato quando un preventivo viene salvato"""
         MainWindowBusinessLogic.preventivo_salvato(self)
-            
-        

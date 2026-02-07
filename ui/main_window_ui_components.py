@@ -10,8 +10,18 @@ Last Updated: 24/09/2025
 Author: Sviluppatore PyQt5 + Claude
 """
 
-from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QWidget, 
-                             QLabel, QListWidget, QGroupBox, QFrame, QSizePolicy, 
+# type: ignore
+# pyright: reportUnknownParameterType=false, reportMissingParameterType=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
+# pyright: reportUnknownArgumentType=false, reportAttributeAccessIssue=false
+# pyright: reportUnusedVariable=false
+# type: ignore
+# pyright: reportUnusedImport=false
+# type: ignore
+# pyright: reportUnknownLambdaType=false
+
+from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QWidget,
+                             QLabel, QGroupBox, QFrame, QSizePolicy,
                              QGraphicsDropShadowEffect)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QColor
@@ -43,13 +53,10 @@ class MainWindowUIComponents:
         # Contenuto principale - layout responsive
         content_layout = QHBoxLayout()
         content_layout.setSpacing(40)
-        
-        # Colonna principale (pulsanti azioni)
+
+        # Colonna principale (pulsanti azioni) - ora occupa tutta la larghezza
         MainWindowUIComponents.create_main_actions_column(window_instance, content_layout)
-        
-        # Colonna preventivi (inizialmente nascosta)
-        MainWindowUIComponents.create_preventivi_column(window_instance, content_layout)
-        
+
         main_layout.addLayout(content_layout, 1)
         
         # Footer informativo
@@ -267,260 +274,9 @@ class MainWindowUIComponents:
         buttons_layout.addWidget(window_instance.btn_nuovo_preventivo)
         buttons_layout.addWidget(window_instance.btn_visualizza_preventivi)
         buttons_layout.addWidget(window_instance.btn_gestisci_materiali)
-        
+
         parent_layout.addLayout(buttons_layout)
-    
-    @staticmethod
-    def create_preventivi_column(window_instance, parent_layout):
-        """Colonna preventivi salvati con nuovo pulsante Genera Documento"""
-        window_instance.preventivi_column = QWidget()
-        window_instance.preventivi_column.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        
-        layout = QVBoxLayout(window_instance.preventivi_column)
-        layout.setSpacing(20)
-        
-        # Sezione preventivi salvati
-        preventivi_group = QGroupBox("Preventivi Salvati")
-        preventivi_group.setGraphicsEffect(MainWindowUIComponents.create_shadow_effect())
-        
-        preventivi_layout = QVBoxLayout(preventivi_group)
-        preventivi_layout.setContentsMargins(30, 35, 30, 30)
-        preventivi_layout.setSpacing(16)
-        
-        # Info preventivi
-        MainWindowUIComponents.create_preventivi_info_card(window_instance, preventivi_layout)
-        
-        # Toggle per visualizzare Preventivi o Revisioni
-        MainWindowUIComponents.create_view_toggle(window_instance, preventivi_layout)
-        
-        # Lista preventivi
-        window_instance.lista_preventivi = QListWidget()
-        window_instance.lista_preventivi.setMinimumHeight(300)
-        window_instance.lista_preventivi.itemDoubleClicked.connect(window_instance.visualizza_preventivo)
-        preventivi_layout.addWidget(window_instance.lista_preventivi)
-        
-        # Pulsanti gestione preventivi CON NUOVO PULSANTE GENERA DOCUMENTO
-        MainWindowUIComponents.create_preventivi_buttons(window_instance, preventivi_layout)
-        
-        layout.addWidget(preventivi_group)
-        layout.addStretch()
-        
-        parent_layout.addWidget(window_instance.preventivi_column)
-        
-        # Inizialmente nascondi la colonna preventivi
-        window_instance.preventivi_column.hide()
-    
-    @staticmethod
-    def create_preventivi_info_card(window_instance, parent_layout):
-        """Card informativa preventivi"""
-        container = QFrame()
-        container.setStyleSheet("""
-            QFrame {
-                background-color: #f0fff4;
-                border: 1px solid #68d391;
-                border-radius: 8px;
-                padding: 16px;
-                margin: 2px 0px;
-            }
-        """)
-        
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        info_label = QLabel("Seleziona un preventivo per visualizzarlo, modificarlo, generare documenti o crearne una revisione")
-        info_label.setStyleSheet("""
-            QLabel {
-                color: #2d3748;
-                font-size: 14px;
-                font-weight: 500;
-            }
-        """)
-        
-        layout.addWidget(info_label)
-        layout.addStretch()
-        
-        parent_layout.addWidget(container)
-    
-    @staticmethod
-    def create_view_toggle(window_instance, parent_layout):
-        """Toggle per cambiare visualizzazione tra Preventivi e Revisioni"""
-        toggle_container = QFrame()
-        toggle_container.setStyleSheet("""
-            QFrame {
-                background-color: #f7fafc;
-                border: 1px solid #e2e8f0;
-                border-radius: 8px;
-                padding: 8px;
-                margin: 2px 0px;
-            }
-        """)
-        
-        toggle_layout = QHBoxLayout(toggle_container)
-        toggle_layout.setContentsMargins(0, 0, 0, 0)
-        toggle_layout.setSpacing(8)
-        
-        # Label
-        toggle_label = QLabel("Visualizza:")
-        toggle_label.setStyleSheet("""
-            QLabel {
-                color: #4a5568;
-                font-size: 14px;
-                font-weight: 600;
-            }
-        """)
-        toggle_layout.addWidget(toggle_label)
-        
-        # Pulsante Preventivi
-        window_instance.btn_mostra_preventivi = QPushButton("Preventivi")
-        window_instance.btn_mostra_preventivi.setStyleSheet("""
-            QPushButton {
-                background-color: #4a5568;
-                color: #ffffff;
-                min-height: 28px;
-                min-width: 100px;
-                padding: 6px 16px;
-            }
-            QPushButton:hover {
-                background-color: #2d3748;
-            }
-        """)
-        window_instance.btn_mostra_preventivi.clicked.connect(lambda: window_instance.cambia_visualizzazione('preventivi'))
-        toggle_layout.addWidget(window_instance.btn_mostra_preventivi)
-        
-        # Pulsante Revisioni
-        window_instance.btn_mostra_revisioni = QPushButton("Revisioni")
-        window_instance.btn_mostra_revisioni.setStyleSheet("""
-            QPushButton {
-                background-color: #f7fafc;
-                color: #4a5568;
-                border: 1px solid #e2e8f0;
-                min-height: 28px;
-                min-width: 100px;
-                padding: 6px 16px;
-            }
-            QPushButton:hover {
-                background-color: #edf2f7;
-            }
-        """)
-        window_instance.btn_mostra_revisioni.clicked.connect(lambda: window_instance.cambia_visualizzazione('revisioni'))
-        toggle_layout.addWidget(window_instance.btn_mostra_revisioni)
-        
-        toggle_layout.addStretch()
-        parent_layout.addWidget(toggle_container)
-    
-    @staticmethod
-    def create_preventivi_buttons(window_instance, parent_layout):
-        """Pulsanti gestione preventivi CON NUOVO PULSANTE GENERA DOCUMENTO"""
-        # Prima riga di pulsanti - aggiunta Genera Documento
-        buttons_layout_1 = QHBoxLayout()
-        buttons_layout_1.setSpacing(12)
-        
-        # Visualizza dettagli
-        window_instance.btn_visualizza_dettagli = QPushButton("Visualizza")
-        window_instance.btn_visualizza_dettagli.setStyleSheet("""
-            QPushButton {
-                background-color: #4a5568;
-                color: #ffffff;
-                min-height: 36px;
-            }
-            QPushButton:hover {
-                background-color: #2d3748;
-            }
-        """)
-        window_instance.btn_visualizza_dettagli.clicked.connect(window_instance.visualizza_preventivo)
-        
-        # Modifica preventivo
-        window_instance.btn_modifica_preventivo = QPushButton("Modifica")
-        window_instance.btn_modifica_preventivo.setStyleSheet("""
-            QPushButton {
-                background-color: #718096;
-                color: #ffffff;
-                min-height: 36px;
-            }
-            QPushButton:hover {
-                background-color: #4a5568;
-            }
-        """)
-        window_instance.btn_modifica_preventivo.clicked.connect(window_instance.modifica_preventivo)
-        
-        # NUOVO: Genera Documento
-        window_instance.btn_genera_documento = QPushButton("📄 Genera Documento")
-        window_instance.btn_genera_documento.setStyleSheet("""
-            QPushButton {
-                background-color: #48bb78;
-                color: #ffffff;
-                min-height: 36px;
-            }
-            QPushButton:hover {
-                background-color: #38a169;
-            }
-            QPushButton:disabled {
-                background-color: #a0aec0;
-                color: #718096;
-            }
-        """)
-        window_instance.btn_genera_documento.clicked.connect(window_instance.genera_documento_preventivo)
-        
-        # Crea revisione
-        window_instance.btn_crea_revisione = QPushButton("Crea Revisione")
-        window_instance.btn_crea_revisione.setStyleSheet("""
-            QPushButton {
-                background-color: #a0aec0;
-                color: #2d3748;
-                min-height: 36px;
-            }
-            QPushButton:hover {
-                background-color: #718096;
-                color: #ffffff;
-            }
-        """)
-        window_instance.btn_crea_revisione.clicked.connect(window_instance.crea_revisione)
-        
-        buttons_layout_1.addWidget(window_instance.btn_visualizza_dettagli)
-        buttons_layout_1.addWidget(window_instance.btn_modifica_preventivo)
-        buttons_layout_1.addWidget(window_instance.btn_genera_documento)
-        buttons_layout_1.addWidget(window_instance.btn_crea_revisione)
-        
-        # Seconda riga di pulsanti
-        buttons_layout_2 = QHBoxLayout()
-        buttons_layout_2.setSpacing(12)
-        
-        # Elimina preventivo
-        window_instance.btn_elimina_preventivo = QPushButton("Elimina")
-        window_instance.btn_elimina_preventivo.setStyleSheet("""
-            QPushButton {
-                background-color: #e53e3e;
-                color: #ffffff;
-                min-height: 36px;
-            }
-            QPushButton:hover {
-                background-color: #c53030;
-            }
-        """)
-        window_instance.btn_elimina_preventivo.clicked.connect(window_instance.elimina_preventivo)
-        
-        # Nascondi preventivi
-        window_instance.btn_nascondi_preventivi = QPushButton("Nascondi Preventivi")
-        window_instance.btn_nascondi_preventivi.setStyleSheet("""
-            QPushButton {
-                background-color: #f7fafc;
-                color: #4a5568;
-                border: 1px solid #e2e8f0;
-                min-height: 36px;
-            }
-            QPushButton:hover {
-                background-color: #edf2f7;
-            }
-        """)
-        window_instance.btn_nascondi_preventivi.clicked.connect(window_instance.mostra_nascondi_preventivi)
-        
-        buttons_layout_2.addWidget(window_instance.btn_elimina_preventivo)
-        buttons_layout_2.addStretch()
-        buttons_layout_2.addWidget(window_instance.btn_nascondi_preventivi)
-        
-        parent_layout.addLayout(buttons_layout_1)
-        parent_layout.addLayout(buttons_layout_2)
-    
+
     @staticmethod
     def create_footer(window_instance, parent_layout):
         """Footer informativo"""

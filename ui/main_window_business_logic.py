@@ -16,6 +16,12 @@ v1.1.0 (25/09/2025):
 - Corretta gestione file generati senza apri_file_esterno
 """
 
+# type: ignore
+# pyright: reportUnknownParameterType=false, reportMissingParameterType=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
+# pyright: reportUnknownArgumentType=false, reportAttributeAccessIssue=false
+# pyright: reportUnusedVariable=false
+
 from PyQt5.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QTextEdit, QDialogButtonBox, QLabel, QListWidgetItem
 from PyQt5.QtCore import Qt
 from ui.preventivo_window import PreventivoWindow
@@ -23,12 +29,37 @@ from ui.gestione_materiali_window import GestioneMaterialiWindow
 from ui.document_utils import DocumentUtils
 
 class MainWindowBusinessLogic:
-    
+
+    @staticmethod
+    def load_clienti_filtro(window_instance):
+        """Carica la lista dei clienti nel filtro"""
+        window_instance.filtro_cliente.clear()
+        window_instance.filtro_cliente.addItem("Tutti i clienti", None)
+
+        try:
+            preventivi = window_instance.db_manager.get_all_preventivi()
+            clienti = set()
+            for prev in preventivi:
+                if len(prev) >= 5:
+                    nome_cliente = prev[4].strip() if prev[4] else ''
+                    if nome_cliente:
+                        clienti.add(nome_cliente)
+
+            for cliente in sorted(clienti):
+                window_instance.filtro_cliente.addItem(cliente, cliente)
+        except Exception as e:
+            print(f"Errore nel caricamento clienti filtro: {str(e)}")
+
     @staticmethod
     def load_preventivi(window_instance):
-        """Carica preventivi o revisioni in base alla modalità di visualizzazione"""
+        """Carica preventivi o revisioni in base alla modalità di visualizzazione E ai filtri attivi"""
         window_instance.lista_preventivi.clear()
-        
+
+        # Ottieni i valori dei filtri
+        filtro_origine_text = window_instance.filtro_origine.currentText()
+        filtro_cliente_data = window_instance.filtro_cliente.currentData()
+        filtro_keyword_text = window_instance.filtro_keyword.text().lower().strip()
+
         if window_instance.modalita_visualizzazione == 'preventivi':
             # Mostra solo preventivi originali (ultima revisione di ogni gruppo)
             preventivi = window_instance.db_manager.get_all_preventivi_latest()
@@ -42,11 +73,11 @@ class MainWindowBusinessLogic:
                     numero_revisione = prev[8] if len(prev) > 8 else 1
                     if numero_revisione > 1:
                         preventivi_filtrati.append(prev)
-                
+
             preventivi = preventivi_filtrati
-        
+
         for preventivo in preventivi:
-            # Formato: id, data_creazione, preventivo_finale, prezzo_cliente, 
+            # Formato: id, data_creazione, preventivo_finale, prezzo_cliente,
             # nome_cliente, numero_ordine, descrizione, codice, numero_revisione
             if len(preventivo) >= 9:
                 id_prev, data_creazione, preventivo_finale, prezzo_cliente, nome_cliente, numero_ordine, descrizione, codice, numero_revisione = preventivo[:9]
@@ -54,7 +85,37 @@ class MainWindowBusinessLogic:
                 # Fallback per compatibilità
                 id_prev, data_creazione, preventivo_finale, prezzo_cliente = preventivo[:4]
                 nome_cliente, numero_ordine, descrizione, codice, numero_revisione = "", "", "", "", 1
-            
+
+            # APPLICA FILTRO ORIGINE
+            if filtro_origine_text == "Originali" and numero_revisione != 1:
+                continue  # Salta se non è originale
+            elif filtro_origine_text == "Revisionati" and numero_revisione == 1:
+                continue  # Salta se è originale
+            elif filtro_origine_text == "Modificati" and numero_revisione == 1:
+                continue  # Modificati = Revisionati (numero_revisione > 1)
+
+            # APPLICA FILTRO CLIENTE
+            if filtro_cliente_data and nome_cliente.strip() != filtro_cliente_data:
+                continue  # Salta se il cliente non corrisponde
+
+            # APPLICA FILTRO KEYWORD
+            if filtro_keyword_text:
+                # Cerca la keyword in TUTTI i campi del preventivo
+                campi_ricerca = [
+                    str(id_prev),
+                    str(data_creazione),
+                    str(preventivo_finale),
+                    str(prezzo_cliente),
+                    str(nome_cliente),
+                    str(numero_ordine),
+                    str(descrizione),
+                    str(codice),
+                    str(numero_revisione)
+                ]
+                testo_completo = " ".join(campi_ricerca).lower()
+                if filtro_keyword_text not in testo_completo:
+                    continue  # Salta se la keyword non è trovata
+
             # Formatta la data
             data_formattata = data_creazione.split('T')[0] if 'T' in data_creazione else data_creazione
             
@@ -392,26 +453,36 @@ class MainWindowBusinessLogic:
     def apri_gestione_materiali(window_instance):
         """Apre la finestra per gestire i materiali"""
         window_instance.gestione_materiali_window = GestioneMaterialiWindow(window_instance.db_manager, window_instance)
-        
+
         # Collega il signal per aggiornare i preventivi aperti
         window_instance.gestione_materiali_window.materiali_modificati.connect(window_instance.aggiorna_preventivi_aperti)
-        
+
         window_instance.gestione_materiali_window.show()
+
+    @staticmethod
+    def apri_confronto_preventivi(window_instance):
+        """NUOVO: Apre la finestra per confrontare due preventivi"""
+        from ui.confronto_preventivi_window import ConfrontoPreventiviWindow
+
+        window_instance.confronto_preventivi_window = ConfrontoPreventiviWindow(
+            window_instance.db_manager,
+            window_instance
+        )
+        window_instance.confronto_preventivi_window.show()
     
     @staticmethod
     def mostra_nascondi_preventivi(window_instance):
-        """Mostra o nasconde la sezione dei preventivi"""
-        if window_instance.preventivi_visibili:
-            # Nascondi preventivi
-            window_instance.preventivi_column.hide()
-            window_instance.btn_visualizza_preventivi.setText("Visualizza Preventivi Salvati")
-            window_instance.preventivi_visibili = False
-        else:
-            # Mostra preventivi
-            window_instance.preventivi_column.show()
-            window_instance.btn_visualizza_preventivi.setText("Nascondi Preventivi")
-            window_instance.preventivi_visibili = True
-            MainWindowBusinessLogic.load_preventivi(window_instance)
+        """Apre la finestra per visualizzare i preventivi"""
+        from ui.visualizza_preventivi_window import VisualizzaPreventiviWindow
+
+        window_instance.visualizza_preventivi_window = VisualizzaPreventiviWindow(
+            window_instance.db_manager,
+            window_instance
+        )
+        window_instance.visualizza_preventivi_window.preventivo_modificato.connect(
+            window_instance.preventivo_salvato
+        )
+        window_instance.visualizza_preventivi_window.show()
     
     @staticmethod
     def visualizza_preventivo(window_instance):

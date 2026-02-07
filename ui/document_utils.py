@@ -7,7 +7,7 @@ Template aggiornato per matchare il formato richiesto
 
 Version: 1.3.0
 Last Updated: 03/10/2025
-Author: Sviluppatore PyQt5 + Claude
+Author: Sviluppatore antonio
 
 CHANGELOG:
 v1.3.0 (03/10/2025):
@@ -15,6 +15,18 @@ v1.3.0 (03/10/2025):
 - Gestione flessibile formati materiale (oggetti/dict)
 - Layout DOCX semplificato
 """
+
+# type: ignore
+# pyright: reportUnknownParameterType=false, reportMissingParameterType=false
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
+# pyright: reportUnknownArgumentType=false, reportAttributeAccessIssue=false
+# pyright: reportUnusedVariable=false
+# type: ignore
+# pyright: reportUnusedImport=false
+# type: ignore  
+# pyright: reportPrivateImportUsage=false, reportPrivateUsage=false
+
+
 
 import os
 from datetime import datetime
