@@ -1,11 +1,15 @@
 """
-VisualizzaPreventiviWindow - Interfaccia per visualizzare e gestire i preventivi con design system unificato
+VisualizzaPreventiviWindow - Interfaccia per visualizzare e gestire i preventivi con sistema di versioning
 
-Version: 1.0.0
-Last Updated: 2026-02-06
+Version: 2.0.0
+Last Updated: 2026-02-07
 Author: Sviluppatore PyQt5
 
 CHANGELOG:
+v2.0.0 (2026-02-07):
+- ADDED: Filtro "Con modifiche" per vedere preventivi con storico modifiche
+- ADDED: Pulsante "Visualizza Modifiche" per aprire dialog storico
+- UPDATED: Integrazione con sistema di versioning Git-like
 v1.0.0 (2026-02-06):
 - CREATED: Nuova finestra dedicata per visualizzare preventivi
 - ADDED: Design system unificato con MainWindow e altre finestre
@@ -276,7 +280,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         parent_layout.addWidget(toggle_container)
 
     def create_filters_section(self, parent_layout: QVBoxLayout) -> None:
-        """Sezione filtri per preventivi - inline compatto"""
+        """Sezione filtri per preventivi - inline compatto CON FILTRO "CON MODIFICHE" """
         filters_container = QFrame()
         filters_container.setStyleSheet("""
             QFrame {
@@ -292,11 +296,11 @@ class VisualizzaPreventiviWindow(QMainWindow):
         filters_layout = QHBoxLayout(filters_container)
         filters_layout.setSpacing(15)
 
-        # Filtro Tipo Preventivo (solo per modalità revisioni)
+        # Filtro Tipo Preventivo (AGGIORNATO con "Con modifiche")
         self.label_tipo = QLabel("Tipo Preventivo:")
         self.label_tipo.setStyleSheet("QLabel { font-weight: 500; color: #4a5568; }")
         self.filtro_origine = QComboBox()
-        self.filtro_origine.addItems(["Tutti", "Originali", "Revisionati", "Modificati"])
+        self.filtro_origine.addItems(["Tutti", "Originali", "Revisionati", "Con modifiche"])
         self.filtro_origine.currentIndexChanged.connect(self.load_preventivi)
         self.filtro_origine.setMinimumWidth(140)
 
@@ -360,7 +364,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         parent_layout.addWidget(lista_group)
 
     def create_action_buttons(self, parent_layout: QVBoxLayout) -> None:
-        """Pulsanti azioni preventivi - compatti"""
+        """Pulsanti azioni preventivi - compatti CON PULSANTE "VISUALIZZA MODIFICHE" """
         buttons_container = QFrame()
         buttons_container.setStyleSheet("""
             QFrame {
@@ -424,9 +428,25 @@ class VisualizzaPreventiviWindow(QMainWindow):
         """)
         self.btn_revisione.clicked.connect(self.crea_revisione)
 
+        # NUOVO: Visualizza Modifiche
+        self.btn_visualizza_modifiche = QPushButton("Visualizza Modifiche")
+        self.btn_visualizza_modifiche.setStyleSheet("""
+            QPushButton {
+                background-color: #805ad5;
+                color: #ffffff;
+                min-height: 32px;
+                padding: 8px 16px;
+            }
+            QPushButton:hover {
+                background-color: #6b46c1;
+            }
+        """)
+        self.btn_visualizza_modifiche.clicked.connect(self.visualizza_modifiche)
+
         row1.addWidget(self.btn_visualizza)
         row1.addWidget(self.btn_modifica)
         row1.addWidget(self.btn_revisione)
+        row1.addWidget(self.btn_visualizza_modifiche)
 
         # Seconda riga
         row2 = QHBoxLayout()
@@ -545,7 +565,11 @@ class VisualizzaPreventiviWindow(QMainWindow):
         filtro_cliente_data = self.filtro_cliente.currentData()
         filtro_keyword_text = self.filtro_keyword.text().lower().strip()
 
-        if self.modalita_visualizzazione == 'preventivi':
+        # GESTIONE FILTRO "CON MODIFICHE"
+        if filtro_origine_text == "Con modifiche":
+            # Mostra solo preventivi con storico modifiche
+            preventivi = self.db_manager.get_preventivi_con_modifiche()
+        elif self.modalita_visualizzazione == 'preventivi':
             # Mostra solo preventivi (ultima revisione di ogni gruppo)
             preventivi = self.db_manager.get_all_preventivi_latest()
         else:
@@ -562,20 +586,21 @@ class VisualizzaPreventiviWindow(QMainWindow):
         count = 0
         for preventivo in preventivi:
             # Formato: id, data_creazione, preventivo_finale, prezzo_cliente,
-            # nome_cliente, numero_ordine, descrizione, codice, numero_revisione
+            # nome_cliente, numero_ordine, descrizione, codice, numero_revisione, [storico_modifiche]
             if len(preventivo) >= 9:
                 id_prev, data_creazione, preventivo_finale, prezzo_cliente, nome_cliente, numero_ordine, descrizione, codice, numero_revisione = preventivo[:9]
+                storico_modifiche = preventivo[10] if len(preventivo) > 10 else '[]'
             else:
                 id_prev, data_creazione, preventivo_finale, prezzo_cliente = preventivo[:4]
                 nome_cliente, numero_ordine, descrizione, codice, numero_revisione = "", "", "", "", 1
+                storico_modifiche = '[]'
 
-            # APPLICA FILTRO ORIGINE
-            if filtro_origine_text == "Originali" and numero_revisione != 1:
-                continue
-            elif filtro_origine_text == "Revisionati" and numero_revisione == 1:
-                continue
-            elif filtro_origine_text == "Modificati" and numero_revisione == 1:
-                continue
+            # APPLICA FILTRO ORIGINE (solo se non è "Con modifiche")
+            if filtro_origine_text != "Con modifiche":
+                if filtro_origine_text == "Originali" and numero_revisione != 1:
+                    continue
+                elif filtro_origine_text == "Revisionati" and numero_revisione == 1:
+                    continue
 
             # APPLICA FILTRO CLIENTE
             if filtro_cliente_data and nome_cliente.strip() != filtro_cliente_data:
@@ -596,7 +621,9 @@ class VisualizzaPreventiviWindow(QMainWindow):
             data_formattata = data_creazione.split('T')[0] if 'T' in data_creazione else data_creazione
 
             # Formatta il testo
-            if self.modalita_visualizzazione == 'revisioni':
+            if filtro_origine_text == "Con modifiche":
+                prefisso_tipo = "Con modifiche"
+            elif self.modalita_visualizzazione == 'revisioni':
                 prefisso_tipo = "Revisione"
             else:
                 if numero_revisione == 1:
@@ -607,7 +634,18 @@ class VisualizzaPreventiviWindow(QMainWindow):
             cliente_info = nome_cliente if nome_cliente else "Cliente non specificato"
             ordine_info = f" | {numero_ordine}" if numero_ordine else ""
 
-            testo = f"#{id_prev:03d} [{prefisso_tipo}] - {data_formattata} - {cliente_info}{ordine_info}"
+            # Aggiungi badge se ha modifiche nello storico
+            badge_modifiche = ""
+            if storico_modifiche and storico_modifiche != '[]':
+                try:
+                    import json
+                    storico_list = json.loads(storico_modifiche) if isinstance(storico_modifiche, str) else []
+                    if storico_list:
+                        badge_modifiche = f" 📝({len(storico_list)})"
+                except Exception:
+                    pass
+
+            testo = f"#{id_prev:03d} [{prefisso_tipo}]{badge_modifiche} - {data_formattata} - {cliente_info}{ordine_info}"
             testo += f"\nPreventivo: EUR {preventivo_finale:,.2f} | Cliente: EUR {prezzo_cliente:,.2f}"
             if descrizione:
                 testo += f"\nDescrizione: {descrizione[:60]}{'...' if len(descrizione) > 60 else ''}"
@@ -713,7 +751,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         preventivo_window.show()
 
     def modifica_preventivo(self) -> None:
-        """Apre un preventivo per la modifica DIRETTA"""
+        """Apre un preventivo per la modifica DIRETTA (con versioning)"""
         current_item = self.lista_preventivi.currentItem()
         if not current_item:
             QMessageBox.warning(self, "Attenzione", "Seleziona un preventivo da modificare.")
@@ -758,6 +796,28 @@ class VisualizzaPreventiviWindow(QMainWindow):
         )
         preventivo_window.preventivo_salvato.connect(self.on_preventivo_modificato)
         preventivo_window.show()
+
+    def visualizza_modifiche(self) -> None:
+        """NUOVO: Apre il dialog per visualizzare lo storico modifiche"""
+        current_item = self.lista_preventivi.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "Attenzione", "Seleziona un preventivo per visualizzare le modifiche.")
+            return
+
+        preventivo_id = current_item.data(Qt.UserRole)
+
+        # Verifica se il preventivo ha modifiche
+        storico = self.db_manager.get_storico_modifiche(preventivo_id)
+        if not storico:
+            QMessageBox.information(self, "Info", "Questo preventivo non ha modifiche nello storico.")
+            return
+
+        # Importa e apri il dialog
+        from ui.visualizza_modifiche_dialog import VisualizzaModificheDialog
+
+        dialog = VisualizzaModificheDialog(self.db_manager, preventivo_id, self)
+        dialog.versione_ripristinata.connect(self.on_preventivo_modificato)
+        dialog.exec_()
 
     def confronta_preventivi(self) -> None:
         """Apre la finestra confronto preventivi"""
