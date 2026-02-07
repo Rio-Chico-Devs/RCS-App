@@ -276,72 +276,57 @@ class VisualizzaPreventiviWindow(QMainWindow):
         parent_layout.addWidget(toggle_container)
 
     def create_filters_section(self, parent_layout: QVBoxLayout) -> None:
-        """Sezione filtri per preventivi - compatta"""
+        """Sezione filtri per preventivi - inline compatto"""
         filters_container = QFrame()
         filters_container.setStyleSheet("""
             QFrame {
                 background-color: #ffffff;
                 border: 1px solid #e2e8f0;
                 border-radius: 8px;
-                padding: 12px;
+                padding: 10px 12px;
             }
         """)
         filters_container.setGraphicsEffect(self.create_shadow_effect())
 
-        filters_layout = QVBoxLayout(filters_container)
-        filters_layout.setSpacing(10)
+        # Layout orizzontale per tutti i filtri inline
+        filters_layout = QHBoxLayout(filters_container)
+        filters_layout.setSpacing(15)
 
-        # Titolo sezione
-        title_label = QLabel("Filtri Avanzati")
-        title_label.setStyleSheet("""
-            QLabel {
-                font-size: 16px;
-                font-weight: 600;
-                color: #2d3748;
-            }
-        """)
-        filters_layout.addWidget(title_label)
-
-        # Prima riga: Origine e Cliente
-        row1_layout = QHBoxLayout()
-        row1_layout.setSpacing(20)
-
-        # Filtro Origine
-        origine_container = QVBoxLayout()
-        origine_label = QLabel("Tipo Preventivo:")
-        origine_label.setStyleSheet("QLabel { font-weight: 500; color: #4a5568; }")
+        # Filtro Tipo Preventivo (solo per modalità revisioni)
+        self.label_tipo = QLabel("Tipo Preventivo:")
+        self.label_tipo.setStyleSheet("QLabel { font-weight: 500; color: #4a5568; }")
         self.filtro_origine = QComboBox()
         self.filtro_origine.addItems(["Tutti", "Originali", "Revisionati", "Modificati"])
         self.filtro_origine.currentIndexChanged.connect(self.load_preventivi)
-        origine_container.addWidget(origine_label)
-        origine_container.addWidget(self.filtro_origine)
+        self.filtro_origine.setMinimumWidth(140)
+
+        # Nascosto di default (si mostra solo in modalità revisioni)
+        self.label_tipo.setVisible(False)
+        self.filtro_origine.setVisible(False)
+
+        filters_layout.addWidget(self.label_tipo)
+        filters_layout.addWidget(self.filtro_origine)
 
         # Filtro Cliente
-        cliente_container = QVBoxLayout()
         cliente_label = QLabel("Cliente:")
         cliente_label.setStyleSheet("QLabel { font-weight: 500; color: #4a5568; }")
         self.filtro_cliente = QComboBox()
         self.filtro_cliente.addItem("Tutti i clienti", None)
         self.filtro_cliente.currentIndexChanged.connect(self.load_preventivi)
-        cliente_container.addWidget(cliente_label)
-        cliente_container.addWidget(self.filtro_cliente)
+        self.filtro_cliente.setMinimumWidth(180)
 
-        row1_layout.addLayout(origine_container, 1)
-        row1_layout.addLayout(cliente_container, 1)
+        filters_layout.addWidget(cliente_label)
+        filters_layout.addWidget(self.filtro_cliente)
 
-        filters_layout.addLayout(row1_layout)
-
-        # Seconda riga: Keyword
-        keyword_container = QVBoxLayout()
-        keyword_label = QLabel("Cerca per parola chiave:")
+        # Filtro Keyword
+        keyword_label = QLabel("Cerca:")
         keyword_label.setStyleSheet("QLabel { font-weight: 500; color: #4a5568; }")
         self.filtro_keyword = QLineEdit()
-        self.filtro_keyword.setPlaceholderText("Cerca per ID, cliente, descrizione, codice, prezzo...")
+        self.filtro_keyword.setPlaceholderText("ID, cliente, descrizione, codice, prezzo...")
         self.filtro_keyword.textChanged.connect(self.load_preventivi)
-        keyword_container.addWidget(keyword_label)
-        keyword_container.addWidget(self.filtro_keyword)
 
-        filters_layout.addLayout(keyword_container)
+        filters_layout.addWidget(keyword_label)
+        filters_layout.addWidget(self.filtro_keyword, 1)  # Stretch per occupare spazio rimanente
 
         parent_layout.addWidget(filters_container)
 
@@ -638,6 +623,16 @@ class VisualizzaPreventiviWindow(QMainWindow):
     def cambia_visualizzazione(self, modalita: str) -> None:
         """Cambia tra visualizzazione Preventivi e Revisioni"""
         self.modalita_visualizzazione = modalita
+
+        # Mostra/nascondi filtro Tipo Preventivo in base alla modalità
+        if modalita == 'preventivi':
+            # Nascondi filtro tipo (non ha senso per preventivi che mostrano solo ultime versioni)
+            self.label_tipo.setVisible(False)
+            self.filtro_origine.setVisible(False)
+        else:
+            # Mostra filtro tipo per revisioni
+            self.label_tipo.setVisible(True)
+            self.filtro_origine.setVisible(True)
 
         # Aggiorna stili pulsanti
         if modalita == 'preventivi':
