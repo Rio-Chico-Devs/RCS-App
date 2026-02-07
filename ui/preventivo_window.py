@@ -124,10 +124,7 @@ class PreventivoWindow(QMainWindow):
             title = "Calcolo Preventivo"
             
         self.setWindowTitle(title)
-        
-        # Apertura a schermo intero
-        self.showMaximized()
-        
+
         # Stile unificato (IDENTICO ALL'ORIGINALE)
         self.setStyleSheet("""
             QMainWindow {
@@ -211,11 +208,15 @@ class PreventivoWindow(QMainWindow):
         # Footer
         self.create_footer(main_layout)
         
+        # Imposta dimensione minima ragionevole per schermi 1080p e apri massimizzato
+        self.setMinimumSize(800, 600)
+        self.showMaximized()
+
         # IMPORTANTE: Carica i valori nei campi SOLO DOPO che tutti i controlli sono stati creati
         if self.preventivo_id:
             from PyQt5.QtCore import QTimer
             QTimer.singleShot(100, self.carica_valori_con_delay)  # 100ms delay
-            
+
         # DOPO il caricamento, disabilita solo se necessario
         if self.modalita == 'visualizza':
             QTimer.singleShot(150, self.disabilita_solo_controlli)  # Dopo il caricamento
