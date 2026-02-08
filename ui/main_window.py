@@ -115,3 +115,5 @@ class MainWindow(QMainWindow):
     def preventivo_salvato(self):
         """Callback chiamato quando un preventivo viene salvato"""
         MainWindowBusinessLogic.preventivo_salvato(self)
+            
+        

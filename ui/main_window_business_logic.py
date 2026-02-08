@@ -626,12 +626,13 @@ class MainWindowBusinessLogic:
     @staticmethod
     def preventivo_salvato(window_instance):
         """Callback chiamato quando un preventivo viene salvato"""
-        MainWindowBusinessLogic.load_preventivi(window_instance)
-        
-        # Se i preventivi sono visibili, aggiorna la visualizzazione
-        if window_instance.preventivi_visibili:
-            pass  # La lista è già aggiornata da load_preventivi()
+        # Se la finestra visualizza preventivi è aperta, aggiornala
+        if (hasattr(window_instance, 'visualizza_preventivi_window') and
+                window_instance.visualizza_preventivi_window is not None and
+                window_instance.visualizza_preventivi_window.isVisible()):
+            window_instance.visualizza_preventivi_window.load_preventivi()
+            window_instance.visualizza_preventivi_window.load_clienti_filtro()
         else:
             # Mostra un messaggio di successo
-            QMessageBox.information(window_instance, "Successo", 
+            QMessageBox.information(window_instance, "Successo",
                                   "Preventivo salvato con successo!\n\nUsa 'Visualizza Preventivi Salvati' per vederlo nella lista.")
