@@ -77,7 +77,8 @@ class PreventivoWindow(QMainWindow):
         self.numero_ordine_data = preventivo_data.get('numero_ordine', '')
         self.descrizione_data = preventivo_data.get('descrizione', '')
         self.codice_data = preventivo_data.get('codice', '')
-        
+        self.misura_data = preventivo_data.get('misura', '')
+
         # IMPORTANTE: Carica TUTTI i valori numerici e verifica che siano validi
         self.preventivo.costi_accessori = float(preventivo_data.get('costi_accessori', 0.0))
         self.preventivo.minuti_taglio = float(preventivo_data.get('minuti_taglio', 0.0))
@@ -255,10 +256,14 @@ class PreventivoWindow(QMainWindow):
         self.edit_numero_ordine = QLineEdit()
         client_grid.addWidget(self.edit_numero_ordine, 0, 3)
         
-        # Seconda riga: Codice
+        # Seconda riga: Codice e Misura
         client_grid.addWidget(self.create_standard_label("Codice:"), 1, 0)
         self.edit_codice = QLineEdit()
         client_grid.addWidget(self.edit_codice, 1, 1)
+
+        client_grid.addWidget(self.create_standard_label("Misura:"), 1, 2)
+        self.edit_misura = QLineEdit()
+        client_grid.addWidget(self.edit_misura, 1, 3)
         
         # Terza riga: Descrizione (LineEdit semplice con limite caratteri)
         client_grid.addWidget(self.create_standard_label("Descrizione:"), 2, 0)
@@ -274,7 +279,9 @@ class PreventivoWindow(QMainWindow):
             self.edit_numero_ordine.setText(self.numero_ordine_data)
             self.edit_descrizione.setText(self.descrizione_data)
             self.edit_codice.setText(self.codice_data)
-        
+            if hasattr(self, 'misura_data'):
+                self.edit_misura.setText(self.misura_data)
+
         parent_layout.addWidget(client_group)
     
     def disabilita_solo_controlli(self):
@@ -284,7 +291,8 @@ class PreventivoWindow(QMainWindow):
         self.edit_numero_ordine.setEnabled(False)
         self.edit_descrizione.setEnabled(False)
         self.edit_codice.setEnabled(False)
-        
+        self.edit_misura.setEnabled(False)
+
         # Disabilita tutti i SpinBox
         self.edit_minuti_taglio.setEnabled(False)
         self.edit_minuti_avvolgimento.setEnabled(False)
@@ -806,7 +814,8 @@ class PreventivoWindow(QMainWindow):
             'nome_cliente': self.edit_nome_cliente.text().strip(),
             'numero_ordine': self.edit_numero_ordine.text().strip(),
             'descrizione': self.edit_descrizione.text().strip(),
-            'codice': self.edit_codice.text().strip()
+            'codice': self.edit_codice.text().strip(),
+            'misura': self.edit_misura.text().strip()
         }
     
     def carica_valori_con_delay(self):
@@ -820,7 +829,9 @@ class PreventivoWindow(QMainWindow):
             self.edit_numero_ordine.setText(self.numero_ordine_data or "")
             self.edit_descrizione.setText(self.descrizione_data or "")
             self.edit_codice.setText(self.codice_data or "")
-        
+            if hasattr(self, 'misura_data'):
+                self.edit_misura.setText(self.misura_data or "")
+
         # Imposta valori mano d'opera
         try:
             # Blocca segnali

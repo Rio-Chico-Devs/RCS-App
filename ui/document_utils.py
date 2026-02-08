@@ -168,7 +168,7 @@ class DocumentUtils:
             info_table.cell(1, 1).text = f"Descrizione: {dati_cliente.get('oggetto_preventivo', '')}"
             
             # Riga 3
-            info_table.cell(2, 0).text = "Finitura: ________________________"
+            info_table.cell(2, 0).text = f"Misura: {dati_cliente.get('misura', '')}"
             info_table.cell(2, 1).text = f"Codice: {dati_cliente.get('codice', '')}"
             
             doc.add_paragraph()  # Spazio
@@ -459,8 +459,8 @@ class DocumentUtils:
                 <input type="text" class="editable-field" value="{datetime.now().strftime('%d/%m/%Y')}" style="width: 30mm;">
             </div>
             <div class="info-section">
-                <span class="info-label">Finitura:</span>
-                <input type="text" class="editable-field" style="width: 50mm;">
+                <span class="info-label">Misura:</span>
+                <input type="text" class="editable-field" value="{dati_cliente.get('misura', '')}" style="width: 50mm;">
             </div>
         </div>
         <div style="width: 48%;">
