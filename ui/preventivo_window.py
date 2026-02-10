@@ -632,13 +632,13 @@ class PreventivoWindow(QMainWindow):
                 background-color: #f0fff4;
                 border: 2px solid #68d391;
                 border-radius: 8px;
-                padding: 16px;
                 margin: 8px 0px;
             }
         """)
-        
+        final_container.setMinimumHeight(50)
+
         final_layout = QHBoxLayout(final_container)
-        final_layout.setContentsMargins(0, 0, 0, 0)
+        final_layout.setContentsMargins(16, 12, 16, 12)
         
         final_title = QLabel("Preventivo Finale:")
         final_title.setStyleSheet("""
