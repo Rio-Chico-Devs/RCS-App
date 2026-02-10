@@ -40,37 +40,45 @@ class DocumentUtils:
         """Mostra dialog per selezione formato documento"""
         dialog = QDialog(parent)
         dialog.setWindowTitle("Genera Documento")
-        dialog.setFixedSize(300, 120)
-        
+        dialog.setFixedSize(400, 120)
+
         layout = QVBoxLayout(dialog)
         layout.addWidget(QPushButton("Seleziona formato per il documento:"))
-        
+
         buttons_layout = QHBoxLayout()
         btn_html = QPushButton("HTML")
-        btn_docx = QPushButton("DOCX") 
+        btn_odt = QPushButton("ODT (OpenOffice)")
+        btn_docx = QPushButton("DOCX")
         btn_cancel = QPushButton("Annulla")
-        
+
         buttons_layout.addWidget(btn_html)
+        buttons_layout.addWidget(btn_odt)
         buttons_layout.addWidget(btn_docx)
         buttons_layout.addWidget(btn_cancel)
         layout.addLayout(buttons_layout)
-        
+
         formato_scelto = None
-        
+
         def on_html():
             nonlocal formato_scelto
             formato_scelto = 'html'
             dialog.accept()
-            
+
+        def on_odt():
+            nonlocal formato_scelto
+            formato_scelto = 'odt'
+            dialog.accept()
+
         def on_docx():
             nonlocal formato_scelto
             formato_scelto = 'docx'
             dialog.accept()
-            
+
         def on_cancel():
             dialog.reject()
-            
+
         btn_html.clicked.connect(on_html)
+        btn_odt.clicked.connect(on_odt)
         btn_docx.clicked.connect(on_docx)
         btn_cancel.clicked.connect(on_cancel)
         
@@ -320,6 +328,279 @@ class DocumentUtils:
                 QMessageBox.warning(parent, "Errore", f"Errore nella generazione DOCX: {e}")
             return None
     
+    @staticmethod
+    def genera_documento_odt(preventivo, dati_cliente, parent=None):
+        """Genera documento ODT (OpenDocument Text) editabile con OpenOffice/LibreOffice"""
+        try:
+            try:
+                from odf.opendocument import OpenDocumentText
+                from odf.style import Style, TextProperties, ParagraphProperties, TableColumnProperties, TableCellProperties, GraphicProperties
+                from odf.text import P, Span
+                from odf.table import Table, TableColumn, TableRow, TableCell
+                from odf.draw import Frame, TextBox
+            except ImportError:
+                if parent:
+                    QMessageBox.information(
+                        parent,
+                        "Libreria Mancante",
+                        "Per generare ODT è necessario installare odfpy:\n\npip install odfpy"
+                    )
+                return None
+
+            # Dialog per salvare file
+            nome_file = f"SchediaTaglio_{preventivo.codice_preventivo}_{datetime.now().strftime('%Y%m%d')}"
+            file_path, _ = QFileDialog.getSaveFileName(
+                parent,
+                "Salva Scheda di Taglio ODT",
+                nome_file,
+                "ODT Files (*.odt)"
+            )
+
+            if not file_path:
+                return None
+
+            doc = OpenDocumentText()
+
+            # === STILI ===
+            # Titolo centrato
+            style_title = Style(name="TitoloScheda", family="paragraph")
+            style_title.addElement(ParagraphProperties(textalign="center", marginbottom="0.5cm"))
+            style_title.addElement(TextProperties(fontsize="14pt", fontweight="bold"))
+            doc.styles.addElement(style_title)
+
+            # Testo normale
+            style_normal = Style(name="Normale", family="paragraph")
+            style_normal.addElement(TextProperties(fontsize="10pt"))
+            doc.styles.addElement(style_normal)
+
+            # Testo bold
+            style_bold = Style(name="Bold", family="text")
+            style_bold.addElement(TextProperties(fontweight="bold", fontsize="10pt"))
+            doc.styles.addElement(style_bold)
+
+            # Centrato
+            style_centered = Style(name="Centrato", family="paragraph")
+            style_centered.addElement(ParagraphProperties(textalign="center"))
+            style_centered.addElement(TextProperties(fontsize="10pt", fontweight="bold"))
+            doc.styles.addElement(style_centered)
+
+            # Stile cella con bordi
+            style_cell = Style(name="CellaBordo", family="table-cell")
+            style_cell.addElement(TableCellProperties(
+                border="0.05pt solid #000000",
+                padding="0.2cm"
+            ))
+            doc.automaticstyles.addElement(style_cell)
+
+            # Stile cella header (grassetto)
+            style_cell_header = Style(name="CellaHeader", family="table-cell")
+            style_cell_header.addElement(TableCellProperties(
+                border="0.05pt solid #000000",
+                padding="0.2cm",
+                backgroundcolor="#f0f0f0"
+            ))
+            doc.automaticstyles.addElement(style_cell_header)
+
+            # Stile tabella info
+            style_table_info = Style(name="TabellaInfo", family="table")
+            doc.automaticstyles.addElement(style_table_info)
+
+            # Colonne tabella info
+            style_col_info = Style(name="ColInfo", family="table-column")
+            style_col_info.addElement(TableColumnProperties(columnwidth="9cm"))
+            doc.automaticstyles.addElement(style_col_info)
+
+            # Stile tabella operazioni
+            style_table_ops = Style(name="TabellaOps", family="table")
+            doc.automaticstyles.addElement(style_table_ops)
+
+            # Colonne tabella operazioni (7 colonne)
+            col_widths_ops = ["2.5cm", "1.8cm", "1.8cm", "1.8cm", "1.8cm", "1.8cm", "6cm"]
+            style_cols_ops = []
+            for i, w in enumerate(col_widths_ops):
+                s = Style(name=f"ColOps{i}", family="table-column")
+                s.addElement(TableColumnProperties(columnwidth=w))
+                doc.automaticstyles.addElement(s)
+                style_cols_ops.append(s)
+
+            # Stile per rettangolo materiale
+            style_mat_box = Style(name="MatBox", family="table-cell")
+            style_mat_box.addElement(TableCellProperties(
+                border="1.5pt solid #000000",
+                padding="0.15cm"
+            ))
+            doc.automaticstyles.addElement(style_mat_box)
+
+            # Stile cella senza bordo
+            style_cell_no_border = Style(name="CellaNoBordo", family="table-cell")
+            style_cell_no_border.addElement(TableCellProperties(
+                border="none",
+                padding="0.1cm"
+            ))
+            doc.automaticstyles.addElement(style_cell_no_border)
+
+            # Stile colonne materiale (3 colonne: giri, rettangolo, sviluppo)
+            style_col_mat_narrow = Style(name="ColMatNarrow", family="table-column")
+            style_col_mat_narrow.addElement(TableColumnProperties(columnwidth="2cm"))
+            doc.automaticstyles.addElement(style_col_mat_narrow)
+
+            style_col_mat_wide = Style(name="ColMatWide", family="table-column")
+            style_col_mat_wide.addElement(TableColumnProperties(columnwidth="12cm"))
+            doc.automaticstyles.addElement(style_col_mat_wide)
+
+            # Paragrafo allineato a destra
+            style_right = Style(name="AllineatoDestra", family="paragraph")
+            style_right.addElement(ParagraphProperties(textalign="end"))
+            style_right.addElement(TextProperties(fontsize="10pt", fontweight="bold"))
+            doc.styles.addElement(style_right)
+
+            # Footer
+            style_footer = Style(name="Footer", family="paragraph")
+            style_footer.addElement(ParagraphProperties(textalign="center", margintop="1cm"))
+            style_footer.addElement(TextProperties(fontsize="8pt", color="#666666"))
+            doc.styles.addElement(style_footer)
+
+            # === CONTENUTO ===
+
+            # Titolo
+            p_title = P(stylename=style_title)
+            title_span = Span(stylename=style_bold, text="RCS - Scheda di Taglio")
+            p_title.addElement(title_span)
+            doc.text.addElement(p_title)
+
+            # Spazio
+            doc.text.addElement(P(stylename=style_normal, text=""))
+
+            # --- Tabella informazioni cliente (3 righe x 2 colonne) ---
+            info_table = Table(name="InfoCliente", stylename=style_table_info)
+            info_table.addElement(TableColumn(stylename=style_col_info))
+            info_table.addElement(TableColumn(stylename=style_col_info))
+
+            info_rows = [
+                (f"Cliente: {dati_cliente.get('nome_cliente', '')}", f"Ordine No: {dati_cliente.get('numero_ordine', '')}"),
+                (f"Data: {datetime.now().strftime('%d/%m/%Y')}", f"Descrizione: {dati_cliente.get('oggetto_preventivo', '')}"),
+                (f"Misura: {dati_cliente.get('misura', '')}", f"Codice: {dati_cliente.get('codice', '')}"),
+            ]
+
+            for left_text, right_text in info_rows:
+                tr = TableRow()
+                for text in [left_text, right_text]:
+                    tc = TableCell(stylename=style_cell)
+                    tc.addElement(P(stylename=style_normal, text=text))
+                    tr.addElement(tc)
+                info_table.addElement(tr)
+
+            doc.text.addElement(info_table)
+
+            # Spazio
+            doc.text.addElement(P(stylename=style_normal, text=""))
+
+            # --- Sezione materiali ---
+            if hasattr(preventivo, 'materiali') and preventivo.materiali:
+                for i, materiale in enumerate(preventivo.materiali):
+                    if hasattr(materiale, 'giri'):
+                        giri = materiale.giri
+                        lunghezza = getattr(materiale, 'lunghezza', 0)
+                        sviluppo = getattr(materiale, 'sviluppo', 0)
+                        nome = getattr(materiale, 'nome', f'Materiale {i+1}')
+                    elif isinstance(materiale, dict):
+                        giri = materiale.get('giri', 0)
+                        lunghezza = materiale.get('lunghezza', 0)
+                        sviluppo = materiale.get('sviluppo', 0)
+                        nome = materiale.get('nome', materiale.get('materiale_nome', f'Materiale {i+1}'))
+                    else:
+                        giri = 1
+                        lunghezza = 1000
+                        sviluppo = 100
+                        nome = f'Materiale {i+1}'
+
+                    # Lunghezza centrata sopra
+                    doc.text.addElement(P(stylename=style_centered, text=f"{int(lunghezza)} mm"))
+
+                    # Tabella 1x3: Giri | Rettangolo con nome | Sviluppo
+                    mat_table = Table(name=f"Materiale{i}")
+                    mat_table.addElement(TableColumn(stylename=style_col_mat_narrow))
+                    mat_table.addElement(TableColumn(stylename=style_col_mat_wide))
+                    mat_table.addElement(TableColumn(stylename=style_col_mat_narrow))
+
+                    mat_row = TableRow()
+
+                    # Giri (senza bordo, allineato a destra)
+                    cell_giri = TableCell(stylename=style_cell_no_border)
+                    cell_giri.addElement(P(stylename=style_right, text=f"G{giri}"))
+                    mat_row.addElement(cell_giri)
+
+                    # Rettangolo con nome (con bordo)
+                    cell_rect = TableCell(stylename=style_mat_box)
+                    p_rect = P(stylename=style_centered)
+                    p_rect.addElement(Span(stylename=style_bold, text=f"==          {nome}"))
+                    cell_rect.addElement(p_rect)
+                    mat_row.addElement(cell_rect)
+
+                    # Sviluppo (senza bordo)
+                    cell_svil = TableCell(stylename=style_cell_no_border)
+                    p_svil = P(stylename=style_normal)
+                    p_svil.addElement(Span(stylename=style_bold, text=f"H {int(sviluppo)} mm"))
+                    cell_svil.addElement(p_svil)
+                    mat_row.addElement(cell_svil)
+
+                    mat_table.addElement(mat_row)
+                    doc.text.addElement(mat_table)
+
+                    # Spazio tra materiali
+                    doc.text.addElement(P(stylename=style_normal, text=""))
+
+            # Spazio
+            doc.text.addElement(P(stylename=style_normal, text=""))
+
+            # --- Tabella operazioni (6 righe x 7 colonne) ---
+            ops_table = Table(name="Operazioni", stylename=style_table_ops)
+            for s in style_cols_ops:
+                ops_table.addElement(TableColumn(stylename=s))
+
+            # Header
+            headers = ['Operazione', 'Inizio', 'Fine', 'Tempo Tot.', 'Num. Pezzi', 'Data', 'Note']
+            header_row = TableRow()
+            for h in headers:
+                tc = TableCell(stylename=style_cell_header)
+                p = P(stylename=style_centered)
+                p.addElement(Span(stylename=style_bold, text=h))
+                tc.addElement(p)
+                header_row.addElement(tc)
+            ops_table.addElement(header_row)
+
+            # 5 righe vuote
+            for _ in range(5):
+                tr = TableRow()
+                for _ in range(7):
+                    tc = TableCell(stylename=style_cell)
+                    tc.addElement(P(stylename=style_normal, text=""))
+                    tr.addElement(tc)
+                ops_table.addElement(tr)
+
+            doc.text.addElement(ops_table)
+
+            # Footer
+            doc.text.addElement(P(stylename=style_footer,
+                text=f"Documento generato automaticamente dal sistema RCS - {datetime.now().strftime('%d/%m/%Y %H:%M')}"))
+
+            # Salva documento
+            doc.save(file_path)
+            print(f"DEBUG: Documento ODT generato: {file_path}")
+
+            # Apri automaticamente
+            os.startfile(file_path)
+
+            return file_path
+
+        except Exception as e:
+            print(f"DEBUG: Errore generazione ODT: {e}")
+            import traceback
+            traceback.print_exc()
+            if parent:
+                QMessageBox.warning(parent, "Errore", f"Errore nella generazione ODT: {e}")
+            return None
+
     @staticmethod
     def _genera_html_template_specifico(preventivo, dati_cliente):
         """Template HTML che replica esattamente il documento di esempio"""

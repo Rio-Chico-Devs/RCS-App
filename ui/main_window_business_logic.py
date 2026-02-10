@@ -430,6 +430,8 @@ class MainWindowBusinessLogic:
             # Genera documento nel formato scelto
             if formato == 'html':
                 file_path = DocumentUtils.genera_documento_html(preventivo_obj, dati_cliente, window_instance)
+            elif formato == 'odt':
+                file_path = DocumentUtils.genera_documento_odt(preventivo_obj, dati_cliente, window_instance)
             elif formato == 'docx':
                 file_path = DocumentUtils.genera_documento_docx(preventivo_obj, dati_cliente, window_instance)
             else:
