@@ -40,7 +40,7 @@ class DocumentUtils:
         """Mostra dialog per selezione formato documento"""
         dialog = QDialog(parent)
         dialog.setWindowTitle("Genera Documento")
-        dialog.setFixedSize(400, 120)
+        dialog.setFixedSize(350, 120)
 
         layout = QVBoxLayout(dialog)
         layout.addWidget(QPushButton("Seleziona formato per il documento:"))
@@ -48,12 +48,10 @@ class DocumentUtils:
         buttons_layout = QHBoxLayout()
         btn_html = QPushButton("HTML")
         btn_odt = QPushButton("ODT (OpenOffice)")
-        btn_docx = QPushButton("DOCX")
         btn_cancel = QPushButton("Annulla")
 
         buttons_layout.addWidget(btn_html)
         buttons_layout.addWidget(btn_odt)
-        buttons_layout.addWidget(btn_docx)
         buttons_layout.addWidget(btn_cancel)
         layout.addLayout(buttons_layout)
 
@@ -69,17 +67,11 @@ class DocumentUtils:
             formato_scelto = 'odt'
             dialog.accept()
 
-        def on_docx():
-            nonlocal formato_scelto
-            formato_scelto = 'docx'
-            dialog.accept()
-
         def on_cancel():
             dialog.reject()
 
         btn_html.clicked.connect(on_html)
         btn_odt.clicked.connect(on_odt)
-        btn_docx.clicked.connect(on_docx)
         btn_cancel.clicked.connect(on_cancel)
         
         if dialog.exec_() == QDialog.Accepted:
@@ -330,14 +322,13 @@ class DocumentUtils:
     
     @staticmethod
     def genera_documento_odt(preventivo, dati_cliente, parent=None):
-        """Genera documento ODT (OpenDocument Text) editabile con OpenOffice/LibreOffice"""
+        """Genera documento ODT scalabile (1-25 materiali) per OpenOffice/LibreOffice"""
         try:
             try:
                 from odf.opendocument import OpenDocumentText
-                from odf.style import Style, TextProperties, ParagraphProperties, TableColumnProperties, TableCellProperties, GraphicProperties
+                from odf.style import Style, TextProperties, ParagraphProperties, TableColumnProperties, TableCellProperties, TableRowProperties
                 from odf.text import P, Span
                 from odf.table import Table, TableColumn, TableRow, TableCell
-                from odf.draw import Frame, TextBox
             except ImportError:
                 if parent:
                     QMessageBox.information(
@@ -359,87 +350,94 @@ class DocumentUtils:
             if not file_path:
                 return None
 
+            # Calcola scala
+            num_mat = len(preventivo.materiali) if hasattr(preventivo, 'materiali') and preventivo.materiali else 0
+            sc = DocumentUtils._calcola_scala(num_mat)
+
+            # Mappa font size
+            font_map = {'10px': '10pt', '9px': '9pt', '8px': '8pt', '11px': '11pt', '7px': '7pt', '6px': '6pt'}
+            ft_info = font_map.get(sc['font_info'], '10pt')
+            ft_nome = font_map.get(sc['font_nome'], '10pt')
+            ft_giri = font_map.get(sc['font_giri'], '10pt')
+
+            # Mappa margini
+            margin_map = {'12mm': '1.2cm', '6mm': '0.6cm', '3mm': '0.3cm'}
+            margin_mat = margin_map.get(sc['margin_mat'], '1.2cm')
+
+            # Mappa altezza rettangolo
+            rect_map = {'8mm': '0.8cm', '6mm': '0.6cm', '5mm': '0.5cm'}
+            rect_h = rect_map.get(sc['rect_height'], '0.8cm')
+
+            # Padding cella materiale basato su scala
+            mat_padding = '0.15cm' if num_mat <= 10 else ('0.08cm' if num_mat <= 17 else '0.04cm')
+            cell_padding = '0.2cm' if num_mat <= 10 else ('0.12cm' if num_mat <= 17 else '0.08cm')
+            no_border_padding = '0.1cm' if num_mat <= 10 else ('0.05cm' if num_mat <= 17 else '0.02cm')
+
             doc = OpenDocumentText()
 
-            # === STILI ===
-            # Titolo centrato
+            # === STILI (adattivi) ===
             style_title = Style(name="TitoloScheda", family="paragraph")
-            style_title.addElement(ParagraphProperties(textalign="center", marginbottom="0.5cm"))
+            style_title.addElement(ParagraphProperties(textalign="center", marginbottom="0.3cm"))
             style_title.addElement(TextProperties(fontsize="14pt", fontweight="bold"))
             doc.styles.addElement(style_title)
 
-            # Testo normale
             style_normal = Style(name="Normale", family="paragraph")
-            style_normal.addElement(TextProperties(fontsize="10pt"))
+            style_normal.addElement(TextProperties(fontsize=ft_info))
             doc.styles.addElement(style_normal)
 
-            # Testo bold
             style_bold = Style(name="Bold", family="text")
-            style_bold.addElement(TextProperties(fontweight="bold", fontsize="10pt"))
+            style_bold.addElement(TextProperties(fontweight="bold", fontsize=ft_info))
             doc.styles.addElement(style_bold)
 
-            # Centrato
+            style_bold_nome = Style(name="BoldNome", family="text")
+            style_bold_nome.addElement(TextProperties(fontweight="bold", fontsize=ft_nome))
+            doc.styles.addElement(style_bold_nome)
+
             style_centered = Style(name="Centrato", family="paragraph")
-            style_centered.addElement(ParagraphProperties(textalign="center"))
-            style_centered.addElement(TextProperties(fontsize="10pt", fontweight="bold"))
+            style_centered.addElement(ParagraphProperties(textalign="center", marginbottom="0cm", margintop="0cm"))
+            style_centered.addElement(TextProperties(fontsize=ft_info, fontweight="bold"))
             doc.styles.addElement(style_centered)
 
-            # Stile cella con bordi
+            # Stile paragrafo con margine ridotto per materiali
+            style_mat_label = Style(name="MatLabel", family="paragraph")
+            style_mat_label.addElement(ParagraphProperties(textalign="center", marginbottom="0cm", margintop=margin_mat))
+            style_mat_label.addElement(TextProperties(fontsize=ft_info, fontweight="bold"))
+            doc.styles.addElement(style_mat_label)
+
             style_cell = Style(name="CellaBordo", family="table-cell")
-            style_cell.addElement(TableCellProperties(
-                border="0.05pt solid #000000",
-                padding="0.2cm"
-            ))
+            style_cell.addElement(TableCellProperties(border="0.05pt solid #000000", padding=cell_padding))
             doc.automaticstyles.addElement(style_cell)
 
-            # Stile cella header (grassetto)
             style_cell_header = Style(name="CellaHeader", family="table-cell")
-            style_cell_header.addElement(TableCellProperties(
-                border="0.05pt solid #000000",
-                padding="0.2cm",
-                backgroundcolor="#f0f0f0"
-            ))
+            style_cell_header.addElement(TableCellProperties(border="0.05pt solid #000000", padding=cell_padding, backgroundcolor="#f0f0f0"))
             doc.automaticstyles.addElement(style_cell_header)
 
-            # Stile tabella info
             style_table_info = Style(name="TabellaInfo", family="table")
             doc.automaticstyles.addElement(style_table_info)
 
-            # Colonne tabella info
             style_col_info = Style(name="ColInfo", family="table-column")
             style_col_info.addElement(TableColumnProperties(columnwidth="9cm"))
             doc.automaticstyles.addElement(style_col_info)
 
-            # Stile tabella operazioni
             style_table_ops = Style(name="TabellaOps", family="table")
             doc.automaticstyles.addElement(style_table_ops)
 
-            # Colonne tabella operazioni (7 colonne)
             col_widths_ops = ["2.5cm", "1.8cm", "1.8cm", "1.8cm", "1.8cm", "1.8cm", "6cm"]
             style_cols_ops = []
             for i, w in enumerate(col_widths_ops):
-                s = Style(name=f"ColOps{i}", family="table-column")
-                s.addElement(TableColumnProperties(columnwidth=w))
-                doc.automaticstyles.addElement(s)
-                style_cols_ops.append(s)
+                st = Style(name=f"ColOps{i}", family="table-column")
+                st.addElement(TableColumnProperties(columnwidth=w))
+                doc.automaticstyles.addElement(st)
+                style_cols_ops.append(st)
 
-            # Stile per rettangolo materiale
             style_mat_box = Style(name="MatBox", family="table-cell")
-            style_mat_box.addElement(TableCellProperties(
-                border="1.5pt solid #000000",
-                padding="0.15cm"
-            ))
+            style_mat_box.addElement(TableCellProperties(border="1.5pt solid #000000", padding=mat_padding))
             doc.automaticstyles.addElement(style_mat_box)
 
-            # Stile cella senza bordo
             style_cell_no_border = Style(name="CellaNoBordo", family="table-cell")
-            style_cell_no_border.addElement(TableCellProperties(
-                border="none",
-                padding="0.1cm"
-            ))
+            style_cell_no_border.addElement(TableCellProperties(border="none", padding=no_border_padding))
             doc.automaticstyles.addElement(style_cell_no_border)
 
-            # Stile colonne materiale (3 colonne: giri, rettangolo, sviluppo)
             style_col_mat_narrow = Style(name="ColMatNarrow", family="table-column")
             style_col_mat_narrow.addElement(TableColumnProperties(columnwidth="2cm"))
             doc.automaticstyles.addElement(style_col_mat_narrow)
@@ -448,30 +446,29 @@ class DocumentUtils:
             style_col_mat_wide.addElement(TableColumnProperties(columnwidth="12cm"))
             doc.automaticstyles.addElement(style_col_mat_wide)
 
-            # Paragrafo allineato a destra
             style_right = Style(name="AllineatoDestra", family="paragraph")
             style_right.addElement(ParagraphProperties(textalign="end"))
-            style_right.addElement(TextProperties(fontsize="10pt", fontweight="bold"))
+            style_right.addElement(TextProperties(fontsize=ft_giri, fontweight="bold"))
             doc.styles.addElement(style_right)
 
-            # Footer
-            style_footer = Style(name="Footer", family="paragraph")
-            style_footer.addElement(ParagraphProperties(textalign="center", margintop="1cm"))
-            style_footer.addElement(TextProperties(fontsize="8pt", color="#666666"))
-            doc.styles.addElement(style_footer)
+            style_giri_text = Style(name="GiriText", family="text")
+            style_giri_text.addElement(TextProperties(fontweight="bold", fontsize=ft_giri))
+            doc.styles.addElement(style_giri_text)
+
+            # Stile riga materiale con altezza fissa
+            style_mat_row = Style(name="MatRow", family="table-row")
+            style_mat_row.addElement(TableRowProperties(rowheight=rect_h))
+            doc.automaticstyles.addElement(style_mat_row)
 
             # === CONTENUTO ===
 
-            # Titolo
-            p_title = P(stylename=style_title)
-            title_span = Span(stylename=style_bold, text="RCS - Scheda di Taglio")
-            p_title.addElement(title_span)
-            doc.text.addElement(p_title)
+            # Titolo (solo se <= 10 materiali)
+            if sc['show_title']:
+                p_title = P(stylename=style_title)
+                p_title.addElement(Span(stylename=style_bold, text="RCS - Scheda di Taglio"))
+                doc.text.addElement(p_title)
 
-            # Spazio
-            doc.text.addElement(P(stylename=style_normal, text=""))
-
-            # --- Tabella informazioni cliente (3 righe x 2 colonne) ---
+            # Tabella info cliente
             info_table = Table(name="InfoCliente", stylename=style_table_info)
             info_table.addElement(TableColumn(stylename=style_col_info))
             info_table.addElement(TableColumn(stylename=style_col_info))
@@ -492,10 +489,7 @@ class DocumentUtils:
 
             doc.text.addElement(info_table)
 
-            # Spazio
-            doc.text.addElement(P(stylename=style_normal, text=""))
-
-            # --- Sezione materiali ---
+            # Sezione materiali
             if hasattr(preventivo, 'materiali') and preventivo.materiali:
                 for i, materiale in enumerate(preventivo.materiali):
                     if hasattr(materiale, 'giri'):
@@ -514,52 +508,45 @@ class DocumentUtils:
                         sviluppo = 100
                         nome = f'Materiale {i+1}'
 
-                    # Lunghezza centrata sopra
-                    doc.text.addElement(P(stylename=style_centered, text=f"{int(lunghezza)} mm"))
+                    # Lunghezza centrata sopra (con margine top adattivo)
+                    doc.text.addElement(P(stylename=style_mat_label, text=f"{int(lunghezza)} mm"))
 
-                    # Tabella 1x3: Giri | Rettangolo con nome | Sviluppo
+                    # Tabella 1x3: Giri | Rettangolo | Sviluppo
                     mat_table = Table(name=f"Materiale{i}")
                     mat_table.addElement(TableColumn(stylename=style_col_mat_narrow))
                     mat_table.addElement(TableColumn(stylename=style_col_mat_wide))
                     mat_table.addElement(TableColumn(stylename=style_col_mat_narrow))
 
-                    mat_row = TableRow()
+                    mat_row = TableRow(stylename=style_mat_row)
 
-                    # Giri (senza bordo, allineato a destra)
                     cell_giri = TableCell(stylename=style_cell_no_border)
                     cell_giri.addElement(P(stylename=style_right, text=f"G{giri}"))
                     mat_row.addElement(cell_giri)
 
-                    # Rettangolo con nome (con bordo)
                     cell_rect = TableCell(stylename=style_mat_box)
                     p_rect = P(stylename=style_centered)
-                    p_rect.addElement(Span(stylename=style_bold, text=f"==          {nome}"))
+                    p_rect.addElement(Span(stylename=style_bold_nome, text=f"==          {nome}"))
                     cell_rect.addElement(p_rect)
                     mat_row.addElement(cell_rect)
 
-                    # Sviluppo (senza bordo)
                     cell_svil = TableCell(stylename=style_cell_no_border)
                     p_svil = P(stylename=style_normal)
-                    p_svil.addElement(Span(stylename=style_bold, text=f"H {int(sviluppo)} mm"))
+                    p_svil.addElement(Span(stylename=style_giri_text, text=f"H {int(sviluppo)} mm"))
                     cell_svil.addElement(p_svil)
                     mat_row.addElement(cell_svil)
 
                     mat_table.addElement(mat_row)
                     doc.text.addElement(mat_table)
 
-                    # Spazio tra materiali
-                    doc.text.addElement(P(stylename=style_normal, text=""))
-
-            # Spazio
+            # Spazio prima tabella operazioni
             doc.text.addElement(P(stylename=style_normal, text=""))
 
-            # --- Tabella operazioni (6 righe x 7 colonne) ---
+            # Tabella operazioni
             ops_table = Table(name="Operazioni", stylename=style_table_ops)
-            for s in style_cols_ops:
-                ops_table.addElement(TableColumn(stylename=s))
+            for st in style_cols_ops:
+                ops_table.addElement(TableColumn(stylename=st))
 
-            # Header
-            headers = ['Operazione', 'Inizio', 'Fine', 'Tempo Tot.', 'Num. Pezzi', 'Data', 'Note']
+            headers = ['Operazione', 'Inizio', 'Fine', 'Tempo', 'Pezzi', 'Data', 'Note']
             header_row = TableRow()
             for h in headers:
                 tc = TableCell(stylename=style_cell_header)
@@ -569,8 +556,7 @@ class DocumentUtils:
                 header_row.addElement(tc)
             ops_table.addElement(header_row)
 
-            # 5 righe vuote
-            for _ in range(5):
+            for _ in range(sc['ops_rows']):
                 tr = TableRow()
                 for _ in range(7):
                     tc = TableCell(stylename=style_cell)
@@ -579,10 +565,6 @@ class DocumentUtils:
                 ops_table.addElement(tr)
 
             doc.text.addElement(ops_table)
-
-            # Footer
-            doc.text.addElement(P(stylename=style_footer,
-                text=f"Documento generato automaticamente dal sistema RCS - {datetime.now().strftime('%d/%m/%Y %H:%M')}"))
 
             # Salva documento
             doc.save(file_path)
@@ -602,14 +584,45 @@ class DocumentUtils:
             return None
 
     @staticmethod
+    def _calcola_scala(num_materiali):
+        """Calcola i parametri di scala in base al numero di materiali.
+        Ritorna dict con tutte le misure adattive."""
+        if num_materiali <= 10:
+            return {
+                'margin_mat': '12mm', 'rect_height': '8mm', 'font_nome': '11px',
+                'font_info': '10px', 'font_giri': '10px', 'top_offset': '-6mm',
+                'orient_font': '8px', 'orient_width': '18mm',
+                'show_title': True, 'ops_rows': 5, 'ops_height': '8mm',
+                'info_margin': '3mm', 'ops_margin_top': '15mm',
+            }
+        elif num_materiali <= 17:
+            return {
+                'margin_mat': '6mm', 'rect_height': '6mm', 'font_nome': '10px',
+                'font_info': '9px', 'font_giri': '9px', 'top_offset': '-4mm',
+                'orient_font': '7px', 'orient_width': '15mm',
+                'show_title': False, 'ops_rows': 4, 'ops_height': '6mm',
+                'info_margin': '2mm', 'ops_margin_top': '8mm',
+            }
+        else:  # 18-25
+            return {
+                'margin_mat': '3mm', 'rect_height': '5mm', 'font_nome': '9px',
+                'font_info': '8px', 'font_giri': '8px', 'top_offset': '-3mm',
+                'orient_font': '6px', 'orient_width': '12mm',
+                'show_title': False, 'ops_rows': 3, 'ops_height': '5mm',
+                'info_margin': '1mm', 'ops_margin_top': '5mm',
+            }
+
+    @staticmethod
     def _genera_html_template_specifico(preventivo, dati_cliente):
-        """Template HTML che replica esattamente il documento di esempio"""
-        
+        """Template HTML scalabile - adatta il layout al numero di materiali (1-25)"""
+
+        num_materiali = len(preventivo.materiali) if hasattr(preventivo, 'materiali') and preventivo.materiali else 0
+        s = DocumentUtils._calcola_scala(num_materiali)
+
         # Sezione materiali dettagliata
         materiali_html = ""
         if hasattr(preventivo, 'materiali') and preventivo.materiali:
             for i, materiale in enumerate(preventivo.materiali):
-                # Gestisci diversi formati di materiale
                 if hasattr(materiale, 'giri'):
                     giri = materiale.giri
                     lunghezza = getattr(materiale, 'lunghezza', 0)
@@ -625,34 +638,36 @@ class DocumentUtils:
                     lunghezza = 1000
                     sviluppo = 100
                     nome = f'Materiale {i+1}'
-                
+
                 materiali_html += f"""
-                <div style="width: 120mm; margin: 12mm auto; position: relative; page-break-inside: avoid;">
-                    <!-- Lunghezza (sopra al centro del rettangolo) -->
-                    <div style="position: absolute; left: 50%; top: -6mm; transform: translateX(-50%); font-size: 10px;">
+                <div style="width: 120mm; margin: {s['margin_mat']} auto; position: relative; page-break-inside: avoid;">
+                    <div style="position: absolute; left: 50%; top: {s['top_offset']}; transform: translateX(-50%); font-size: {s['font_info']};">
                         <strong>{lunghezza}mm</strong>
                     </div>
-                    
-                    <!-- Rettangolo materiale con orientamento interno -->
-                    <div style="width: 80mm; height: 8mm; margin: 0 auto; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative;">
-                        <!-- Orientamento a sinistra dentro il rettangolo -->
-                        <input type="text" placeholder="Orient." style="width: 18mm; border: none; font-size: 8px; background: transparent; border-bottom: none;">
-                        <!-- Nome materiale al centro -->
-                        <strong style="font-size: 11px; position: absolute; left: 50%; transform: translateX(-50%);">{nome}</strong>
+                    <div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative;">
+                        <input type="text" placeholder="Orient." style="width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent;">
+                        <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; transform: translateX(-50%);">{nome}</strong>
                     </div>
-                    
-                    <!-- Giri (a metà del lato sinistro del rettangolo, molto vicino) -->
-                    <div style="position: absolute; left: -2mm; top: 50%; transform: translateY(-50%); font-size: 10px;">
+                    <div style="position: absolute; left: -2mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
                         <strong>G{giri}</strong>
                     </div>
-                    
-                    <!-- Sviluppo (a metà del lato destro del rettangolo) -->
-                    <div style="position: absolute; right: -6mm; top: 50%; transform: translateY(-50%); font-size: 10px;">
+                    <div style="position: absolute; right: -6mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
                         <strong>H {int(sviluppo)} mm</strong>
                     </div>
                 </div>
                 """
-        
+
+        # Titolo condizionale
+        title_html = ""
+        if s['show_title']:
+            title_html = '<div class="header"><h2 style="text-align: center; margin: 0; font-size: 14px;">RCS - Scheda di Taglio</h2></div>'
+
+        # Righe tabella operazioni
+        ops_rows_html = "".join([
+            '<tr>' + ''.join([f'<td style="height: {s["ops_height"]};"><textarea class="editable-area" rows="1"></textarea></td>' for _ in range(7)]) + '</tr>'
+            for _ in range(s['ops_rows'])
+        ])
+
         return f"""
 <!DOCTYPE html>
 <html>
@@ -662,71 +677,69 @@ class DocumentUtils:
     <style>
         @page {{
             size: A4;
-            margin: 15mm;
+            margin: 10mm;
         }}
-        body {{ 
-            font-family: Arial, sans-serif; 
+        body {{
+            font-family: Arial, sans-serif;
             max-width: 180mm;
             margin: 0 auto;
-            font-size: 10px;
+            font-size: {s['font_info']};
             line-height: 1.2;
         }}
-        .header {{ 
-            text-align: center; 
-            margin-bottom: 15mm;
+        .header {{
+            text-align: center;
+            margin-bottom: 8mm;
         }}
-        .info-section {{ 
-            margin-bottom: 3mm;
+        .info-section {{
+            margin-bottom: {s['info_margin']};
         }}
-        .info-label {{ 
-            font-weight: bold; 
-            display: inline-block; 
+        .info-label {{
+            font-weight: bold;
+            display: inline-block;
             width: 25mm;
         }}
         .editable-field {{
             border: none;
             border-bottom: 1px solid #000;
             background: transparent;
-            font-size: 10px;
+            font-size: {s['font_info']};
             padding: 1mm 0;
         }}
-        .operations-table {{ 
-            width: 100%; 
+        .operations-table {{
+            width: 100%;
             max-width: 180mm;
-            border-collapse: collapse; 
-            margin: 15mm auto 0;
+            border-collapse: collapse;
+            margin: {s['ops_margin_top']} auto 0;
         }}
-        .operations-table th, .operations-table td {{ 
-            border: 1px solid #000; 
-            padding: 1mm; 
+        .operations-table th, .operations-table td {{
+            border: 1px solid #000;
+            padding: 1mm;
             text-align: center;
-            height: 8mm;
+            height: {s['ops_height']};
         }}
-        .operations-table th {{ 
-            background: #f0f0f0; 
+        .operations-table th {{
+            background: #f0f0f0;
             font-weight: bold;
-            font-size: 9px;
+            font-size: {s['font_info']};
         }}
         .editable-area {{
             width: 100%;
             border: none;
             background: transparent;
             resize: none;
-            font-size: 10px;
+            font-size: {s['font_info']};
             text-align: center;
         }}
         @media print {{
             body {{ margin: 0; }}
-            .editable-field {{ 
-                border-bottom: 1px solid #000 !important; 
+            .editable-field {{
+                border-bottom: 1px solid #000 !important;
             }}
         }}
     </style>
 </head>
 <body>
-    <div class="header">
-        <h2 style="text-align: center; margin: 0; font-size: 14px;">RCS - Scheda di Taglio</h2>
-    </div>
+    {title_html}
 
     <!-- INFORMAZIONI CLIENTE (2 colonne) -->
     <div style="display: flex; justify-content: space-between;">
@@ -770,20 +783,16 @@ class DocumentUtils:
                 <th style="width: 12%;">Operazione</th>
                 <th style="width: 8%;">Inizio</th>
                 <th style="width: 8%;">Fine</th>
-                <th style="width: 8%;">Tempo Tot.</th>
-                <th style="width: 8%;">Num. Pezzi</th>
+                <th style="width: 8%;">Tempo</th>
+                <th style="width: 8%;">Pezzi</th>
                 <th style="width: 8%;">Data</th>
                 <th style="width: 48%;">Note</th>
             </tr>
         </thead>
         <tbody>
-            {"".join(['<tr>' + ''.join([f'<td style="height: 8mm;"><textarea class="editable-area" rows="1"></textarea></td>' for _ in range(7)]) + '</tr>' for _ in range(5)])}
+            {ops_rows_html}
         </tbody>
     </table>
-
-    <div style="margin-top: 10mm; font-size: 8px; color: #666; text-align: center;">
-        Documento generato automaticamente dal sistema RCS - {datetime.now().strftime('%d/%m/%Y %H:%M')}
-    </div>
 </body>
 </html>
         """

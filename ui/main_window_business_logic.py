@@ -432,8 +432,6 @@ class MainWindowBusinessLogic:
                 file_path = DocumentUtils.genera_documento_html(preventivo_obj, dati_cliente, window_instance)
             elif formato == 'odt':
                 file_path = DocumentUtils.genera_documento_odt(preventivo_obj, dati_cliente, window_instance)
-            elif formato == 'docx':
-                file_path = DocumentUtils.genera_documento_docx(preventivo_obj, dati_cliente, window_instance)
             else:
                 print(f"DEBUG: Formato non riconosciuto: {formato}")
                 return
