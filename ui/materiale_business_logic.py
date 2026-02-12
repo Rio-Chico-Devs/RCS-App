@@ -29,7 +29,7 @@ class MaterialeBusinessLogic:
                 text = f"{nome} - {spessore}mm - €{prezzo:.2f}/m"
                 window_instance.combo_materiale.addItem(text, id_mat)
         except Exception as e:
-            QMessageBox.error(window_instance, "Errore", f"Errore nel caricamento materiali: {str(e)}")
+            QMessageBox.critical(window_instance, "Errore", f"Errore nel caricamento materiali: {str(e)}")
     
     @staticmethod
     def on_materiale_changed(window_instance):
@@ -122,7 +122,7 @@ class MaterialeBusinessLogic:
                 # Ricalcola tutto dopo aver impostato il materiale
                 MaterialeBusinessLogic.ricalcola_tutto(window_instance)
         except Exception as e:
-            QMessageBox.error(window_instance, "Errore", f"Errore nella selezione materiale: {str(e)}")
+            QMessageBox.critical(window_instance, "Errore", f"Errore nella selezione materiale: {str(e)}")
     
     @staticmethod
     def ricalcola_tutto(window_instance):

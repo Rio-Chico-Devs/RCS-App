@@ -23,7 +23,7 @@ class PreventivoBusinessLogic:
         """Carica un preventivo esistente dal database"""
         preventivo_data = window_instance.db_manager.get_preventivo_by_id(preventivo_id)
         if not preventivo_data:
-            QMessageBox.error(window_instance, "Errore", "Preventivo non trovato nel database.")
+            QMessageBox.critical(window_instance, "Errore", "Preventivo non trovato nel database.")
             return
         
         # Carica dati base
@@ -432,7 +432,7 @@ class PreventivoBusinessLogic:
             window_instance.close()
             
         except Exception as e:
-            QMessageBox.error(window_instance, "Errore", f"Errore nel salvataggio: {str(e)}")
+            QMessageBox.critical(window_instance, "Errore", f"Errore nel salvataggio: {str(e)}")
     
     @staticmethod
     def gestisci_chiusura_finestra(window_instance, event):

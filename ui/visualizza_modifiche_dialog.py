@@ -515,4 +515,4 @@ class VisualizzaModificheDialog(QDialog):
             self.versione_ripristinata.emit()
             self.load_storico()
         else:
-            QMessageBox.error(self, "Errore", "Errore durante il ripristino della versione")
+            QMessageBox.critical(self, "Errore", "Errore durante il ripristino della versione")

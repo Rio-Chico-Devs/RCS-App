@@ -704,7 +704,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
                 self.load_preventivi()
                 self.preventivo_modificato.emit()
             else:
-                QMessageBox.error(self, "Errore",
+                QMessageBox.critical(self, "Errore",
                                 "Errore durante l'eliminazione del preventivo.")
 
     def on_preventivo_modificato(self) -> None:

@@ -69,7 +69,7 @@ class PreventivoWindow(QMainWindow):
         """Carica un preventivo esistente dal database"""
         preventivo_data = self.db_manager.get_preventivo_by_id(self.preventivo_id)
         if not preventivo_data:
-            QMessageBox.error(self, "Errore", "Preventivo non trovato nel database.")
+            QMessageBox.critical(self, "Errore", "Preventivo non trovato nel database.")
             return
         
         # Carica i dati del preventivo (inclusi i nuovi campi)
@@ -866,7 +866,7 @@ class PreventivoWindow(QMainWindow):
             self.aggiorna_totali()
             
         except Exception as e:
-            QMessageBox.error(self, "Errore", f"Errore nel caricamento valori: {str(e)}")
+            QMessageBox.critical(self, "Errore", f"Errore nel caricamento valori: {str(e)}")
     
     def salva_preventivo(self):
         """Salva preventivo"""
@@ -902,7 +902,7 @@ class PreventivoWindow(QMainWindow):
                     self.preventivo_salvato.emit()
                     self.close()
                 else:
-                    QMessageBox.error(self, "Errore", "Errore durante la modifica del preventivo.")
+                    QMessageBox.critical(self, "Errore", "Errore durante la modifica del preventivo.")
             else:
                 # Crea nuovo preventivo
                 preventivo_id = self.db_manager.save_preventivo(preventivo_data)
@@ -950,9 +950,9 @@ class PreventivoWindow(QMainWindow):
                 self.preventivo_salvato.emit()
                 self.close()
             else:
-                QMessageBox.error(self, "Errore", "Errore durante il salvataggio della revisione.")
+                QMessageBox.critical(self, "Errore", "Errore durante il salvataggio della revisione.")
         except Exception as e:
-            QMessageBox.error(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
+            QMessageBox.critical(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
     
     def aggiungi_materiale(self):
         """Aggiungi nuovo materiale"""
@@ -984,7 +984,7 @@ class PreventivoWindow(QMainWindow):
                 self.aggiorna_materiali_info()
                 self.aggiorna_totali()
             else:
-                QMessageBox.error(self, "Errore", "Impossibile aggiungere il materiale.")
+                QMessageBox.critical(self, "Errore", "Impossibile aggiungere il materiale.")
     
     def visualizza_materiali(self):
         """Visualizza lista materiali"""

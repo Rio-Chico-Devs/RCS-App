@@ -564,7 +564,7 @@ class MainWindowBusinessLogic:
                                       "Preventivo e tutte le sue revisioni sono stati eliminati con successo.")
                 MainWindowBusinessLogic.load_preventivi(window_instance)
             else:
-                QMessageBox.error(window_instance, "Errore", 
+                QMessageBox.critical(window_instance, "Errore", 
                                 "Errore durante l'eliminazione del preventivo.")
     
     @staticmethod

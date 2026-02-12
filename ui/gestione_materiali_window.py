@@ -641,9 +641,9 @@ class GestioneMaterialiWindow(QMainWindow):
                     self.carica_materiali()
                     self.materiali_modificati.emit()  # Notifica le modifiche
                 else:
-                    QMessageBox.error(self, "Errore", "Nome materiale già esistente o errore nel database.")
+                    QMessageBox.critical(self, "Errore", "Nome materiale già esistente o errore nel database.")
             except Exception as e:
-                QMessageBox.error(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
+                QMessageBox.critical(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
     
     def elimina_materiale(self):
         """Elimina il materiale corrente"""
@@ -672,9 +672,9 @@ class GestioneMaterialiWindow(QMainWindow):
                     self.abilita_pulsanti_form(False)
                     self.materiali_modificati.emit()  # Notifica le modifiche
                 else:
-                    QMessageBox.error(self, "Errore", "Errore durante l'eliminazione del materiale.")
+                    QMessageBox.critical(self, "Errore", "Errore durante l'eliminazione del materiale.")
             except Exception as e:
-                QMessageBox.error(self, "Errore", f"Errore durante l'eliminazione:\n{str(e)}")
+                QMessageBox.critical(self, "Errore", f"Errore durante l'eliminazione:\n{str(e)}")
 
 
 class NuovoMaterialeDialog(QDialog):
@@ -819,6 +819,6 @@ class NuovoMaterialeDialog(QDialog):
             if materiale_id:
                 self.accept()
             else:
-                QMessageBox.error(self, "Errore", "Nome materiale già esistente.")
+                QMessageBox.critical(self, "Errore", "Nome materiale già esistente.")
         except Exception as e:
-            QMessageBox.error(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
+            QMessageBox.critical(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
