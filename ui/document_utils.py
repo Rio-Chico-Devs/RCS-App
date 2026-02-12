@@ -603,13 +603,21 @@ class DocumentUtils:
                 'show_title': False, 'ops_rows': 4, 'ops_height': '6mm',
                 'info_margin': '2mm', 'ops_margin_top': '8mm',
             }
-        else:  # 18-25
+        elif num_materiali <= 25:
             return {
                 'margin_mat': '3mm', 'rect_height': '5mm', 'font_nome': '9px',
                 'font_info': '8px', 'font_giri': '8px', 'top_offset': '-3mm',
                 'orient_font': '6px', 'orient_width': '12mm',
                 'show_title': False, 'ops_rows': 3, 'ops_height': '5mm',
                 'info_margin': '1mm', 'ops_margin_top': '5mm',
+            }
+        else:  # 26-30
+            return {
+                'margin_mat': '2mm', 'rect_height': '4mm', 'font_nome': '8px',
+                'font_info': '7px', 'font_giri': '7px', 'top_offset': '-2mm',
+                'orient_font': '6px', 'orient_width': '10mm',
+                'show_title': False, 'ops_rows': 2, 'ops_height': '4mm',
+                'info_margin': '1mm', 'ops_margin_top': '3mm',
             }
 
     @staticmethod

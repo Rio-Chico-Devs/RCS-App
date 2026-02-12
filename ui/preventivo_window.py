@@ -956,9 +956,9 @@ class PreventivoWindow(QMainWindow):
     
     def aggiungi_materiale(self):
         """Aggiungi nuovo materiale"""
-        if len(self.preventivo.materiali_calcolati) >= 10:
-            QMessageBox.warning(self, "Limite Raggiunto", 
-                              "Hai raggiunto il limite massimo di 10 materiali.")
+        if len(self.preventivo.materiali_calcolati) >= 30:
+            QMessageBox.warning(self, "Limite Raggiunto",
+                              "Hai raggiunto il limite massimo di 30 materiali.")
             return
         
         diametro_iniziale = 0.0
@@ -1124,11 +1124,11 @@ class PreventivoWindow(QMainWindow):
         if num_materiali == 0:
             self.lbl_num_materiali.setText("Nessun materiale inserito")
         else:
-            self.lbl_num_materiali.setText(f"{num_materiali}/10 materiali inseriti")
+            self.lbl_num_materiali.setText(f"{num_materiali}/30 materiali inseriti")
         
         # Gestione pulsanti
         if hasattr(self, 'btn_aggiungi_materiale'):
-            self.btn_aggiungi_materiale.setEnabled(num_materiali < 10 and self.modalita != 'visualizza')
+            self.btn_aggiungi_materiale.setEnabled(num_materiali < 30 and self.modalita != 'visualizza')
         if hasattr(self, 'btn_visualizza_materiali'):
             self.btn_visualizza_materiali.setEnabled(num_materiali > 0)
         
