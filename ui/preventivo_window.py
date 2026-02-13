@@ -1009,19 +1009,40 @@ class PreventivoWindow(QMainWindow):
         info_label.setStyleSheet("font-size: 14px; color: #718096;")
         layout.addWidget(info_label)
 
-        self._lista_materiali_dialog = QListWidget()
-        self._lista_materiali_dialog.setSelectionMode(QListWidget.ExtendedSelection)
+        # Scroll area con checkbox per ogni materiale
+        from PyQt5.QtWidgets import QCheckBox, QScrollArea
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: 1px solid #e2e8f0; border-radius: 8px; }")
+        scroll_widget = QWidget()
+        self._materiali_checks_layout = QVBoxLayout(scroll_widget)
+        self._materiali_checks_layout.setContentsMargins(10, 10, 10, 10)
+        self._materiali_checks_layout.setSpacing(6)
+        scroll.setWidget(scroll_widget)
+
+        self._checkbox_list = []
         self._aggiorna_lista_materiali_dialog()
 
-        if self.modalita != 'visualizza':
-            self._lista_materiali_dialog.itemDoubleClicked.connect(lambda item: self.modifica_materiale_selezionato())
-        layout.addWidget(self._lista_materiali_dialog)
+        layout.addWidget(scroll)
 
-        # Conteggio selezione
+        # Conteggio selezione + seleziona/deseleziona tutto
+        check_bar = QHBoxLayout()
         self._lbl_selezione = QLabel("")
         self._lbl_selezione.setStyleSheet("font-size: 12px; color: #718096;")
-        layout.addWidget(self._lbl_selezione)
-        self._lista_materiali_dialog.itemSelectionChanged.connect(self._aggiorna_conteggio_selezione)
+        check_bar.addWidget(self._lbl_selezione)
+        check_bar.addStretch()
+
+        if self.modalita != 'visualizza':
+            btn_sel_tutti = QPushButton("Seleziona Tutti")
+            btn_sel_tutti.setStyleSheet("font-size: 12px; padding: 4px 10px;")
+            btn_sel_tutti.clicked.connect(lambda: self._toggle_tutti_checkbox(True))
+            btn_desel_tutti = QPushButton("Deseleziona Tutti")
+            btn_desel_tutti.setStyleSheet("font-size: 12px; padding: 4px 10px;")
+            btn_desel_tutti.clicked.connect(lambda: self._toggle_tutti_checkbox(False))
+            check_bar.addWidget(btn_sel_tutti)
+            check_bar.addWidget(btn_desel_tutti)
+
+        layout.addLayout(check_bar)
 
         # Pulsanti
         buttons_layout = QHBoxLayout()
@@ -1059,20 +1080,49 @@ class PreventivoWindow(QMainWindow):
         self._dialog_materiali.exec_()
 
     def _aggiorna_lista_materiali_dialog(self):
-        """Aggiorna la lista materiali nel dialog aperto"""
-        self._lista_materiali_dialog.clear()
+        """Aggiorna le checkbox materiali nel dialog aperto"""
+        from PyQt5.QtWidgets import QCheckBox
+        # Rimuovi checkbox esistenti
+        for cb in self._checkbox_list:
+            cb.setParent(None)
+        self._checkbox_list.clear()
+
         for i, materiale in enumerate(self.preventivo.materiali_calcolati):
-            testo = (f"#{i+1} - {materiale.materiale_nome}\n"
-                    f"Ø Iniziale → Ø Finale: {materiale.diametro:.1f}mm → {materiale.diametro_finale:.1f}mm  "
-                    f"Lunghezza: {materiale.lunghezza:.0f}mm  Numero Giri: {materiale.giri} \n"
-                    f"Costo Singolo Materiale: €{materiale.maggiorazione:.2f}")
-            item = QListWidgetItem(testo)
-            item.setData(Qt.UserRole, i)
-            self._lista_materiali_dialog.addItem(item)
+            testo = (f"#{i+1} - {materiale.materiale_nome}  |  "
+                    f"Ø {materiale.diametro:.1f}→{materiale.diametro_finale:.1f}mm  |  "
+                    f"L: {materiale.lunghezza:.0f}mm  |  G: {materiale.giri}  |  "
+                    f"€{materiale.maggiorazione:.2f}")
+            cb = QCheckBox(testo)
+            cb.setStyleSheet("""
+                QCheckBox {
+                    font-size: 13px;
+                    padding: 6px 4px;
+                    color: #2d3748;
+                }
+                QCheckBox:hover {
+                    background-color: #f7fafc;
+                    border-radius: 4px;
+                }
+            """)
+            cb.setProperty("indice", i)
+            cb.stateChanged.connect(self._aggiorna_conteggio_selezione)
+            self._materiali_checks_layout.addWidget(cb)
+            self._checkbox_list.append(cb)
+
+        self._aggiorna_conteggio_selezione()
+
+    def _get_checked_indices(self):
+        """Ritorna lista indici dei materiali con checkbox flaggata"""
+        return [cb.property("indice") for cb in self._checkbox_list if cb.isChecked()]
+
+    def _toggle_tutti_checkbox(self, stato):
+        """Seleziona o deseleziona tutte le checkbox"""
+        for cb in self._checkbox_list:
+            cb.setChecked(stato)
 
     def _aggiorna_conteggio_selezione(self):
         """Aggiorna il label con il numero di materiali selezionati"""
-        n = len(self._lista_materiali_dialog.selectedItems())
+        n = len(self._get_checked_indices())
         if n == 0:
             self._lbl_selezione.setText("")
         elif n == 1:
@@ -1082,30 +1132,29 @@ class PreventivoWindow(QMainWindow):
 
     def modifica_materiale_selezionato(self):
         """Modifica materiale selezionato (singolo)"""
-        selected = self._lista_materiali_dialog.selectedItems()
-        if not selected:
+        checked = self._get_checked_indices()
+        if not checked:
             QMessageBox.warning(self, "Attenzione", "Seleziona un materiale da modificare.")
             return
-        if len(selected) > 1:
+        if len(checked) > 1:
             QMessageBox.warning(self, "Attenzione", "Seleziona un solo materiale per la modifica.")
             return
 
-        indice = selected[0].data(Qt.UserRole)
+        indice = checked[0]
         materiale_da_modificare = self.preventivo.materiali_calcolati[indice]
         self.apri_finestra_modifica_materiale(indice, materiale_da_modificare)
-        # Dopo la modifica, aggiorna la lista (il dialog resta aperto)
         self._aggiorna_lista_materiali_dialog()
 
     def elimina_materiali_selezionati(self):
-        """Elimina uno o più materiali selezionati"""
-        selected = self._lista_materiali_dialog.selectedItems()
-        if not selected:
+        """Elimina uno o più materiali flaggati"""
+        checked = self._get_checked_indices()
+        if not checked:
             QMessageBox.warning(self, "Attenzione", "Seleziona almeno un materiale da eliminare.")
             return
 
-        n = len(selected)
+        n = len(checked)
         if n == 1:
-            nome = self.preventivo.materiali_calcolati[selected[0].data(Qt.UserRole)].materiale_nome
+            nome = self.preventivo.materiali_calcolati[checked[0]].materiale_nome
             msg = f"Eliminare il materiale '{nome}'?"
         else:
             msg = f"Eliminare {n} materiali selezionati?"
@@ -1117,12 +1166,10 @@ class PreventivoWindow(QMainWindow):
 
         if risposta == QMessageBox.Yes:
             # Elimina dal fondo per non spostare gli indici
-            indici = sorted([item.data(Qt.UserRole) for item in selected], reverse=True)
-            for indice in indici:
+            for indice in sorted(checked, reverse=True):
                 self.preventivo.rimuovi_materiale(indice)
 
-            # Ricalcola diametri dal primo indice eliminato in poi
-            primo_indice = min(indici)
+            primo_indice = min(checked)
             if primo_indice > 0:
                 self.ricalcola_diametri_successivi(primo_indice - 1)
             elif self.preventivo.materiali_calcolati:
@@ -1130,11 +1177,8 @@ class PreventivoWindow(QMainWindow):
 
             self.aggiorna_materiali_info()
             self.aggiorna_totali()
-
-            # Aggiorna la lista nel dialog (resta aperto)
             self._aggiorna_lista_materiali_dialog()
 
-            # Se non ci sono più materiali, chiudi il dialog
             if not self.preventivo.materiali_calcolati:
                 self._dialog_materiali.accept()
     
