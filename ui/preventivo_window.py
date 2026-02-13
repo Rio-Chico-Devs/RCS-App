@@ -1168,14 +1168,20 @@ class PreventivoWindow(QMainWindow):
 
         if risposta == QMessageBox.Yes:
             # Elimina dal fondo per non spostare gli indici
+            primo_eliminato = min(checked)
             for indice in sorted(checked, reverse=True):
                 self.preventivo.rimuovi_materiale(indice)
 
-            primo_indice = min(checked)
-            if primo_indice > 0:
-                self.ricalcola_diametri_successivi(primo_indice - 1)
-            elif self.preventivo.materiali_calcolati:
-                self.ricalcola_diametri_successivi(0)
+            if self.preventivo.materiali_calcolati:
+                if primo_eliminato == 0:
+                    # Se ho eliminato il primo, il nuovo primo parte da diametro 0
+                    self.preventivo.materiali_calcolati[0].diametro = 0.0
+                    self.preventivo.materiali_calcolati[0].ricalcola_tutto()
+                    self.ricalcola_diametri_successivi(0)
+                else:
+                    # Ricalcola dalla posizione del primo eliminato in poi
+                    self.ricalcola_diametri_successivi(primo_eliminato - 1)
+                self.preventivo.ricalcola_costo_totale_materiali()
 
             self.aggiorna_materiali_info()
             self.aggiorna_totali()
