@@ -1020,15 +1020,17 @@ class PreventivoWindow(QMainWindow):
         self._materiali_checks_layout.setSpacing(6)
         scroll.setWidget(scroll_widget)
 
+        # Conteggio selezione (creato prima di _aggiorna_lista)
+        self._lbl_selezione = QLabel("")
+        self._lbl_selezione.setStyleSheet("font-size: 12px; color: #718096;")
+
         self._checkbox_list = []
         self._aggiorna_lista_materiali_dialog()
 
         layout.addWidget(scroll)
 
-        # Conteggio selezione + seleziona/deseleziona tutto
+        # Barra selezione
         check_bar = QHBoxLayout()
-        self._lbl_selezione = QLabel("")
-        self._lbl_selezione.setStyleSheet("font-size: 12px; color: #718096;")
         check_bar.addWidget(self._lbl_selezione)
         check_bar.addStretch()
 
