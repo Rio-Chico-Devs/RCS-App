@@ -586,7 +586,7 @@ class DocumentUtils:
     @staticmethod
     def _calcola_scala(num_materiali):
         """Calcola i parametri di scala in base al numero di materiali.
-        Ritorna dict con tutte le misure adattive."""
+        Ritorna dict con tutte le misure adattive. Tabella operazioni sempre 5 righe."""
         if num_materiali <= 10:
             return {
                 'margin_mat': '12mm', 'rect_height': '8mm', 'font_nome': '11px',
@@ -600,7 +600,7 @@ class DocumentUtils:
                 'margin_mat': '6mm', 'rect_height': '6mm', 'font_nome': '10px',
                 'font_info': '9px', 'font_giri': '9px', 'top_offset': '-4mm',
                 'orient_font': '7px', 'orient_width': '15mm',
-                'show_title': False, 'ops_rows': 4, 'ops_height': '6mm',
+                'show_title': False, 'ops_rows': 5, 'ops_height': '6mm',
                 'info_margin': '2mm', 'ops_margin_top': '8mm',
             }
         elif num_materiali <= 25:
@@ -608,7 +608,7 @@ class DocumentUtils:
                 'margin_mat': '3mm', 'rect_height': '5mm', 'font_nome': '9px',
                 'font_info': '8px', 'font_giri': '8px', 'top_offset': '-3mm',
                 'orient_font': '6px', 'orient_width': '12mm',
-                'show_title': False, 'ops_rows': 3, 'ops_height': '5mm',
+                'show_title': False, 'ops_rows': 5, 'ops_height': '5mm',
                 'info_margin': '1mm', 'ops_margin_top': '5mm',
             }
         else:  # 26-30
@@ -616,7 +616,7 @@ class DocumentUtils:
                 'margin_mat': '2mm', 'rect_height': '4mm', 'font_nome': '8px',
                 'font_info': '7px', 'font_giri': '7px', 'top_offset': '-2mm',
                 'orient_font': '6px', 'orient_width': '10mm',
-                'show_title': False, 'ops_rows': 2, 'ops_height': '4mm',
+                'show_title': False, 'ops_rows': 5, 'ops_height': '4mm',
                 'info_margin': '1mm', 'ops_margin_top': '3mm',
             }
 
