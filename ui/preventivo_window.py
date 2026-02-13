@@ -991,96 +991,152 @@ class PreventivoWindow(QMainWindow):
         if not self.preventivo.materiali_calcolati:
             QMessageBox.information(self, "Info", "Nessun materiale inserito.")
             return
-        
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Materiali Inseriti")
-        dialog.setGeometry(300, 300, 700, 550)
-        
-        layout = QVBoxLayout(dialog)
+
+        self._dialog_materiali = QDialog(self)
+        self._dialog_materiali.setWindowTitle("Materiali Inseriti")
+        self._dialog_materiali.setGeometry(300, 300, 700, 550)
+
+        layout = QVBoxLayout(self._dialog_materiali)
         layout.setContentsMargins(25, 25, 25, 25)
         layout.setSpacing(20)
-        
+
         title_label = QLabel("Materiali Inseriti")
         title_label.setStyleSheet("font-size: 20px; font-weight: 700; color: #2d3748;")
         layout.addWidget(title_label)
-        
-        info_text = "Dettagli dei materiali utilizzati nel preventivo" if self.modalita == 'visualizza' else "Seleziona un materiale per modificarlo o eliminarlo"
+
+        info_text = "Dettagli dei materiali utilizzati nel preventivo" if self.modalita == 'visualizza' else "Seleziona uno o più materiali per modificarli o eliminarli"
         info_label = QLabel(info_text)
         info_label.setStyleSheet("font-size: 14px; color: #718096;")
         layout.addWidget(info_label)
-        
-        lista_materiali = QListWidget()
+
+        self._lista_materiali_dialog = QListWidget()
+        self._lista_materiali_dialog.setSelectionMode(QListWidget.ExtendedSelection)
+        self._aggiorna_lista_materiali_dialog()
+
+        if self.modalita != 'visualizza':
+            self._lista_materiali_dialog.itemDoubleClicked.connect(lambda item: self.modifica_materiale_selezionato())
+        layout.addWidget(self._lista_materiali_dialog)
+
+        # Conteggio selezione
+        self._lbl_selezione = QLabel("")
+        self._lbl_selezione.setStyleSheet("font-size: 12px; color: #718096;")
+        layout.addWidget(self._lbl_selezione)
+        self._lista_materiali_dialog.itemSelectionChanged.connect(self._aggiorna_conteggio_selezione)
+
+        # Pulsanti
+        buttons_layout = QHBoxLayout()
+
+        if self.modalita != 'visualizza':
+            btn_modifica = QPushButton("Modifica")
+            btn_modifica.clicked.connect(self.modifica_materiale_selezionato)
+
+            btn_elimina = QPushButton("Elimina Selezionati")
+            btn_elimina.setStyleSheet("""
+                QPushButton {
+                    background-color: #e53e3e;
+                    color: #ffffff;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 8px 16px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background-color: #c53030;
+                }
+            """)
+            btn_elimina.clicked.connect(self.elimina_materiali_selezionati)
+
+            buttons_layout.addWidget(btn_modifica)
+            buttons_layout.addWidget(btn_elimina)
+
+        btn_chiudi = QPushButton("Chiudi")
+        btn_chiudi.clicked.connect(self._dialog_materiali.accept)
+
+        buttons_layout.addStretch()
+        buttons_layout.addWidget(btn_chiudi)
+
+        layout.addLayout(buttons_layout)
+        self._dialog_materiali.exec_()
+
+    def _aggiorna_lista_materiali_dialog(self):
+        """Aggiorna la lista materiali nel dialog aperto"""
+        self._lista_materiali_dialog.clear()
         for i, materiale in enumerate(self.preventivo.materiali_calcolati):
             testo = (f"#{i+1} - {materiale.materiale_nome}\n"
                     f"Ø Iniziale → Ø Finale: {materiale.diametro:.1f}mm → {materiale.diametro_finale:.1f}mm  "
                     f"Lunghezza: {materiale.lunghezza:.0f}mm  Numero Giri: {materiale.giri} \n"
                     f"Costo Singolo Materiale: €{materiale.maggiorazione:.2f}")
-            
             item = QListWidgetItem(testo)
             item.setData(Qt.UserRole, i)
-            lista_materiali.addItem(item)
-        
-        if self.modalita != 'visualizza':
-            lista_materiali.itemDoubleClicked.connect(lambda item: self.modifica_materiale_selezionato(dialog, lista_materiali))
-        layout.addWidget(lista_materiali)
-        
-        # Pulsanti
-        buttons_layout = QHBoxLayout()
-        
-        if self.modalita != 'visualizza':
-            btn_modifica = QPushButton("Modifica")
-            btn_modifica.clicked.connect(lambda: self.modifica_materiale_selezionato(dialog, lista_materiali))
-            
-            btn_elimina = QPushButton("Elimina")
-            btn_elimina.clicked.connect(lambda: self.elimina_materiale_selezionato(dialog, lista_materiali))
-            
-            buttons_layout.addWidget(btn_modifica)
-            buttons_layout.addWidget(btn_elimina)
-        
-        btn_chiudi = QPushButton("Chiudi")
-        btn_chiudi.clicked.connect(dialog.accept)
-        
-        buttons_layout.addStretch()
-        buttons_layout.addWidget(btn_chiudi)
-        
-        layout.addLayout(buttons_layout)
-        dialog.exec_()
-    
-    def modifica_materiale_selezionato(self, dialog, lista_materiali):
-        """Modifica materiale selezionato"""
-        current_item = lista_materiali.currentItem()
-        if not current_item:
+            self._lista_materiali_dialog.addItem(item)
+
+    def _aggiorna_conteggio_selezione(self):
+        """Aggiorna il label con il numero di materiali selezionati"""
+        n = len(self._lista_materiali_dialog.selectedItems())
+        if n == 0:
+            self._lbl_selezione.setText("")
+        elif n == 1:
+            self._lbl_selezione.setText("1 materiale selezionato")
+        else:
+            self._lbl_selezione.setText(f"{n} materiali selezionati")
+
+    def modifica_materiale_selezionato(self):
+        """Modifica materiale selezionato (singolo)"""
+        selected = self._lista_materiali_dialog.selectedItems()
+        if not selected:
             QMessageBox.warning(self, "Attenzione", "Seleziona un materiale da modificare.")
             return
-        
-        indice = current_item.data(Qt.UserRole)
-        materiale_da_modificare = self.preventivo.materiali_calcolati[indice]
-        dialog.accept()
-        self.apri_finestra_modifica_materiale(indice, materiale_da_modificare)
-    
-    def elimina_materiale_selezionato(self, dialog, lista_materiali):
-        """Elimina materiale selezionato"""
-        current_item = lista_materiali.currentItem()
-        if not current_item:
-            QMessageBox.warning(self, "Attenzione", "Seleziona un materiale da eliminare.")
+        if len(selected) > 1:
+            QMessageBox.warning(self, "Attenzione", "Seleziona un solo materiale per la modifica.")
             return
-        
-        indice = current_item.data(Qt.UserRole)
-        materiale = self.preventivo.materiali_calcolati[indice]
-        
+
+        indice = selected[0].data(Qt.UserRole)
+        materiale_da_modificare = self.preventivo.materiali_calcolati[indice]
+        self.apri_finestra_modifica_materiale(indice, materiale_da_modificare)
+        # Dopo la modifica, aggiorna la lista (il dialog resta aperto)
+        self._aggiorna_lista_materiali_dialog()
+
+    def elimina_materiali_selezionati(self):
+        """Elimina uno o più materiali selezionati"""
+        selected = self._lista_materiali_dialog.selectedItems()
+        if not selected:
+            QMessageBox.warning(self, "Attenzione", "Seleziona almeno un materiale da eliminare.")
+            return
+
+        n = len(selected)
+        if n == 1:
+            nome = self.preventivo.materiali_calcolati[selected[0].data(Qt.UserRole)].materiale_nome
+            msg = f"Eliminare il materiale '{nome}'?"
+        else:
+            msg = f"Eliminare {n} materiali selezionati?"
+
         risposta = QMessageBox.question(
-            self, "Conferma Eliminazione",
-            f"Eliminare il materiale '{materiale.materiale_nome}'?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            self, "Conferma Eliminazione", msg,
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
-        
+
         if risposta == QMessageBox.Yes:
-            if self.preventivo.rimuovi_materiale(indice):
-                self.ricalcola_diametri_successivi(indice - 1)
-                self.aggiorna_materiali_info()
-                self.aggiorna_totali()
-                dialog.accept()
+            # Elimina dal fondo per non spostare gli indici
+            indici = sorted([item.data(Qt.UserRole) for item in selected], reverse=True)
+            for indice in indici:
+                self.preventivo.rimuovi_materiale(indice)
+
+            # Ricalcola diametri dal primo indice eliminato in poi
+            primo_indice = min(indici)
+            if primo_indice > 0:
+                self.ricalcola_diametri_successivi(primo_indice - 1)
+            elif self.preventivo.materiali_calcolati:
+                self.ricalcola_diametri_successivi(0)
+
+            self.aggiorna_materiali_info()
+            self.aggiorna_totali()
+
+            # Aggiorna la lista nel dialog (resta aperto)
+            self._aggiorna_lista_materiali_dialog()
+
+            # Se non ci sono più materiali, chiudi il dialog
+            if not self.preventivo.materiali_calcolati:
+                self._dialog_materiali.accept()
     
     def apri_finestra_modifica_materiale(self, indice, materiale_esistente):
         """Apri finestra modifica materiale"""
