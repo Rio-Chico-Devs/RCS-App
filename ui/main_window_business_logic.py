@@ -453,7 +453,7 @@ class MainWindowBusinessLogic:
     @staticmethod
     def apri_gestione_materiali(window_instance):
         """Apre la finestra per gestire i materiali"""
-        window_instance.gestione_materiali_window = GestioneMaterialiWindow(window_instance.db_manager, window_instance)
+        window_instance.gestione_materiali_window = GestioneMaterialiWindow(window_instance.db_manager)
 
         # Collega il signal per aggiornare i preventivi aperti
         window_instance.gestione_materiali_window.materiali_modificati.connect(window_instance.aggiorna_preventivi_aperti)
@@ -463,7 +463,7 @@ class MainWindowBusinessLogic:
     @staticmethod
     def apri_magazzino(window_instance):
         """Apre la finestra per gestire il magazzino"""
-        window_instance.magazzino_window = MagazzinoWindow(window_instance.db_manager, window_instance)
+        window_instance.magazzino_window = MagazzinoWindow(window_instance.db_manager)
         window_instance.magazzino_window.show()
 
     @staticmethod

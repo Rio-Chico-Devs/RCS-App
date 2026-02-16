@@ -72,7 +72,7 @@ class MagazzinoWindow(QMainWindow):
     magazzino_aggiornato = pyqtSignal()
 
     def __init__(self, db_manager, parent=None):
-        super().__init__(parent)
+        super().__init__(None)  # No parent per evitare bug ridimensionamento
         self.db_manager = db_manager
         self.init_ui()
         self.carica_scorte()
@@ -180,8 +180,8 @@ class MagazzinoWindow(QMainWindow):
         self.setCentralWidget(central_widget)
 
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(40, 30, 40, 30)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(30, 15, 30, 15)
+        main_layout.setSpacing(12)
 
         # Header
         self.create_header(main_layout)
@@ -210,23 +210,20 @@ class MagazzinoWindow(QMainWindow):
         return shadow
 
     def create_header(self, parent_layout):
-        header_container = QFrame()
-        header_container.setStyleSheet("QFrame { background-color: transparent; border: none; padding: 20px 0px; }")
-
-        header_layout = QVBoxLayout(header_container)
-        header_layout.setSpacing(8)
+        header_layout = QHBoxLayout()
 
         title_label = QLabel("Gestione Magazzino")
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("QLabel { font-size: 32px; font-weight: 700; color: #2d3748; padding: 0; }")
+        title_label.setStyleSheet("QLabel { font-size: 24px; font-weight: 700; color: #2d3748; }")
 
         subtitle_label = QLabel("Visualizza scorte, gestisci carico/scarico e monitora i consumi")
-        subtitle_label.setAlignment(Qt.AlignCenter)
-        subtitle_label.setStyleSheet("QLabel { font-size: 16px; font-weight: 400; color: #718096; padding: 0; }")
+        subtitle_label.setStyleSheet("QLabel { font-size: 14px; font-weight: 400; color: #718096; }")
 
         header_layout.addWidget(title_label)
+        header_layout.addSpacing(20)
         header_layout.addWidget(subtitle_label)
-        parent_layout.addWidget(header_container)
+        header_layout.addStretch()
+
+        parent_layout.addLayout(header_layout)
 
     # =================== TAB SCORTE ===================
 

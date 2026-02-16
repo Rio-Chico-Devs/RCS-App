@@ -45,7 +45,7 @@ class PreventivoWindow(QMainWindow):
     preventivo_salvato = pyqtSignal()
     
     def __init__(self, db_manager, parent=None, preventivo_id=None, modalita='nuovo', note_revisione=""):
-        super().__init__(parent)
+        super().__init__(None)  # No parent per evitare bug ridimensionamento
         self.db_manager = db_manager
         
         # Parametri per sistema revisioni

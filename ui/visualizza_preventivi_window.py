@@ -39,7 +39,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
     preventivo_modificato = pyqtSignal()  # Signal per notificare modifiche
 
     def __init__(self, db_manager: Any, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
+        super().__init__(None)  # No parent per evitare bug ridimensionamento
         self.db_manager = db_manager
         self.parent_window = parent
         self.init_ui()

@@ -26,7 +26,7 @@ class GestioneMaterialiWindow(QMainWindow):
     materiali_modificati = pyqtSignal()  # Signal per notificare modifiche
     
     def __init__(self, db_manager, parent=None):
-        super().__init__(parent)
+        super().__init__(None)  # No parent per evitare bug ridimensionamento
         self.db_manager = db_manager
         self.init_ui()
         self.carica_materiali()
@@ -121,15 +121,15 @@ class GestioneMaterialiWindow(QMainWindow):
         
         # Layout principale
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(40, 30, 40, 30)
-        main_layout.setSpacing(30)
+        main_layout.setContentsMargins(30, 15, 30, 15)
+        main_layout.setSpacing(12)
         
         # Header
         self.create_header(main_layout)
         
         # Contenuto principale - layout a due colonne
         content_layout = QHBoxLayout()
-        content_layout.setSpacing(40)
+        content_layout.setSpacing(20)
         
         # Colonna lista materiali
         self.create_lista_materiali_column(content_layout)
@@ -151,47 +151,21 @@ class GestioneMaterialiWindow(QMainWindow):
         return shadow
     
     def create_header(self, parent_layout):
-        """Header unificato"""
-        header_container = QFrame()
-        header_container.setStyleSheet("""
-            QFrame {
-                background-color: transparent;
-                border: none;
-                padding: 20px 0px;
-            }
-        """)
-        
-        header_layout = QVBoxLayout(header_container)
-        header_layout.setSpacing(8)
-        
-        # Titolo principale
+        """Header compatto"""
+        header_layout = QHBoxLayout()
+
         title_label = QLabel("Gestione Materiali")
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("""
-            QLabel {
-                font-size: 32px;
-                font-weight: 700;
-                color: #2d3748;
-                padding: 0;
-            }
-        """)
-        
-        # Sottotitolo
+        title_label.setStyleSheet("QLabel { font-size: 24px; font-weight: 700; color: #2d3748; }")
+
         subtitle_label = QLabel("Modifica, aggiungi ed elimina materiali dal database")
-        subtitle_label.setAlignment(Qt.AlignCenter)
-        subtitle_label.setStyleSheet("""
-            QLabel {
-                font-size: 16px;
-                font-weight: 400;
-                color: #718096;
-                padding: 0;
-            }
-        """)
-        
+        subtitle_label.setStyleSheet("QLabel { font-size: 14px; font-weight: 400; color: #718096; }")
+
         header_layout.addWidget(title_label)
+        header_layout.addSpacing(20)
         header_layout.addWidget(subtitle_label)
-        
-        parent_layout.addWidget(header_container)
+        header_layout.addStretch()
+
+        parent_layout.addLayout(header_layout)
     
     def create_lista_materiali_column(self, parent_layout):
         """Colonna lista materiali"""
@@ -206,15 +180,14 @@ class GestioneMaterialiWindow(QMainWindow):
         lista_group.setGraphicsEffect(self.create_shadow_effect())
         
         lista_layout = QVBoxLayout(lista_group)
-        lista_layout.setContentsMargins(30, 35, 30, 30)
-        lista_layout.setSpacing(16)
-        
+        lista_layout.setContentsMargins(20, 28, 20, 15)
+        lista_layout.setSpacing(10)
+
         # Barra di ricerca
         self.create_search_bar(lista_layout)
-        
+
         # Lista materiali
         self.lista_materiali = QListWidget()
-        self.lista_materiali.setMinimumHeight(400)
         self.lista_materiali.itemSelectionChanged.connect(self.on_materiale_selezionato)
         lista_layout.addWidget(self.lista_materiali)
         
@@ -322,8 +295,8 @@ class GestioneMaterialiWindow(QMainWindow):
         form_group.setGraphicsEffect(self.create_shadow_effect())
         
         form_layout = QVBoxLayout(form_group)
-        form_layout.setContentsMargins(30, 35, 30, 30)
-        form_layout.setSpacing(20)
+        form_layout.setContentsMargins(20, 28, 20, 15)
+        form_layout.setSpacing(10)
         
         # Info selezione
         self.create_selection_info(form_layout)
@@ -347,8 +320,8 @@ class GestioneMaterialiWindow(QMainWindow):
                 background-color: #f0fff4;
                 border: 1px solid #68d391;
                 border-radius: 8px;
-                padding: 16px;
-                margin: 2px 0px;
+                padding: 8px;
+                margin: 0px;
             }
         """)
         
@@ -381,8 +354,8 @@ class GestioneMaterialiWindow(QMainWindow):
     def create_form_fields(self, parent_layout):
         """Campi del form"""
         form_fields = QFormLayout()
-        form_fields.setVerticalSpacing(16)
-        form_fields.setHorizontalSpacing(16)
+        form_fields.setVerticalSpacing(8)
+        form_fields.setHorizontalSpacing(12)
 
         # Nome materiale
         self.edit_nome = QLineEdit()
