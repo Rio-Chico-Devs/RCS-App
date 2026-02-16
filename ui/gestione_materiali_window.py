@@ -383,32 +383,61 @@ class GestioneMaterialiWindow(QMainWindow):
         form_fields = QFormLayout()
         form_fields.setVerticalSpacing(16)
         form_fields.setHorizontalSpacing(16)
-        
+
         # Nome materiale
         self.edit_nome = QLineEdit()
         self.edit_nome.setPlaceholderText("es. HS300")
-        
+
         # Spessore
         self.edit_spessore = QDoubleSpinBox()
         self.edit_spessore.setDecimals(2)
         self.edit_spessore.setMaximum(999.99)
         self.edit_spessore.setSuffix(" mm")
         self.edit_spessore.setMinimumHeight(36)
-        
-        # Prezzo
+
+        # Prezzo (preventivo)
         self.edit_prezzo = QDoubleSpinBox()
         self.edit_prezzo.setDecimals(2)
         self.edit_prezzo.setMaximum(9999.99)
         self.edit_prezzo.setSuffix(" €")
         self.edit_prezzo.setMinimumHeight(36)
-        
+
+        # Fornitore
+        self.edit_fornitore = QLineEdit()
+        self.edit_fornitore.setPlaceholderText("es. Toray, Hexcel...")
+
+        # Prezzo Fornitore
+        self.edit_prezzo_fornitore = QDoubleSpinBox()
+        self.edit_prezzo_fornitore.setDecimals(2)
+        self.edit_prezzo_fornitore.setMaximum(9999.99)
+        self.edit_prezzo_fornitore.setSuffix(" €/m²")
+        self.edit_prezzo_fornitore.setMinimumHeight(36)
+
+        # Capacità Magazzino (m²)
+        self.edit_capacita_magazzino = QDoubleSpinBox()
+        self.edit_capacita_magazzino.setDecimals(2)
+        self.edit_capacita_magazzino.setMaximum(99999.99)
+        self.edit_capacita_magazzino.setSuffix(" m²")
+        self.edit_capacita_magazzino.setMinimumHeight(36)
+
+        # Giacenza (m²)
+        self.edit_giacenza = QDoubleSpinBox()
+        self.edit_giacenza.setDecimals(2)
+        self.edit_giacenza.setMaximum(99999.99)
+        self.edit_giacenza.setSuffix(" m²")
+        self.edit_giacenza.setMinimumHeight(36)
+
         # Aggiunta campi
         form_fields.addRow(self.create_standard_label("Nome Materiale:"), self.edit_nome)
         form_fields.addRow(self.create_standard_label("Spessore:"), self.edit_spessore)
-        form_fields.addRow(self.create_standard_label("Prezzo:"), self.edit_prezzo)
-        
+        form_fields.addRow(self.create_standard_label("Prezzo (Preventivo):"), self.edit_prezzo)
+        form_fields.addRow(self.create_standard_label("Fornitore:"), self.edit_fornitore)
+        form_fields.addRow(self.create_standard_label("Prezzo Fornitore:"), self.edit_prezzo_fornitore)
+        form_fields.addRow(self.create_standard_label("Capacità Magazzino:"), self.edit_capacita_magazzino)
+        form_fields.addRow(self.create_standard_label("Giacenza:"), self.edit_giacenza)
+
         parent_layout.addLayout(form_fields)
-        
+
         # Inizialmente disabilita i campi
         self.abilita_form(False)
     
@@ -521,8 +550,11 @@ class GestioneMaterialiWindow(QMainWindow):
         self.materiali_data = self.db_manager.get_all_materiali()
         
         for materiale in self.materiali_data:
-            id_mat, nome, spessore, prezzo = materiale
+            id_mat, nome, spessore, prezzo = materiale[:4]
+            fornitore = materiale[4] if len(materiale) > 4 else ""
             testo = f"{nome} • {spessore}mm • €{prezzo:.2f}"
+            if fornitore:
+                testo += f" • {fornitore}"
             
             item = QListWidgetItem(testo)
             item.setData(Qt.UserRole, materiale)  # Salva tutti i dati del materiale
@@ -561,16 +593,24 @@ class GestioneMaterialiWindow(QMainWindow):
         # Ottieni i dati del materiale selezionato
         materiale_data = current_item.data(Qt.UserRole)
         self.materiale_corrente = materiale_data
-        id_mat, nome, spessore, prezzo = materiale_data
-        
+        id_mat, nome, spessore, prezzo = materiale_data[:4]
+        fornitore = materiale_data[4] if len(materiale_data) > 4 else ""
+        prezzo_fornitore = materiale_data[5] if len(materiale_data) > 5 else 0.0
+        capacita_magazzino = materiale_data[6] if len(materiale_data) > 6 else 0.0
+        giacenza = materiale_data[7] if len(materiale_data) > 7 else 0.0
+
         # Aggiorna le informazioni
         self.lbl_selezione.setText(f"Materiale selezionato: {nome}")
         self.lbl_info_materiale.setText(f"ID: {id_mat} • Creato nel database")
-        
+
         # Popola il form
         self.edit_nome.setText(nome)
         self.edit_spessore.setValue(spessore)
         self.edit_prezzo.setValue(prezzo)
+        self.edit_fornitore.setText(fornitore)
+        self.edit_prezzo_fornitore.setValue(prezzo_fornitore)
+        self.edit_capacita_magazzino.setValue(capacita_magazzino)
+        self.edit_giacenza.setValue(giacenza)
         
         # Abilita form e pulsanti
         self.abilita_form(True)
@@ -581,6 +621,10 @@ class GestioneMaterialiWindow(QMainWindow):
         self.edit_nome.setEnabled(enabled)
         self.edit_spessore.setEnabled(enabled)
         self.edit_prezzo.setEnabled(enabled)
+        self.edit_fornitore.setEnabled(enabled)
+        self.edit_prezzo_fornitore.setEnabled(enabled)
+        self.edit_capacita_magazzino.setEnabled(enabled)
+        self.edit_giacenza.setEnabled(enabled)
     
     def abilita_pulsanti_form(self, enabled):
         """Abilita/disabilita i pulsanti del form"""
@@ -595,6 +639,10 @@ class GestioneMaterialiWindow(QMainWindow):
             self.edit_nome.clear()
             self.edit_spessore.setValue(0.0)
             self.edit_prezzo.setValue(0.0)
+            self.edit_fornitore.clear()
+            self.edit_prezzo_fornitore.setValue(0.0)
+            self.edit_capacita_magazzino.setValue(0.0)
+            self.edit_giacenza.setValue(0.0)
     
     def nuovo_materiale(self):
         """Apre dialog per creare un nuovo materiale"""
@@ -635,7 +683,14 @@ class GestioneMaterialiWindow(QMainWindow):
         
         if risposta == QMessageBox.Yes:
             try:
-                success = self.db_manager.update_materiale(id_materiale, nome, spessore, prezzo)
+                fornitore = self.edit_fornitore.text().strip()
+                prezzo_fornitore = self.edit_prezzo_fornitore.value()
+                capacita_magazzino = self.edit_capacita_magazzino.value()
+                giacenza = self.edit_giacenza.value()
+                success = self.db_manager.update_materiale(
+                    id_materiale, nome, spessore, prezzo,
+                    fornitore, prezzo_fornitore, capacita_magazzino, giacenza
+                )
                 if success:
                     QMessageBox.information(self, "Successo", "Materiale aggiornato con successo!")
                     self.carica_materiali()
@@ -688,7 +743,7 @@ class NuovoMaterialeDialog(QDialog):
     def init_ui(self):
         """Inizializza l'interfaccia del dialog"""
         self.setWindowTitle("Nuovo Materiale")
-        self.setFixedSize(400, 300)
+        self.setFixedSize(450, 500)
         self.setStyleSheet("""
             QDialog {
                 background-color: #fafbfc;
@@ -721,11 +776,11 @@ class NuovoMaterialeDialog(QDialog):
                 min-height: 36px;
             }
         """)
-        
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 25, 30, 25)
         layout.setSpacing(20)
-        
+
         # Titolo
         title_label = QLabel("Aggiungi Nuovo Materiale")
         title_label.setStyleSheet("""
@@ -737,28 +792,50 @@ class NuovoMaterialeDialog(QDialog):
             }
         """)
         layout.addWidget(title_label)
-        
+
         # Form
         form_layout = QFormLayout()
         form_layout.setVerticalSpacing(16)
-        
+
         self.edit_nome = QLineEdit()
         self.edit_nome.setPlaceholderText("es. HS400")
-        
+
         self.edit_spessore = QDoubleSpinBox()
         self.edit_spessore.setDecimals(2)
         self.edit_spessore.setMaximum(999.99)
         self.edit_spessore.setSuffix(" mm")
-        
+
         self.edit_prezzo = QDoubleSpinBox()
         self.edit_prezzo.setDecimals(2)
         self.edit_prezzo.setMaximum(9999.99)
         self.edit_prezzo.setSuffix(" €")
-        
+
+        self.edit_fornitore = QLineEdit()
+        self.edit_fornitore.setPlaceholderText("es. Toray, Hexcel...")
+
+        self.edit_prezzo_fornitore = QDoubleSpinBox()
+        self.edit_prezzo_fornitore.setDecimals(2)
+        self.edit_prezzo_fornitore.setMaximum(9999.99)
+        self.edit_prezzo_fornitore.setSuffix(" €/m²")
+
+        self.edit_capacita_magazzino = QDoubleSpinBox()
+        self.edit_capacita_magazzino.setDecimals(2)
+        self.edit_capacita_magazzino.setMaximum(99999.99)
+        self.edit_capacita_magazzino.setSuffix(" m²")
+
+        self.edit_giacenza = QDoubleSpinBox()
+        self.edit_giacenza.setDecimals(2)
+        self.edit_giacenza.setMaximum(99999.99)
+        self.edit_giacenza.setSuffix(" m²")
+
         form_layout.addRow("Nome Materiale:", self.edit_nome)
         form_layout.addRow("Spessore:", self.edit_spessore)
-        form_layout.addRow("Prezzo:", self.edit_prezzo)
-        
+        form_layout.addRow("Prezzo (Preventivo):", self.edit_prezzo)
+        form_layout.addRow("Fornitore:", self.edit_fornitore)
+        form_layout.addRow("Prezzo Fornitore:", self.edit_prezzo_fornitore)
+        form_layout.addRow("Capacità Magazzino:", self.edit_capacita_magazzino)
+        form_layout.addRow("Giacenza Iniziale:", self.edit_giacenza)
+
         layout.addLayout(form_layout)
         
         # Pulsanti
@@ -815,7 +892,14 @@ class NuovoMaterialeDialog(QDialog):
         
         # Salva nel database
         try:
-            materiale_id = self.db_manager.add_materiale(nome, spessore, prezzo)
+            fornitore = self.edit_fornitore.text().strip()
+            prezzo_fornitore = self.edit_prezzo_fornitore.value()
+            capacita_magazzino = self.edit_capacita_magazzino.value()
+            giacenza = self.edit_giacenza.value()
+            materiale_id = self.db_manager.add_materiale(
+                nome, spessore, prezzo,
+                fornitore, prezzo_fornitore, capacita_magazzino, giacenza
+            )
             if materiale_id:
                 self.accept()
             else:

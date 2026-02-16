@@ -48,6 +48,7 @@ class MainWindow(QMainWindow):
         self.preventivo_window = None
         self.gestione_materiali_window = None
         self.visualizza_preventivi_window = None
+        self.magazzino_window = None
 
         # Inizializzazione UI delegata al modulo
         MainWindowUIComponents.init_ui(self)
@@ -75,6 +76,10 @@ class MainWindow(QMainWindow):
     def apri_gestione_materiali(self):
         """Apre la finestra per gestire i materiali"""
         MainWindowBusinessLogic.apri_gestione_materiali(self)
+
+    def apri_magazzino(self):
+        """Apre la finestra per gestire il magazzino"""
+        MainWindowBusinessLogic.apri_magazzino(self)
     
     def mostra_nascondi_preventivi(self):
         """Mostra o nasconde la sezione dei preventivi"""

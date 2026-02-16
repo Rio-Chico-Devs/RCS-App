@@ -135,51 +135,84 @@ class DatabaseManager:
                 except sqlite3.OperationalError as e:
                     print(f"Errore durante l'aggiunta della colonna {column_name}: {e}")
 
+        # Migrazione tabella materiali - nuovi campi magazzino
+        cursor.execute("PRAGMA table_info(materiali)")
+        materiali_columns = [column[1] for column in cursor.fetchall()]
+
+        materiali_new_columns = [
+            ("fornitore", "TEXT NOT NULL DEFAULT ''"),
+            ("prezzo_fornitore", "REAL NOT NULL DEFAULT 0.0"),
+            ("capacita_magazzino", "REAL NOT NULL DEFAULT 0.0"),
+            ("giacenza", "REAL NOT NULL DEFAULT 0.0"),
+        ]
+
+        for column_name, column_def in materiali_new_columns:
+            if column_name not in materiali_columns:
+                try:
+                    cursor.execute(f"ALTER TABLE materiali ADD COLUMN {column_name} {column_def}")
+                    print(f"Aggiunta colonna {column_name} alla tabella materiali")
+                except sqlite3.OperationalError as e:
+                    print(f"Errore durante l'aggiunta della colonna {column_name}: {e}")
+
+        # Tabella movimenti magazzino
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS movimenti_magazzino (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                materiale_id INTEGER NOT NULL,
+                tipo TEXT NOT NULL,
+                quantita REAL NOT NULL,
+                data TEXT NOT NULL,
+                note TEXT DEFAULT '',
+                preventivo_id INTEGER,
+                FOREIGN KEY (materiale_id) REFERENCES materiali(id)
+            )
+        """)
+
     # =================== METODI MATERIALI (IDENTICI ALL'ORIGINALE) ===================
 
     def get_all_materiali(self):
         """Restituisce tutti i materiali disponibili"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo FROM materiali ORDER BY nome")
+            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza FROM materiali ORDER BY nome")
             return cursor.fetchall()
 
     def get_materiale_by_id(self, materiale_id):
         """Restituisce un materiale specifico tramite ID"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo FROM materiali WHERE id = ?", (materiale_id,))
+            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza FROM materiali WHERE id = ?", (materiale_id,))
             return cursor.fetchone()
 
     def get_materiale_by_nome(self, nome):
-        """Restituisce un materiale specifico tramite nome - AGGIUNTO per compatibilità"""
+        """Restituisce un materiale specifico tramite nome"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo FROM materiali WHERE nome = ?", (nome,))
+            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza FROM materiali WHERE nome = ?", (nome,))
             return cursor.fetchone()
 
-    def add_materiale(self, nome, spessore, prezzo):
+    def add_materiale(self, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0):
         """Aggiunge un nuovo materiale"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    "INSERT INTO materiali (nome, spessore, prezzo) VALUES (?, ?, ?)",
-                    (nome, spessore, prezzo)
+                    "INSERT INTO materiali (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza)
                 )
                 conn.commit()
                 return cursor.lastrowid
             except sqlite3.IntegrityError:
                 return False
 
-    def update_materiale(self, materiale_id, nome, spessore, prezzo):
-        """Aggiorna un materiale esistente - AGGIUNTO per gestione materiali"""
+    def update_materiale(self, materiale_id, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0):
+        """Aggiorna un materiale esistente"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    "UPDATE materiali SET nome = ?, spessore = ?, prezzo = ? WHERE id = ?",
-                    (nome, spessore, prezzo, materiale_id)
+                    "UPDATE materiali SET nome = ?, spessore = ?, prezzo = ?, fornitore = ?, prezzo_fornitore = ?, capacita_magazzino = ?, giacenza = ? WHERE id = ?",
+                    (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, materiale_id)
                 )
                 conn.commit()
                 return cursor.rowcount > 0
@@ -187,7 +220,7 @@ class DatabaseManager:
                 return False
 
     def update_prezzo_materiale(self, materiale_id, nuovo_prezzo):
-        """Aggiorna solo il prezzo di un materiale - AGGIUNTO per aggiornamenti prezzi"""
+        """Aggiorna solo il prezzo di un materiale"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -198,12 +231,80 @@ class DatabaseManager:
             return cursor.rowcount > 0
 
     def delete_materiale(self, materiale_id):
-        """Elimina un materiale - AGGIUNTO per gestione materiali"""
+        """Elimina un materiale e i suoi movimenti"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            cursor.execute("DELETE FROM movimenti_magazzino WHERE materiale_id = ?", (materiale_id,))
             cursor.execute("DELETE FROM materiali WHERE id = ?", (materiale_id,))
             conn.commit()
             return cursor.rowcount > 0
+
+    # =================== METODI MAGAZZINO ===================
+
+    def registra_movimento(self, materiale_id, tipo, quantita, note="", preventivo_id=None):
+        """Registra un movimento di magazzino (carico/scarico) e aggiorna giacenza"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO movimenti_magazzino (materiale_id, tipo, quantita, data, note, preventivo_id)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (materiale_id, tipo, quantita, datetime.now().isoformat(), note, preventivo_id))
+
+            if tipo == 'carico':
+                cursor.execute("UPDATE materiali SET giacenza = giacenza + ? WHERE id = ?", (quantita, materiale_id))
+            elif tipo == 'scarico':
+                cursor.execute("UPDATE materiali SET giacenza = MAX(giacenza - ?, 0) WHERE id = ?", (quantita, materiale_id))
+
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_movimenti_per_materiale(self, materiale_id, limit=100):
+        """Restituisce i movimenti di un materiale"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT m.id, m.tipo, m.quantita, m.data, m.note, m.preventivo_id
+                FROM movimenti_magazzino m
+                WHERE m.materiale_id = ?
+                ORDER BY m.data DESC
+                LIMIT ?
+            """, (materiale_id, limit))
+            return cursor.fetchall()
+
+    def get_consumi_periodo(self, data_inizio, data_fine):
+        """Restituisce i consumi aggregati per materiale in un periodo"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT mat.id, mat.nome, mat.prezzo_fornitore,
+                       COALESCE(SUM(mov.quantita), 0) as totale_consumato
+                FROM materiali mat
+                LEFT JOIN movimenti_magazzino mov ON mat.id = mov.materiale_id
+                    AND mov.tipo = 'scarico'
+                    AND mov.data >= ? AND mov.data <= ?
+                GROUP BY mat.id, mat.nome, mat.prezzo_fornitore
+                HAVING totale_consumato > 0
+                ORDER BY totale_consumato DESC
+            """, (data_inizio, data_fine))
+            return cursor.fetchall()
+
+    def get_scorte(self, ordina_per='giacenza_asc'):
+        """Restituisce le scorte di tutti i materiali con ordinamento"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            if ordina_per == 'giacenza_asc':
+                order = "CASE WHEN capacita_magazzino > 0 THEN (giacenza / capacita_magazzino) ELSE 0 END ASC"
+            elif ordina_per == 'giacenza_desc':
+                order = "CASE WHEN capacita_magazzino > 0 THEN (giacenza / capacita_magazzino) ELSE 0 END DESC"
+            else:
+                order = "nome ASC"
+
+            cursor.execute(f"""
+                SELECT id, nome, giacenza, capacita_magazzino, fornitore, prezzo_fornitore
+                FROM materiali
+                ORDER BY {order}
+            """)
+            return cursor.fetchall()
 
     # =================== METODI PREVENTIVI CON VERSIONING ===================
 

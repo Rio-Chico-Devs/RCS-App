@@ -26,6 +26,7 @@ from PyQt5.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QTextEdit, QDialo
 from PyQt5.QtCore import Qt
 from ui.preventivo_window import PreventivoWindow
 from ui.gestione_materiali_window import GestioneMaterialiWindow
+from ui.magazzino_window import MagazzinoWindow
 from ui.document_utils import DocumentUtils
 
 class MainWindowBusinessLogic:
@@ -458,6 +459,12 @@ class MainWindowBusinessLogic:
         window_instance.gestione_materiali_window.materiali_modificati.connect(window_instance.aggiorna_preventivi_aperti)
 
         window_instance.gestione_materiali_window.show()
+
+    @staticmethod
+    def apri_magazzino(window_instance):
+        """Apre la finestra per gestire il magazzino"""
+        window_instance.magazzino_window = MagazzinoWindow(window_instance.db_manager, window_instance)
+        window_instance.magazzino_window.show()
 
     @staticmethod
     def apri_confronto_preventivi(window_instance):

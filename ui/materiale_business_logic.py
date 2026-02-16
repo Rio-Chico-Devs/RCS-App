@@ -25,7 +25,7 @@ class MaterialeBusinessLogic:
         try:
             window_instance.materiali_disponibili = window_instance.db_manager.get_all_materiali()
             for materiale in window_instance.materiali_disponibili:
-                id_mat, nome, spessore, prezzo = materiale
+                id_mat, nome, spessore, prezzo = materiale[:4]
                 text = f"{nome} - {spessore}mm - €{prezzo:.2f}/m"
                 window_instance.combo_materiale.addItem(text, id_mat)
         except Exception as e:

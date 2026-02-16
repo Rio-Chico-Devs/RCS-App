@@ -270,10 +270,32 @@ class MainWindowUIComponents:
             }
         """)
         window_instance.btn_gestisci_materiali.clicked.connect(window_instance.apri_gestione_materiali)
-        
+
+        # Pulsante Gestisci Magazzino
+        window_instance.btn_gestisci_magazzino = QPushButton("Gestisci Magazzino")
+        window_instance.btn_gestisci_magazzino.setMinimumHeight(50)
+        window_instance.btn_gestisci_magazzino.setStyleSheet("""
+            QPushButton {
+                background-color: #f7fafc;
+                color: #4a5568;
+                border: 1px solid #e2e8f0;
+                min-height: 50px;
+                font-size: 16px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background-color: #edf2f7;
+            }
+            QPushButton:pressed {
+                background-color: #e2e8f0;
+            }
+        """)
+        window_instance.btn_gestisci_magazzino.clicked.connect(window_instance.apri_magazzino)
+
         buttons_layout.addWidget(window_instance.btn_nuovo_preventivo)
         buttons_layout.addWidget(window_instance.btn_visualizza_preventivi)
         buttons_layout.addWidget(window_instance.btn_gestisci_materiali)
+        buttons_layout.addWidget(window_instance.btn_gestisci_magazzino)
 
         parent_layout.addLayout(buttons_layout)
 
