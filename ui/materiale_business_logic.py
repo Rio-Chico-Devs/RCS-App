@@ -112,7 +112,7 @@ class MaterialeBusinessLogic:
             materiale_info = window_instance.db_manager.get_materiale_by_id(materiale_id)
             if materiale_info:
                 # Il metodo restituisce (id, nome, spessore, prezzo)
-                id_materiale, nome, spessore, prezzo = materiale_info
+                id_materiale, nome, spessore, prezzo = materiale_info[:4]
                 
                 window_instance.materiale_calcolato.materiale_id = materiale_id
                 window_instance.materiale_calcolato.materiale_nome = nome
