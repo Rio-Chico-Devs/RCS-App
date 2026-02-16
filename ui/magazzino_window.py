@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
                              QLineEdit, QTextEdit, QTabWidget, QGridLayout,
                              QTableWidget, QTableWidgetItem, QHeaderView)
 from PyQt5.QtCore import Qt, pyqtSignal, QDate
-from PyQt5.QtGui import QColor, QPainter, QLinearGradient
+from PyQt5.QtGui import QColor, QPainter
 from datetime import datetime, timedelta
 
 
