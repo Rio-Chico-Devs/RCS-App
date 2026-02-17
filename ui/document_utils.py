@@ -155,21 +155,26 @@ class DocumentUtils:
             
             doc.add_paragraph()  # Spazio
             
-            # Informazioni cliente - Tabella 3x2
-            info_table = doc.add_table(rows=3, cols=2)
+            # Informazioni cliente - Tabella 3x3 con ultima riga merged
+            info_table = doc.add_table(rows=3, cols=3)
             info_table.style = 'Table Grid'
-            
-            # Riga 1
+
+            # Riga 1: Cliente | Ordine n. | Data
             info_table.cell(0, 0).text = f"Cliente: {dati_cliente.get('nome_cliente', '')}"
-            info_table.cell(0, 1).text = f"Ordine No: {dati_cliente.get('numero_ordine', '')}"
-            
-            # Riga 2
-            info_table.cell(1, 0).text = f"Data: {datetime.now().strftime('%d/%m/%Y')}"
-            info_table.cell(1, 1).text = f"Descrizione: {dati_cliente.get('oggetto_preventivo', '')}"
-            
-            # Riga 3
-            info_table.cell(2, 0).text = f"Misura: {dati_cliente.get('misura', '')}"
-            info_table.cell(2, 1).text = f"Codice: {dati_cliente.get('codice', '')}"
+            info_table.cell(0, 1).text = f"Ordine n.: {dati_cliente.get('numero_ordine', '')}"
+            info_table.cell(0, 2).text = f"Data: {datetime.now().strftime('%d/%m/%Y')}"
+
+            # Riga 2: Codice | Misura | Finitura
+            info_table.cell(1, 0).text = f"Codice: {dati_cliente.get('codice', '')}"
+            info_table.cell(1, 1).text = f"Misura: {dati_cliente.get('misura', '')}"
+            info_table.cell(1, 2).text = f"Finitura: {dati_cliente.get('finitura', '')}"
+
+            # Riga 3: Descrizione (merge delle 3 celle)
+            descrizione = dati_cliente.get('oggetto_preventivo', dati_cliente.get('descrizione', ''))
+            cell_a = info_table.cell(2, 0)
+            cell_c = info_table.cell(2, 2)
+            cell_a.merge(cell_c)
+            cell_a.text = f"Descrizione: {descrizione}"
             
             doc.add_paragraph()  # Spazio
             
@@ -416,8 +421,12 @@ class DocumentUtils:
             doc.automaticstyles.addElement(style_table_info)
 
             style_col_info = Style(name="ColInfo", family="table-column")
-            style_col_info.addElement(TableColumnProperties(columnwidth="9cm"))
+            style_col_info.addElement(TableColumnProperties(columnwidth="6cm"))
             doc.automaticstyles.addElement(style_col_info)
+
+            style_col_info_wide = Style(name="ColInfoWide", family="table-column")
+            style_col_info_wide.addElement(TableColumnProperties(columnwidth="18cm"))
+            doc.automaticstyles.addElement(style_col_info_wide)
 
             style_table_ops = Style(name="TabellaOps", family="table")
             doc.automaticstyles.addElement(style_table_ops)
@@ -468,24 +477,38 @@ class DocumentUtils:
                 p_title.addElement(Span(stylename=style_bold, text="RCS - Scheda di Taglio"))
                 doc.text.addElement(p_title)
 
-            # Tabella info cliente
+            # Tabella info cliente (3 colonne)
             info_table = Table(name="InfoCliente", stylename=style_table_info)
             info_table.addElement(TableColumn(stylename=style_col_info))
             info_table.addElement(TableColumn(stylename=style_col_info))
+            info_table.addElement(TableColumn(stylename=style_col_info))
 
-            info_rows = [
-                (f"Cliente: {dati_cliente.get('nome_cliente', '')}", f"Ordine No: {dati_cliente.get('numero_ordine', '')}"),
-                (f"Data: {datetime.now().strftime('%d/%m/%Y')}", f"Descrizione: {dati_cliente.get('oggetto_preventivo', '')}"),
-                (f"Misura: {dati_cliente.get('misura', '')}", f"Codice: {dati_cliente.get('codice', '')}"),
-            ]
+            # Riga 1: Cliente | Ordine n. | Data
+            tr1 = TableRow()
+            for text in [f"Cliente: {dati_cliente.get('nome_cliente', '')}", f"Ordine n.: {dati_cliente.get('numero_ordine', '')}", f"Data: {datetime.now().strftime('%d/%m/%Y')}"]:
+                tc = TableCell(stylename=style_cell)
+                tc.addElement(P(stylename=style_normal, text=text))
+                tr1.addElement(tc)
+            info_table.addElement(tr1)
 
-            for left_text, right_text in info_rows:
-                tr = TableRow()
-                for text in [left_text, right_text]:
-                    tc = TableCell(stylename=style_cell)
-                    tc.addElement(P(stylename=style_normal, text=text))
-                    tr.addElement(tc)
-                info_table.addElement(tr)
+            # Riga 2: Codice | Misura | Finitura
+            tr2 = TableRow()
+            for text in [f"Codice: {dati_cliente.get('codice', '')}", f"Misura: {dati_cliente.get('misura', '')}", f"Finitura: {dati_cliente.get('finitura', '')}"]:
+                tc = TableCell(stylename=style_cell)
+                tc.addElement(P(stylename=style_normal, text=text))
+                tr2.addElement(tc)
+            info_table.addElement(tr2)
+
+            # Riga 3: Descrizione (occupa tutte e 3 le colonne)
+            tr3 = TableRow()
+            descrizione = dati_cliente.get('oggetto_preventivo', dati_cliente.get('descrizione', ''))
+            tc_desc = TableCell(stylename=style_cell, numbercolumnsspanned="3")
+            tc_desc.addElement(P(stylename=style_normal, text=f"Descrizione: {descrizione}"))
+            tr3.addElement(tc_desc)
+            # Celle coperte dal colspan
+            tr3.addElement(TableCell())
+            tr3.addElement(TableCell())
+            info_table.addElement(tr3)
 
             doc.text.addElement(info_table)
 
@@ -749,37 +772,43 @@ class DocumentUtils:
 <body>
     {title_html}
 
-    <!-- INFORMAZIONI CLIENTE (2 colonne) -->
-    <div style="display: flex; justify-content: space-between;">
-        <div style="width: 48%;">
-            <div class="info-section">
+    <!-- INFORMAZIONI CLIENTE (3 colonne per riga) -->
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: {s['info_margin']};">
+        <tr>
+            <td style="padding: 2mm; border: 1px solid #000; width: 33%;">
                 <span class="info-label">Cliente:</span>
-                <input type="text" class="editable-field" value="{dati_cliente.get('nome_cliente', '')}" style="width: 50mm;">
-            </div>
-            <div class="info-section">
+                <input type="text" class="editable-field" value="{dati_cliente.get('nome_cliente', '')}" style="width: 28mm;">
+            </td>
+            <td style="padding: 2mm; border: 1px solid #000; width: 33%;">
+                <span class="info-label">Ordine n.:</span>
+                <input type="text" class="editable-field" value="{dati_cliente.get('numero_ordine', '')}" style="width: 25mm;">
+            </td>
+            <td style="padding: 2mm; border: 1px solid #000; width: 34%;">
                 <span class="info-label">Data:</span>
-                <input type="text" class="editable-field" value="{datetime.now().strftime('%d/%m/%Y')}" style="width: 30mm;">
-            </div>
-            <div class="info-section">
-                <span class="info-label">Misura:</span>
-                <input type="text" class="editable-field" value="{dati_cliente.get('misura', '')}" style="width: 50mm;">
-            </div>
-        </div>
-        <div style="width: 48%;">
-            <div class="info-section">
-                <span class="info-label">Ordine No:</span>
-                <input type="text" class="editable-field" value="{dati_cliente.get('numero_ordine', '')}" style="width: 30mm;">
-            </div>
-            <div class="info-section">
-                <span class="info-label">Descrizione:</span>
-                <input type="text" class="editable-field" value="{dati_cliente.get('oggetto_preventivo', '')}" style="width: 50mm;">
-            </div>
-            <div class="info-section">
+                <input type="text" class="editable-field" value="{datetime.now().strftime('%d/%m/%Y')}" style="width: 25mm;">
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 2mm; border: 1px solid #000;">
                 <span class="info-label">Codice:</span>
-                <input type="text" class="editable-field" value="{dati_cliente.get('codice', '')}" style="width: 30mm;">
-            </div>
-        </div>
-    </div>
+                <input type="text" class="editable-field" value="{dati_cliente.get('codice', '')}" style="width: 28mm;">
+            </td>
+            <td style="padding: 2mm; border: 1px solid #000;">
+                <span class="info-label">Misura:</span>
+                <input type="text" class="editable-field" value="{dati_cliente.get('misura', '')}" style="width: 25mm;">
+            </td>
+            <td style="padding: 2mm; border: 1px solid #000;">
+                <span class="info-label">Finitura:</span>
+                <input type="text" class="editable-field" value="{dati_cliente.get('finitura', '')}" style="width: 25mm;">
+            </td>
+        </tr>
+        <tr>
+            <td style="padding: 2mm; border: 1px solid #000;" colspan="3">
+                <span class="info-label">Descrizione:</span>
+                <input type="text" class="editable-field" value="{dati_cliente.get('oggetto_preventivo', dati_cliente.get('descrizione', ''))}" style="width: calc(100% - 30mm);">
+            </td>
+        </tr>
+    </table>
 
     <!-- SEZIONE MATERIALI -->
     {materiali_html}

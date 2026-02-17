@@ -324,7 +324,9 @@ class MainWindowBusinessLogic:
                     'nome_cliente': 'Cliente da lista preventivi',
                     'numero_ordine': '',
                     'oggetto_preventivo': 'Oggetto da completare',
-                    'codice': codice
+                    'codice': codice,
+                    'misura': '',
+                    'finitura': ''
                 }
                 
                 print(f"DEBUG: Usando dati base: {dati_cliente}")
@@ -341,7 +343,9 @@ class MainWindowBusinessLogic:
                         'nome_cliente': preventivo_data.get('nome_cliente', ''),
                         'numero_ordine': preventivo_data.get('numero_ordine', ''),
                         'oggetto_preventivo': preventivo_data.get('descrizione', ''),
-                        'codice': preventivo_data.get('codice', f"PREV_{preventivo_id:03d}")
+                        'codice': preventivo_data.get('codice', f"PREV_{preventivo_id:03d}"),
+                        'misura': preventivo_data.get('misura', ''),
+                        'finitura': preventivo_data.get('finitura', '')
                     }
                     
                     print(f"DEBUG: Chiavi disponibili nel preventivo: {list(preventivo_data.keys())}")
@@ -368,7 +372,9 @@ class MainWindowBusinessLogic:
                         'nome_cliente': preventivo_data[4] if len(preventivo_data) > 4 else '',
                         'numero_ordine': preventivo_data[5] if len(preventivo_data) > 5 else '',
                         'oggetto_preventivo': preventivo_data[6] if len(preventivo_data) > 6 else '',
-                        'codice': preventivo_data[7] if len(preventivo_data) > 7 else f"PREV_{preventivo_id:03d}"
+                        'codice': preventivo_data[7] if len(preventivo_data) > 7 else f"PREV_{preventivo_id:03d}",
+                        'misura': '',
+                        'finitura': ''
                     }
                     materiali = []  # Tuple/list non contiene materiali
                 else:
@@ -376,7 +382,9 @@ class MainWindowBusinessLogic:
                         'nome_cliente': 'Cliente non specificato',
                         'numero_ordine': '',
                         'oggetto_preventivo': 'Descrizione non disponibile',
-                        'codice': f"PREV_{preventivo_id:03d}"
+                        'codice': f"PREV_{preventivo_id:03d}",
+                        'misura': '',
+                        'finitura': ''
                     }
                     materiali = []
                 
