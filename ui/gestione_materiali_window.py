@@ -26,7 +26,7 @@ class GestioneMaterialiWindow(QMainWindow):
     materiali_modificati = pyqtSignal()  # Signal per notificare modifiche
     
     def __init__(self, db_manager, parent=None):
-        super().__init__(parent)
+        super().__init__(None)  # No parent per evitare bug ridimensionamento
         self.db_manager = db_manager
         self.init_ui()
         self.carica_materiali()
@@ -121,15 +121,15 @@ class GestioneMaterialiWindow(QMainWindow):
         
         # Layout principale
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(40, 30, 40, 30)
-        main_layout.setSpacing(30)
+        main_layout.setContentsMargins(30, 15, 30, 15)
+        main_layout.setSpacing(12)
         
         # Header
         self.create_header(main_layout)
         
         # Contenuto principale - layout a due colonne
         content_layout = QHBoxLayout()
-        content_layout.setSpacing(40)
+        content_layout.setSpacing(20)
         
         # Colonna lista materiali
         self.create_lista_materiali_column(content_layout)
@@ -151,47 +151,21 @@ class GestioneMaterialiWindow(QMainWindow):
         return shadow
     
     def create_header(self, parent_layout):
-        """Header unificato"""
-        header_container = QFrame()
-        header_container.setStyleSheet("""
-            QFrame {
-                background-color: transparent;
-                border: none;
-                padding: 20px 0px;
-            }
-        """)
-        
-        header_layout = QVBoxLayout(header_container)
-        header_layout.setSpacing(8)
-        
-        # Titolo principale
+        """Header compatto"""
+        header_layout = QHBoxLayout()
+
         title_label = QLabel("Gestione Materiali")
-        title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("""
-            QLabel {
-                font-size: 32px;
-                font-weight: 700;
-                color: #2d3748;
-                padding: 0;
-            }
-        """)
-        
-        # Sottotitolo
+        title_label.setStyleSheet("QLabel { font-size: 24px; font-weight: 700; color: #2d3748; }")
+
         subtitle_label = QLabel("Modifica, aggiungi ed elimina materiali dal database")
-        subtitle_label.setAlignment(Qt.AlignCenter)
-        subtitle_label.setStyleSheet("""
-            QLabel {
-                font-size: 16px;
-                font-weight: 400;
-                color: #718096;
-                padding: 0;
-            }
-        """)
-        
+        subtitle_label.setStyleSheet("QLabel { font-size: 14px; font-weight: 400; color: #718096; }")
+
         header_layout.addWidget(title_label)
+        header_layout.addSpacing(20)
         header_layout.addWidget(subtitle_label)
-        
-        parent_layout.addWidget(header_container)
+        header_layout.addStretch()
+
+        parent_layout.addLayout(header_layout)
     
     def create_lista_materiali_column(self, parent_layout):
         """Colonna lista materiali"""
@@ -206,15 +180,14 @@ class GestioneMaterialiWindow(QMainWindow):
         lista_group.setGraphicsEffect(self.create_shadow_effect())
         
         lista_layout = QVBoxLayout(lista_group)
-        lista_layout.setContentsMargins(30, 35, 30, 30)
-        lista_layout.setSpacing(16)
-        
+        lista_layout.setContentsMargins(20, 28, 20, 15)
+        lista_layout.setSpacing(10)
+
         # Barra di ricerca
         self.create_search_bar(lista_layout)
-        
+
         # Lista materiali
         self.lista_materiali = QListWidget()
-        self.lista_materiali.setMinimumHeight(400)
         self.lista_materiali.itemSelectionChanged.connect(self.on_materiale_selezionato)
         lista_layout.addWidget(self.lista_materiali)
         
@@ -322,8 +295,8 @@ class GestioneMaterialiWindow(QMainWindow):
         form_group.setGraphicsEffect(self.create_shadow_effect())
         
         form_layout = QVBoxLayout(form_group)
-        form_layout.setContentsMargins(30, 35, 30, 30)
-        form_layout.setSpacing(20)
+        form_layout.setContentsMargins(20, 28, 20, 15)
+        form_layout.setSpacing(10)
         
         # Info selezione
         self.create_selection_info(form_layout)
@@ -347,8 +320,8 @@ class GestioneMaterialiWindow(QMainWindow):
                 background-color: #f0fff4;
                 border: 1px solid #68d391;
                 border-radius: 8px;
-                padding: 16px;
-                margin: 2px 0px;
+                padding: 8px;
+                margin: 0px;
             }
         """)
         
@@ -381,34 +354,63 @@ class GestioneMaterialiWindow(QMainWindow):
     def create_form_fields(self, parent_layout):
         """Campi del form"""
         form_fields = QFormLayout()
-        form_fields.setVerticalSpacing(16)
-        form_fields.setHorizontalSpacing(16)
-        
+        form_fields.setVerticalSpacing(8)
+        form_fields.setHorizontalSpacing(12)
+
         # Nome materiale
         self.edit_nome = QLineEdit()
         self.edit_nome.setPlaceholderText("es. HS300")
-        
+
         # Spessore
         self.edit_spessore = QDoubleSpinBox()
         self.edit_spessore.setDecimals(2)
         self.edit_spessore.setMaximum(999.99)
         self.edit_spessore.setSuffix(" mm")
         self.edit_spessore.setMinimumHeight(36)
-        
-        # Prezzo
+
+        # Prezzo (preventivo)
         self.edit_prezzo = QDoubleSpinBox()
         self.edit_prezzo.setDecimals(2)
         self.edit_prezzo.setMaximum(9999.99)
         self.edit_prezzo.setSuffix(" €")
         self.edit_prezzo.setMinimumHeight(36)
-        
+
+        # Fornitore
+        self.edit_fornitore = QLineEdit()
+        self.edit_fornitore.setPlaceholderText("es. Toray, Hexcel...")
+
+        # Prezzo Fornitore
+        self.edit_prezzo_fornitore = QDoubleSpinBox()
+        self.edit_prezzo_fornitore.setDecimals(2)
+        self.edit_prezzo_fornitore.setMaximum(9999.99)
+        self.edit_prezzo_fornitore.setSuffix(" €/m²")
+        self.edit_prezzo_fornitore.setMinimumHeight(36)
+
+        # Capacità Magazzino (m²)
+        self.edit_capacita_magazzino = QDoubleSpinBox()
+        self.edit_capacita_magazzino.setDecimals(2)
+        self.edit_capacita_magazzino.setMaximum(99999.99)
+        self.edit_capacita_magazzino.setSuffix(" m²")
+        self.edit_capacita_magazzino.setMinimumHeight(36)
+
+        # Giacenza (m²)
+        self.edit_giacenza = QDoubleSpinBox()
+        self.edit_giacenza.setDecimals(2)
+        self.edit_giacenza.setMaximum(99999.99)
+        self.edit_giacenza.setSuffix(" m²")
+        self.edit_giacenza.setMinimumHeight(36)
+
         # Aggiunta campi
         form_fields.addRow(self.create_standard_label("Nome Materiale:"), self.edit_nome)
         form_fields.addRow(self.create_standard_label("Spessore:"), self.edit_spessore)
-        form_fields.addRow(self.create_standard_label("Prezzo:"), self.edit_prezzo)
-        
+        form_fields.addRow(self.create_standard_label("Prezzo (Preventivo):"), self.edit_prezzo)
+        form_fields.addRow(self.create_standard_label("Fornitore:"), self.edit_fornitore)
+        form_fields.addRow(self.create_standard_label("Prezzo Fornitore:"), self.edit_prezzo_fornitore)
+        form_fields.addRow(self.create_standard_label("Capacità Magazzino:"), self.edit_capacita_magazzino)
+        form_fields.addRow(self.create_standard_label("Giacenza:"), self.edit_giacenza)
+
         parent_layout.addLayout(form_fields)
-        
+
         # Inizialmente disabilita i campi
         self.abilita_form(False)
     
@@ -521,8 +523,11 @@ class GestioneMaterialiWindow(QMainWindow):
         self.materiali_data = self.db_manager.get_all_materiali()
         
         for materiale in self.materiali_data:
-            id_mat, nome, spessore, prezzo = materiale
+            id_mat, nome, spessore, prezzo = materiale[:4]
+            fornitore = materiale[4] if len(materiale) > 4 else ""
             testo = f"{nome} • {spessore}mm • €{prezzo:.2f}"
+            if fornitore:
+                testo += f" • {fornitore}"
             
             item = QListWidgetItem(testo)
             item.setData(Qt.UserRole, materiale)  # Salva tutti i dati del materiale
@@ -561,16 +566,24 @@ class GestioneMaterialiWindow(QMainWindow):
         # Ottieni i dati del materiale selezionato
         materiale_data = current_item.data(Qt.UserRole)
         self.materiale_corrente = materiale_data
-        id_mat, nome, spessore, prezzo = materiale_data
-        
+        id_mat, nome, spessore, prezzo = materiale_data[:4]
+        fornitore = materiale_data[4] if len(materiale_data) > 4 else ""
+        prezzo_fornitore = materiale_data[5] if len(materiale_data) > 5 else 0.0
+        capacita_magazzino = materiale_data[6] if len(materiale_data) > 6 else 0.0
+        giacenza = materiale_data[7] if len(materiale_data) > 7 else 0.0
+
         # Aggiorna le informazioni
         self.lbl_selezione.setText(f"Materiale selezionato: {nome}")
         self.lbl_info_materiale.setText(f"ID: {id_mat} • Creato nel database")
-        
+
         # Popola il form
         self.edit_nome.setText(nome)
         self.edit_spessore.setValue(spessore)
         self.edit_prezzo.setValue(prezzo)
+        self.edit_fornitore.setText(fornitore)
+        self.edit_prezzo_fornitore.setValue(prezzo_fornitore)
+        self.edit_capacita_magazzino.setValue(capacita_magazzino)
+        self.edit_giacenza.setValue(giacenza)
         
         # Abilita form e pulsanti
         self.abilita_form(True)
@@ -581,6 +594,10 @@ class GestioneMaterialiWindow(QMainWindow):
         self.edit_nome.setEnabled(enabled)
         self.edit_spessore.setEnabled(enabled)
         self.edit_prezzo.setEnabled(enabled)
+        self.edit_fornitore.setEnabled(enabled)
+        self.edit_prezzo_fornitore.setEnabled(enabled)
+        self.edit_capacita_magazzino.setEnabled(enabled)
+        self.edit_giacenza.setEnabled(enabled)
     
     def abilita_pulsanti_form(self, enabled):
         """Abilita/disabilita i pulsanti del form"""
@@ -595,6 +612,10 @@ class GestioneMaterialiWindow(QMainWindow):
             self.edit_nome.clear()
             self.edit_spessore.setValue(0.0)
             self.edit_prezzo.setValue(0.0)
+            self.edit_fornitore.clear()
+            self.edit_prezzo_fornitore.setValue(0.0)
+            self.edit_capacita_magazzino.setValue(0.0)
+            self.edit_giacenza.setValue(0.0)
     
     def nuovo_materiale(self):
         """Apre dialog per creare un nuovo materiale"""
@@ -635,15 +656,22 @@ class GestioneMaterialiWindow(QMainWindow):
         
         if risposta == QMessageBox.Yes:
             try:
-                success = self.db_manager.update_materiale(id_materiale, nome, spessore, prezzo)
+                fornitore = self.edit_fornitore.text().strip()
+                prezzo_fornitore = self.edit_prezzo_fornitore.value()
+                capacita_magazzino = self.edit_capacita_magazzino.value()
+                giacenza = self.edit_giacenza.value()
+                success = self.db_manager.update_materiale(
+                    id_materiale, nome, spessore, prezzo,
+                    fornitore, prezzo_fornitore, capacita_magazzino, giacenza
+                )
                 if success:
                     QMessageBox.information(self, "Successo", "Materiale aggiornato con successo!")
                     self.carica_materiali()
                     self.materiali_modificati.emit()  # Notifica le modifiche
                 else:
-                    QMessageBox.error(self, "Errore", "Nome materiale già esistente o errore nel database.")
+                    QMessageBox.critical(self, "Errore", "Nome materiale già esistente o errore nel database.")
             except Exception as e:
-                QMessageBox.error(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
+                QMessageBox.critical(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
     
     def elimina_materiale(self):
         """Elimina il materiale corrente"""
@@ -672,9 +700,9 @@ class GestioneMaterialiWindow(QMainWindow):
                     self.abilita_pulsanti_form(False)
                     self.materiali_modificati.emit()  # Notifica le modifiche
                 else:
-                    QMessageBox.error(self, "Errore", "Errore durante l'eliminazione del materiale.")
+                    QMessageBox.critical(self, "Errore", "Errore durante l'eliminazione del materiale.")
             except Exception as e:
-                QMessageBox.error(self, "Errore", f"Errore durante l'eliminazione:\n{str(e)}")
+                QMessageBox.critical(self, "Errore", f"Errore durante l'eliminazione:\n{str(e)}")
 
 
 class NuovoMaterialeDialog(QDialog):
@@ -688,7 +716,7 @@ class NuovoMaterialeDialog(QDialog):
     def init_ui(self):
         """Inizializza l'interfaccia del dialog"""
         self.setWindowTitle("Nuovo Materiale")
-        self.setFixedSize(400, 300)
+        self.setFixedSize(450, 500)
         self.setStyleSheet("""
             QDialog {
                 background-color: #fafbfc;
@@ -721,11 +749,11 @@ class NuovoMaterialeDialog(QDialog):
                 min-height: 36px;
             }
         """)
-        
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 25, 30, 25)
         layout.setSpacing(20)
-        
+
         # Titolo
         title_label = QLabel("Aggiungi Nuovo Materiale")
         title_label.setStyleSheet("""
@@ -737,28 +765,50 @@ class NuovoMaterialeDialog(QDialog):
             }
         """)
         layout.addWidget(title_label)
-        
+
         # Form
         form_layout = QFormLayout()
         form_layout.setVerticalSpacing(16)
-        
+
         self.edit_nome = QLineEdit()
         self.edit_nome.setPlaceholderText("es. HS400")
-        
+
         self.edit_spessore = QDoubleSpinBox()
         self.edit_spessore.setDecimals(2)
         self.edit_spessore.setMaximum(999.99)
         self.edit_spessore.setSuffix(" mm")
-        
+
         self.edit_prezzo = QDoubleSpinBox()
         self.edit_prezzo.setDecimals(2)
         self.edit_prezzo.setMaximum(9999.99)
         self.edit_prezzo.setSuffix(" €")
-        
+
+        self.edit_fornitore = QLineEdit()
+        self.edit_fornitore.setPlaceholderText("es. Toray, Hexcel...")
+
+        self.edit_prezzo_fornitore = QDoubleSpinBox()
+        self.edit_prezzo_fornitore.setDecimals(2)
+        self.edit_prezzo_fornitore.setMaximum(9999.99)
+        self.edit_prezzo_fornitore.setSuffix(" €/m²")
+
+        self.edit_capacita_magazzino = QDoubleSpinBox()
+        self.edit_capacita_magazzino.setDecimals(2)
+        self.edit_capacita_magazzino.setMaximum(99999.99)
+        self.edit_capacita_magazzino.setSuffix(" m²")
+
+        self.edit_giacenza = QDoubleSpinBox()
+        self.edit_giacenza.setDecimals(2)
+        self.edit_giacenza.setMaximum(99999.99)
+        self.edit_giacenza.setSuffix(" m²")
+
         form_layout.addRow("Nome Materiale:", self.edit_nome)
         form_layout.addRow("Spessore:", self.edit_spessore)
-        form_layout.addRow("Prezzo:", self.edit_prezzo)
-        
+        form_layout.addRow("Prezzo (Preventivo):", self.edit_prezzo)
+        form_layout.addRow("Fornitore:", self.edit_fornitore)
+        form_layout.addRow("Prezzo Fornitore:", self.edit_prezzo_fornitore)
+        form_layout.addRow("Capacità Magazzino:", self.edit_capacita_magazzino)
+        form_layout.addRow("Giacenza Iniziale:", self.edit_giacenza)
+
         layout.addLayout(form_layout)
         
         # Pulsanti
@@ -815,10 +865,17 @@ class NuovoMaterialeDialog(QDialog):
         
         # Salva nel database
         try:
-            materiale_id = self.db_manager.add_materiale(nome, spessore, prezzo)
+            fornitore = self.edit_fornitore.text().strip()
+            prezzo_fornitore = self.edit_prezzo_fornitore.value()
+            capacita_magazzino = self.edit_capacita_magazzino.value()
+            giacenza = self.edit_giacenza.value()
+            materiale_id = self.db_manager.add_materiale(
+                nome, spessore, prezzo,
+                fornitore, prezzo_fornitore, capacita_magazzino, giacenza
+            )
             if materiale_id:
                 self.accept()
             else:
-                QMessageBox.error(self, "Errore", "Nome materiale già esistente.")
+                QMessageBox.critical(self, "Errore", "Nome materiale già esistente.")
         except Exception as e:
-            QMessageBox.error(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
+            QMessageBox.critical(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")

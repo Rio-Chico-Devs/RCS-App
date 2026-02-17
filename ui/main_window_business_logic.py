@@ -26,6 +26,7 @@ from PyQt5.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QTextEdit, QDialo
 from PyQt5.QtCore import Qt
 from ui.preventivo_window import PreventivoWindow
 from ui.gestione_materiali_window import GestioneMaterialiWindow
+from ui.magazzino_window import MagazzinoWindow
 from ui.document_utils import DocumentUtils
 
 class MainWindowBusinessLogic:
@@ -323,7 +324,9 @@ class MainWindowBusinessLogic:
                     'nome_cliente': 'Cliente da lista preventivi',
                     'numero_ordine': '',
                     'oggetto_preventivo': 'Oggetto da completare',
-                    'codice': codice
+                    'codice': codice,
+                    'misura': '',
+                    'finitura': ''
                 }
                 
                 print(f"DEBUG: Usando dati base: {dati_cliente}")
@@ -340,7 +343,9 @@ class MainWindowBusinessLogic:
                         'nome_cliente': preventivo_data.get('nome_cliente', ''),
                         'numero_ordine': preventivo_data.get('numero_ordine', ''),
                         'oggetto_preventivo': preventivo_data.get('descrizione', ''),
-                        'codice': preventivo_data.get('codice', f"PREV_{preventivo_id:03d}")
+                        'codice': preventivo_data.get('codice', f"PREV_{preventivo_id:03d}"),
+                        'misura': preventivo_data.get('misura', ''),
+                        'finitura': preventivo_data.get('finitura', '')
                     }
                     
                     print(f"DEBUG: Chiavi disponibili nel preventivo: {list(preventivo_data.keys())}")
@@ -367,7 +372,9 @@ class MainWindowBusinessLogic:
                         'nome_cliente': preventivo_data[4] if len(preventivo_data) > 4 else '',
                         'numero_ordine': preventivo_data[5] if len(preventivo_data) > 5 else '',
                         'oggetto_preventivo': preventivo_data[6] if len(preventivo_data) > 6 else '',
-                        'codice': preventivo_data[7] if len(preventivo_data) > 7 else f"PREV_{preventivo_id:03d}"
+                        'codice': preventivo_data[7] if len(preventivo_data) > 7 else f"PREV_{preventivo_id:03d}",
+                        'misura': '',
+                        'finitura': ''
                     }
                     materiali = []  # Tuple/list non contiene materiali
                 else:
@@ -375,7 +382,9 @@ class MainWindowBusinessLogic:
                         'nome_cliente': 'Cliente non specificato',
                         'numero_ordine': '',
                         'oggetto_preventivo': 'Descrizione non disponibile',
-                        'codice': f"PREV_{preventivo_id:03d}"
+                        'codice': f"PREV_{preventivo_id:03d}",
+                        'misura': '',
+                        'finitura': ''
                     }
                     materiali = []
                 
@@ -430,8 +439,8 @@ class MainWindowBusinessLogic:
             # Genera documento nel formato scelto
             if formato == 'html':
                 file_path = DocumentUtils.genera_documento_html(preventivo_obj, dati_cliente, window_instance)
-            elif formato == 'docx':
-                file_path = DocumentUtils.genera_documento_docx(preventivo_obj, dati_cliente, window_instance)
+            elif formato == 'odt':
+                file_path = DocumentUtils.genera_documento_odt(preventivo_obj, dati_cliente, window_instance)
             else:
                 print(f"DEBUG: Formato non riconosciuto: {formato}")
                 return
@@ -452,12 +461,18 @@ class MainWindowBusinessLogic:
     @staticmethod
     def apri_gestione_materiali(window_instance):
         """Apre la finestra per gestire i materiali"""
-        window_instance.gestione_materiali_window = GestioneMaterialiWindow(window_instance.db_manager, window_instance)
+        window_instance.gestione_materiali_window = GestioneMaterialiWindow(window_instance.db_manager)
 
         # Collega il signal per aggiornare i preventivi aperti
         window_instance.gestione_materiali_window.materiali_modificati.connect(window_instance.aggiorna_preventivi_aperti)
 
         window_instance.gestione_materiali_window.show()
+
+    @staticmethod
+    def apri_magazzino(window_instance):
+        """Apre la finestra per gestire il magazzino"""
+        window_instance.magazzino_window = MagazzinoWindow(window_instance.db_manager)
+        window_instance.magazzino_window.show()
 
     @staticmethod
     def apri_confronto_preventivi(window_instance):
@@ -564,7 +579,7 @@ class MainWindowBusinessLogic:
                                       "Preventivo e tutte le sue revisioni sono stati eliminati con successo.")
                 MainWindowBusinessLogic.load_preventivi(window_instance)
             else:
-                QMessageBox.error(window_instance, "Errore", 
+                QMessageBox.critical(window_instance, "Errore", 
                                 "Errore durante l'eliminazione del preventivo.")
     
     @staticmethod

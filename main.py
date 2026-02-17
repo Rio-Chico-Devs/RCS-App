@@ -27,7 +27,7 @@ def main():
     try:
         # Crea e mostra la finestra principale
         window = MainWindow()
-        window.show()
+        window.showMaximized()
         
         # Avvia il loop degli eventi
         sys.exit(app.exec_())

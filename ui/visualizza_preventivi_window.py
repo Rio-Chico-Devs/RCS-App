@@ -39,7 +39,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
     preventivo_modificato = pyqtSignal()  # Signal per notificare modifiche
 
     def __init__(self, db_manager: Any, parent: Optional[QWidget] = None) -> None:
-        super().__init__(parent)
+        super().__init__(None)  # No parent per evitare bug ridimensionamento
         self.db_manager = db_manager
         self.parent_window = parent
         self.init_ui()
@@ -675,14 +675,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
         # Usa la stessa logica di MainWindowBusinessLogic
         from ui.main_window_business_logic import MainWindowBusinessLogic
 
-        # Crea un oggetto temporaneo con gli attributi necessari
-        class TempWindow:
-            def __init__(self, db_manager, lista_preventivi):
-                self.db_manager = db_manager
-                self.lista_preventivi = lista_preventivi
-
-        temp_window = TempWindow(self.db_manager, self.lista_preventivi)
-        MainWindowBusinessLogic.genera_documento_preventivo(temp_window)
+        # self ha già db_manager e lista_preventivi come attributi (è un QMainWindow)
+        MainWindowBusinessLogic.genera_documento_preventivo(self)
 
     def elimina_preventivo(self) -> None:
         """Elimina il preventivo selezionato"""
@@ -710,7 +704,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
                 self.load_preventivi()
                 self.preventivo_modificato.emit()
             else:
-                QMessageBox.error(self, "Errore",
+                QMessageBox.critical(self, "Errore",
                                 "Errore durante l'eliminazione del preventivo.")
 
     def on_preventivo_modificato(self) -> None:

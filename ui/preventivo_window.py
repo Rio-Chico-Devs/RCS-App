@@ -45,7 +45,7 @@ class PreventivoWindow(QMainWindow):
     preventivo_salvato = pyqtSignal()
     
     def __init__(self, db_manager, parent=None, preventivo_id=None, modalita='nuovo', note_revisione=""):
-        super().__init__(parent)
+        super().__init__(None)  # No parent per evitare bug ridimensionamento
         self.db_manager = db_manager
         
         # Parametri per sistema revisioni
@@ -69,7 +69,7 @@ class PreventivoWindow(QMainWindow):
         """Carica un preventivo esistente dal database"""
         preventivo_data = self.db_manager.get_preventivo_by_id(self.preventivo_id)
         if not preventivo_data:
-            QMessageBox.error(self, "Errore", "Preventivo non trovato nel database.")
+            QMessageBox.critical(self, "Errore", "Preventivo non trovato nel database.")
             return
         
         # Carica i dati del preventivo (inclusi i nuovi campi)
@@ -77,7 +77,8 @@ class PreventivoWindow(QMainWindow):
         self.numero_ordine_data = preventivo_data.get('numero_ordine', '')
         self.descrizione_data = preventivo_data.get('descrizione', '')
         self.codice_data = preventivo_data.get('codice', '')
-        
+        self.misura_data = preventivo_data.get('misura', '')
+
         # IMPORTANTE: Carica TUTTI i valori numerici e verifica che siano validi
         self.preventivo.costi_accessori = float(preventivo_data.get('costi_accessori', 0.0))
         self.preventivo.minuti_taglio = float(preventivo_data.get('minuti_taglio', 0.0))
@@ -255,16 +256,24 @@ class PreventivoWindow(QMainWindow):
         self.edit_numero_ordine = QLineEdit()
         client_grid.addWidget(self.edit_numero_ordine, 0, 3)
         
-        # Seconda riga: Codice
+        # Seconda riga: Codice, Misura e Finitura
         client_grid.addWidget(self.create_standard_label("Codice:"), 1, 0)
         self.edit_codice = QLineEdit()
         client_grid.addWidget(self.edit_codice, 1, 1)
-        
+
+        client_grid.addWidget(self.create_standard_label("Misura:"), 1, 2)
+        self.edit_misura = QLineEdit()
+        client_grid.addWidget(self.edit_misura, 1, 3)
+
+        client_grid.addWidget(self.create_standard_label("Finitura:"), 1, 4)
+        self.edit_finitura = QLineEdit()
+        client_grid.addWidget(self.edit_finitura, 1, 5)
+
         # Terza riga: Descrizione (LineEdit semplice con limite caratteri)
         client_grid.addWidget(self.create_standard_label("Descrizione:"), 2, 0)
         self.edit_descrizione = QLineEdit()
         self.edit_descrizione.setMaxLength(100)  # Limite a 100 caratteri
-        client_grid.addWidget(self.edit_descrizione, 2, 1, 1, 3)  # Span su 3 colonne
+        client_grid.addWidget(self.edit_descrizione, 2, 1, 1, 5)  # Span su 5 colonne
         
         client_layout.addRow(client_grid_widget)
         
@@ -274,7 +283,11 @@ class PreventivoWindow(QMainWindow):
             self.edit_numero_ordine.setText(self.numero_ordine_data)
             self.edit_descrizione.setText(self.descrizione_data)
             self.edit_codice.setText(self.codice_data)
-        
+            if hasattr(self, 'misura_data'):
+                self.edit_misura.setText(self.misura_data)
+            if hasattr(self, 'finitura_data'):
+                self.edit_finitura.setText(self.finitura_data)
+
         parent_layout.addWidget(client_group)
     
     def disabilita_solo_controlli(self):
@@ -284,7 +297,9 @@ class PreventivoWindow(QMainWindow):
         self.edit_numero_ordine.setEnabled(False)
         self.edit_descrizione.setEnabled(False)
         self.edit_codice.setEnabled(False)
-        
+        self.edit_misura.setEnabled(False)
+        self.edit_finitura.setEnabled(False)
+
         # Disabilita tutti i SpinBox
         self.edit_minuti_taglio.setEnabled(False)
         self.edit_minuti_avvolgimento.setEnabled(False)
@@ -624,13 +639,13 @@ class PreventivoWindow(QMainWindow):
                 background-color: #f0fff4;
                 border: 2px solid #68d391;
                 border-radius: 8px;
-                padding: 16px;
                 margin: 8px 0px;
             }
         """)
-        
+        final_container.setMinimumHeight(50)
+
         final_layout = QHBoxLayout(final_container)
-        final_layout.setContentsMargins(0, 0, 0, 0)
+        final_layout.setContentsMargins(16, 12, 16, 12)
         
         final_title = QLabel("Preventivo Finale:")
         final_title.setStyleSheet("""
@@ -806,7 +821,9 @@ class PreventivoWindow(QMainWindow):
             'nome_cliente': self.edit_nome_cliente.text().strip(),
             'numero_ordine': self.edit_numero_ordine.text().strip(),
             'descrizione': self.edit_descrizione.text().strip(),
-            'codice': self.edit_codice.text().strip()
+            'codice': self.edit_codice.text().strip(),
+            'misura': self.edit_misura.text().strip(),
+            'finitura': self.edit_finitura.text().strip()
         }
     
     def carica_valori_con_delay(self):
@@ -820,7 +837,11 @@ class PreventivoWindow(QMainWindow):
             self.edit_numero_ordine.setText(self.numero_ordine_data or "")
             self.edit_descrizione.setText(self.descrizione_data or "")
             self.edit_codice.setText(self.codice_data or "")
-        
+            if hasattr(self, 'misura_data'):
+                self.edit_misura.setText(self.misura_data or "")
+            if hasattr(self, 'finitura_data'):
+                self.edit_finitura.setText(self.finitura_data or "")
+
         # Imposta valori mano d'opera
         try:
             # Blocca segnali
@@ -855,7 +876,7 @@ class PreventivoWindow(QMainWindow):
             self.aggiorna_totali()
             
         except Exception as e:
-            QMessageBox.error(self, "Errore", f"Errore nel caricamento valori: {str(e)}")
+            QMessageBox.critical(self, "Errore", f"Errore nel caricamento valori: {str(e)}")
     
     def salva_preventivo(self):
         """Salva preventivo"""
@@ -891,7 +912,7 @@ class PreventivoWindow(QMainWindow):
                     self.preventivo_salvato.emit()
                     self.close()
                 else:
-                    QMessageBox.error(self, "Errore", "Errore durante la modifica del preventivo.")
+                    QMessageBox.critical(self, "Errore", "Errore durante la modifica del preventivo.")
             else:
                 # Crea nuovo preventivo
                 preventivo_id = self.db_manager.save_preventivo(preventivo_data)
@@ -939,15 +960,15 @@ class PreventivoWindow(QMainWindow):
                 self.preventivo_salvato.emit()
                 self.close()
             else:
-                QMessageBox.error(self, "Errore", "Errore durante il salvataggio della revisione.")
+                QMessageBox.critical(self, "Errore", "Errore durante il salvataggio della revisione.")
         except Exception as e:
-            QMessageBox.error(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
+            QMessageBox.critical(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
     
     def aggiungi_materiale(self):
         """Aggiungi nuovo materiale"""
-        if len(self.preventivo.materiali_calcolati) >= 10:
-            QMessageBox.warning(self, "Limite Raggiunto", 
-                              "Hai raggiunto il limite massimo di 10 materiali.")
+        if len(self.preventivo.materiali_calcolati) >= 30:
+            QMessageBox.warning(self, "Limite Raggiunto",
+                              "Hai raggiunto il limite massimo di 30 materiali.")
             return
         
         diametro_iniziale = 0.0
@@ -973,103 +994,211 @@ class PreventivoWindow(QMainWindow):
                 self.aggiorna_materiali_info()
                 self.aggiorna_totali()
             else:
-                QMessageBox.error(self, "Errore", "Impossibile aggiungere il materiale.")
+                QMessageBox.critical(self, "Errore", "Impossibile aggiungere il materiale.")
     
     def visualizza_materiali(self):
         """Visualizza lista materiali"""
         if not self.preventivo.materiali_calcolati:
             QMessageBox.information(self, "Info", "Nessun materiale inserito.")
             return
-        
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Materiali Inseriti")
-        dialog.setGeometry(300, 300, 700, 550)
-        
-        layout = QVBoxLayout(dialog)
+
+        self._dialog_materiali = QDialog(self)
+        self._dialog_materiali.setWindowTitle("Materiali Inseriti")
+        self._dialog_materiali.setGeometry(300, 300, 700, 550)
+
+        layout = QVBoxLayout(self._dialog_materiali)
         layout.setContentsMargins(25, 25, 25, 25)
         layout.setSpacing(20)
-        
+
         title_label = QLabel("Materiali Inseriti")
         title_label.setStyleSheet("font-size: 20px; font-weight: 700; color: #2d3748;")
         layout.addWidget(title_label)
-        
-        info_text = "Dettagli dei materiali utilizzati nel preventivo" if self.modalita == 'visualizza' else "Seleziona un materiale per modificarlo o eliminarlo"
+
+        info_text = "Dettagli dei materiali utilizzati nel preventivo" if self.modalita == 'visualizza' else "Seleziona uno o più materiali per modificarli o eliminarli"
         info_label = QLabel(info_text)
         info_label.setStyleSheet("font-size: 14px; color: #718096;")
         layout.addWidget(info_label)
-        
-        lista_materiali = QListWidget()
-        for i, materiale in enumerate(self.preventivo.materiali_calcolati):
-            testo = (f"#{i+1} - {materiale.materiale_nome}\n"
-                    f"Ø Iniziale → Ø Finale: {materiale.diametro:.1f}mm → {materiale.diametro_finale:.1f}mm  "
-                    f"Lunghezza: {materiale.lunghezza:.0f}mm  Numero Giri: {materiale.giri} \n"
-                    f"Costo Singolo Materiale: €{materiale.maggiorazione:.2f}")
-            
-            item = QListWidgetItem(testo)
-            item.setData(Qt.UserRole, i)
-            lista_materiali.addItem(item)
-        
+
+        # Scroll area con checkbox per ogni materiale
+        from PyQt5.QtWidgets import QCheckBox, QScrollArea
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: 1px solid #e2e8f0; border-radius: 8px; }")
+        scroll_widget = QWidget()
+        self._materiali_checks_layout = QVBoxLayout(scroll_widget)
+        self._materiali_checks_layout.setContentsMargins(10, 10, 10, 10)
+        self._materiali_checks_layout.setSpacing(6)
+        scroll.setWidget(scroll_widget)
+
+        # Conteggio selezione (creato prima di _aggiorna_lista)
+        self._lbl_selezione = QLabel("")
+        self._lbl_selezione.setStyleSheet("font-size: 12px; color: #718096;")
+
+        self._checkbox_list = []
+        self._aggiorna_lista_materiali_dialog()
+
+        layout.addWidget(scroll)
+
+        # Barra selezione
+        check_bar = QHBoxLayout()
+        check_bar.addWidget(self._lbl_selezione)
+        check_bar.addStretch()
+
         if self.modalita != 'visualizza':
-            lista_materiali.itemDoubleClicked.connect(lambda item: self.modifica_materiale_selezionato(dialog, lista_materiali))
-        layout.addWidget(lista_materiali)
-        
+            btn_sel_tutti = QPushButton("Seleziona Tutti")
+            btn_sel_tutti.setStyleSheet("font-size: 12px; padding: 4px 10px;")
+            btn_sel_tutti.clicked.connect(lambda: self._toggle_tutti_checkbox(True))
+            btn_desel_tutti = QPushButton("Deseleziona Tutti")
+            btn_desel_tutti.setStyleSheet("font-size: 12px; padding: 4px 10px;")
+            btn_desel_tutti.clicked.connect(lambda: self._toggle_tutti_checkbox(False))
+            check_bar.addWidget(btn_sel_tutti)
+            check_bar.addWidget(btn_desel_tutti)
+
+        layout.addLayout(check_bar)
+
         # Pulsanti
         buttons_layout = QHBoxLayout()
-        
+
         if self.modalita != 'visualizza':
             btn_modifica = QPushButton("Modifica")
-            btn_modifica.clicked.connect(lambda: self.modifica_materiale_selezionato(dialog, lista_materiali))
-            
-            btn_elimina = QPushButton("Elimina")
-            btn_elimina.clicked.connect(lambda: self.elimina_materiale_selezionato(dialog, lista_materiali))
-            
+            btn_modifica.clicked.connect(self.modifica_materiale_selezionato)
+
+            btn_elimina = QPushButton("Elimina Selezionati")
+            btn_elimina.setStyleSheet("""
+                QPushButton {
+                    background-color: #e53e3e;
+                    color: #ffffff;
+                    border: none;
+                    border-radius: 6px;
+                    padding: 8px 16px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background-color: #c53030;
+                }
+            """)
+            btn_elimina.clicked.connect(self.elimina_materiali_selezionati)
+
             buttons_layout.addWidget(btn_modifica)
             buttons_layout.addWidget(btn_elimina)
-        
+
         btn_chiudi = QPushButton("Chiudi")
-        btn_chiudi.clicked.connect(dialog.accept)
-        
+        btn_chiudi.clicked.connect(self._dialog_materiali.accept)
+
         buttons_layout.addStretch()
         buttons_layout.addWidget(btn_chiudi)
-        
+
         layout.addLayout(buttons_layout)
-        dialog.exec_()
-    
-    def modifica_materiale_selezionato(self, dialog, lista_materiali):
-        """Modifica materiale selezionato"""
-        current_item = lista_materiali.currentItem()
-        if not current_item:
+        self._dialog_materiali.exec_()
+
+    def _aggiorna_lista_materiali_dialog(self):
+        """Aggiorna le checkbox materiali nel dialog aperto"""
+        from PyQt5.QtWidgets import QCheckBox
+        # Rimuovi checkbox esistenti
+        for cb in self._checkbox_list:
+            cb.setParent(None)
+        self._checkbox_list.clear()
+
+        for i, materiale in enumerate(self.preventivo.materiali_calcolati):
+            testo = (f"#{i+1} - {materiale.materiale_nome}  |  "
+                    f"Ø {materiale.diametro:.1f}→{materiale.diametro_finale:.1f}mm  |  "
+                    f"L: {materiale.lunghezza:.0f}mm  |  G: {materiale.giri}  |  "
+                    f"€{materiale.maggiorazione:.2f}")
+            cb = QCheckBox(testo)
+            cb.setStyleSheet("""
+                QCheckBox {
+                    font-size: 13px;
+                    padding: 6px 4px;
+                    color: #2d3748;
+                }
+                QCheckBox:hover {
+                    background-color: #f7fafc;
+                    border-radius: 4px;
+                }
+            """)
+            cb.setProperty("indice", i)
+            cb.stateChanged.connect(self._aggiorna_conteggio_selezione)
+            self._materiali_checks_layout.addWidget(cb)
+            self._checkbox_list.append(cb)
+
+        self._aggiorna_conteggio_selezione()
+
+    def _get_checked_indices(self):
+        """Ritorna lista indici dei materiali con checkbox flaggata"""
+        return [cb.property("indice") for cb in self._checkbox_list if cb.isChecked()]
+
+    def _toggle_tutti_checkbox(self, stato):
+        """Seleziona o deseleziona tutte le checkbox"""
+        for cb in self._checkbox_list:
+            cb.setChecked(stato)
+
+    def _aggiorna_conteggio_selezione(self):
+        """Aggiorna il label con il numero di materiali selezionati"""
+        n = len(self._get_checked_indices())
+        if n == 0:
+            self._lbl_selezione.setText("")
+        elif n == 1:
+            self._lbl_selezione.setText("1 materiale selezionato")
+        else:
+            self._lbl_selezione.setText(f"{n} materiali selezionati")
+
+    def modifica_materiale_selezionato(self):
+        """Modifica materiale selezionato (singolo)"""
+        checked = self._get_checked_indices()
+        if not checked:
             QMessageBox.warning(self, "Attenzione", "Seleziona un materiale da modificare.")
             return
-        
-        indice = current_item.data(Qt.UserRole)
-        materiale_da_modificare = self.preventivo.materiali_calcolati[indice]
-        dialog.accept()
-        self.apri_finestra_modifica_materiale(indice, materiale_da_modificare)
-    
-    def elimina_materiale_selezionato(self, dialog, lista_materiali):
-        """Elimina materiale selezionato"""
-        current_item = lista_materiali.currentItem()
-        if not current_item:
-            QMessageBox.warning(self, "Attenzione", "Seleziona un materiale da eliminare.")
+        if len(checked) > 1:
+            QMessageBox.warning(self, "Attenzione", "Seleziona un solo materiale per la modifica.")
             return
-        
-        indice = current_item.data(Qt.UserRole)
-        materiale = self.preventivo.materiali_calcolati[indice]
-        
+
+        indice = checked[0]
+        materiale_da_modificare = self.preventivo.materiali_calcolati[indice]
+        self.apri_finestra_modifica_materiale(indice, materiale_da_modificare)
+        self._aggiorna_lista_materiali_dialog()
+
+    def elimina_materiali_selezionati(self):
+        """Elimina uno o più materiali flaggati"""
+        checked = self._get_checked_indices()
+        if not checked:
+            QMessageBox.warning(self, "Attenzione", "Seleziona almeno un materiale da eliminare.")
+            return
+
+        n = len(checked)
+        if n == 1:
+            nome = self.preventivo.materiali_calcolati[checked[0]].materiale_nome
+            msg = f"Eliminare il materiale '{nome}'?"
+        else:
+            msg = f"Eliminare {n} materiali selezionati?"
+
         risposta = QMessageBox.question(
-            self, "Conferma Eliminazione",
-            f"Eliminare il materiale '{materiale.materiale_nome}'?",
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
+            self, "Conferma Eliminazione", msg,
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
         )
-        
+
         if risposta == QMessageBox.Yes:
-            if self.preventivo.rimuovi_materiale(indice):
-                self.ricalcola_diametri_successivi(indice - 1)
-                self.aggiorna_materiali_info()
-                self.aggiorna_totali()
-                dialog.accept()
+            # Elimina dal fondo per non spostare gli indici
+            primo_eliminato = min(checked)
+            for indice in sorted(checked, reverse=True):
+                self.preventivo.rimuovi_materiale(indice)
+
+            if self.preventivo.materiali_calcolati:
+                if primo_eliminato == 0:
+                    # Se ho eliminato il primo, il nuovo primo parte da diametro 0
+                    self.preventivo.materiali_calcolati[0].diametro = 0.0
+                    self.preventivo.materiali_calcolati[0].ricalcola_tutto()
+                    self.ricalcola_diametri_successivi(0)
+                else:
+                    # Ricalcola dalla posizione del primo eliminato in poi
+                    self.ricalcola_diametri_successivi(primo_eliminato - 1)
+                self.preventivo.ricalcola_costo_totale_materiali()
+
+            self.aggiorna_materiali_info()
+            self.aggiorna_totali()
+            self._aggiorna_lista_materiali_dialog()
+
+            if not self.preventivo.materiali_calcolati:
+                self._dialog_materiali.accept()
     
     def apri_finestra_modifica_materiale(self, indice, materiale_esistente):
         """Apri finestra modifica materiale"""
@@ -1113,11 +1242,11 @@ class PreventivoWindow(QMainWindow):
         if num_materiali == 0:
             self.lbl_num_materiali.setText("Nessun materiale inserito")
         else:
-            self.lbl_num_materiali.setText(f"{num_materiali}/10 materiali inseriti")
+            self.lbl_num_materiali.setText(f"{num_materiali}/30 materiali inseriti")
         
         # Gestione pulsanti
         if hasattr(self, 'btn_aggiungi_materiale'):
-            self.btn_aggiungi_materiale.setEnabled(num_materiali < 10 and self.modalita != 'visualizza')
+            self.btn_aggiungi_materiale.setEnabled(num_materiali < 30 and self.modalita != 'visualizza')
         if hasattr(self, 'btn_visualizza_materiali'):
             self.btn_visualizza_materiali.setEnabled(num_materiali > 0)
         

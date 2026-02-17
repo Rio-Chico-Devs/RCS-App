@@ -16,7 +16,7 @@ class Preventivo:
     
     def aggiungi_materiale(self, materiale_calcolato):
         """Aggiunge un materiale calcolato al preventivo"""
-        if len(self.materiali_calcolati) < 10:  # Limite massimo 10 materiali
+        if len(self.materiali_calcolati) < 30:  # Limite massimo 30 materiali
             self.materiali_calcolati.append(materiale_calcolato)
             self.ricalcola_costo_totale_materiali()
             return True
