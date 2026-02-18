@@ -10,7 +10,8 @@ Last Updated: 23/09/2025
 Author: Antonio VB + Claude
 """
 
-from PyQt5.QtWidgets import QMessageBox
+from PyQt5.QtWidgets import QMessageBox, QHBoxLayout, QLabel, QSpinBox, QDoubleSpinBox, QWidget
+from PyQt5.QtCore import Qt
 from models.materiale import MaterialeCalcolato
 
 class MaterialeBusinessLogic:
@@ -129,11 +130,18 @@ class MaterialeBusinessLogic:
         """Ricalcola tutti i valori con logica sviluppo manuale CORRETTA"""
         if not hasattr(window_instance, 'edit_giri') or not hasattr(window_instance, 'lbl_spessore'):
             return
-            
-        # Aggiorna valori dal form
-        window_instance.materiale_calcolato.diametro = window_instance.edit_diametro.value()
-        window_instance.materiale_calcolato.lunghezza = window_instance.edit_lunghezza.value()
+
+        # Aggiorna giri dal form
         window_instance.materiale_calcolato.giri = window_instance.edit_giri.value()
+
+        # Aggiorna valori in base alla modalità
+        if window_instance.materiale_calcolato.is_conica:
+            # Modalità conica: le sezioni sono già sincronizzate da on_sezione_changed
+            pass
+        else:
+            # Modalità cilindrica standard
+            window_instance.materiale_calcolato.diametro = window_instance.edit_diametro.value()
+            window_instance.materiale_calcolato.lunghezza = window_instance.edit_lunghezza.value()
         
         # FIX: Logica sviluppo manuale corretta
         if window_instance.arrotondamento_modificato_manualmente and window_instance.edit_arrotondamento.value() > 0:
@@ -184,6 +192,12 @@ class MaterialeBusinessLogic:
         nuovo_materiale.spessore = materiale_originale.spessore
         nuovo_materiale.arrotondamento_manuale = materiale_originale.arrotondamento_manuale
         nuovo_materiale.costo_materiale = materiale_originale.costo_materiale
+        # Copia dati conici
+        if hasattr(materiale_originale, 'is_conica'):
+            nuovo_materiale.is_conica = materiale_originale.is_conica
+        if hasattr(materiale_originale, 'sezioni_coniche'):
+            import copy
+            nuovo_materiale.sezioni_coniche = copy.deepcopy(materiale_originale.sezioni_coniche)
         nuovo_materiale.ricalcola_tutto()
         return nuovo_materiale
     
@@ -223,7 +237,32 @@ class MaterialeBusinessLogic:
         window_instance.edit_giri.blockSignals(False)
         window_instance.combo_materiale.blockSignals(False)
         window_instance.edit_arrotondamento.blockSignals(False)
-        
+
+        # Carica modalità conica se esistente
+        if hasattr(window_instance.materiale_esistente, 'is_conica') and window_instance.materiale_esistente.is_conica:
+            window_instance.btn_conica.setChecked(True)
+            window_instance.materiale_calcolato.is_conica = True
+            window_instance.cilindrico_widget.hide()
+            window_instance.conica_widget.show()
+
+            # Ricrea le sezioni dal materiale esistente
+            if hasattr(window_instance.materiale_esistente, 'sezioni_coniche') and window_instance.materiale_esistente.sezioni_coniche:
+                for sez in window_instance.materiale_esistente.sezioni_coniche:
+                    MaterialeBusinessLogic.aggiungi_sezione_conica(window_instance)
+                    last = window_instance.sezioni_widgets[-1]
+                    last['lunghezza'].blockSignals(True)
+                    last['d_inizio'].blockSignals(True)
+                    last['d_fine'].blockSignals(True)
+                    last['lunghezza'].setValue(int(sez.get('lunghezza', 0)))
+                    last['d_inizio'].setValue(float(sez.get('d_inizio', 0.0)))
+                    last['d_fine'].setValue(float(sez.get('d_fine', 0.0)))
+                    last['lunghezza'].blockSignals(False)
+                    last['d_inizio'].blockSignals(False)
+                    last['d_fine'].blockSignals(False)
+
+                # Sincronizza sezioni nel modello
+                MaterialeBusinessLogic.on_sezione_changed(window_instance)
+
         # Aggiorna display
         MaterialeBusinessLogic.aggiorna_display(window_instance)
     
@@ -233,18 +272,31 @@ class MaterialeBusinessLogic:
         if window_instance.materiale_calcolato.materiale_id is None:
             QMessageBox.warning(window_instance, "Attenzione", "Seleziona un materiale.")
             return
-        
-        if window_instance.materiale_calcolato.diametro <= 0:
-            QMessageBox.warning(window_instance, "Attenzione", "Inserisci un diametro valido.")
-            return
-        
-        if window_instance.materiale_calcolato.lunghezza <= 0:
-            QMessageBox.warning(window_instance, "Attenzione", "Inserisci una lunghezza valida.")
-            return
-        
+
         if window_instance.materiale_calcolato.giri <= 0:
             QMessageBox.warning(window_instance, "Attenzione", "Inserisci un numero di giri valido.")
             return
+
+        # Validazione specifica per modalità conica vs cilindrica
+        if window_instance.materiale_calcolato.is_conica:
+            if not window_instance.materiale_calcolato.sezioni_coniche:
+                QMessageBox.warning(window_instance, "Attenzione", "Aggiungi almeno una sezione conica.")
+                return
+            # Controlla che tutte le sezioni abbiano valori validi
+            for i, sez in enumerate(window_instance.materiale_calcolato.sezioni_coniche):
+                if sez.get('lunghezza', 0) <= 0:
+                    QMessageBox.warning(window_instance, "Attenzione", f"Sezione {i+1}: inserisci una lunghezza valida.")
+                    return
+                if sez.get('d_inizio', 0) <= 0 and sez.get('d_fine', 0) <= 0:
+                    QMessageBox.warning(window_instance, "Attenzione", f"Sezione {i+1}: inserisci almeno un diametro valido.")
+                    return
+        else:
+            if window_instance.materiale_calcolato.diametro <= 0:
+                QMessageBox.warning(window_instance, "Attenzione", "Inserisci un diametro valido.")
+                return
+            if window_instance.materiale_calcolato.lunghezza <= 0:
+                QMessageBox.warning(window_instance, "Attenzione", "Inserisci una lunghezza valida.")
+                return
         
         # Controllo sviluppo manuale personalizzato
         if window_instance.arrotondamento_modificato_manualmente and window_instance.edit_arrotondamento.value() != 0:
@@ -275,6 +327,137 @@ class MaterialeBusinessLogic:
         window_instance.materiale_confermato.emit(window_instance.materiale_calcolato, window_instance.indice_modifica)
         window_instance.close()
     
+    # ========== CONICAL METHODS ==========
+
+    @staticmethod
+    def toggle_conica(window_instance):
+        """Attiva/disattiva modalità conica"""
+        is_conica = window_instance.btn_conica.isChecked()
+        window_instance.materiale_calcolato.is_conica = is_conica
+
+        if is_conica:
+            window_instance.cilindrico_widget.hide()
+            window_instance.conica_widget.show()
+            # Aggiungi una sezione iniziale se vuota
+            if len(window_instance.sezioni_widgets) == 0:
+                MaterialeBusinessLogic.aggiungi_sezione_conica(window_instance)
+        else:
+            window_instance.cilindrico_widget.show()
+            window_instance.conica_widget.hide()
+            # Ripristina modalità cilindrica
+            window_instance.materiale_calcolato.is_conica = False
+            window_instance.materiale_calcolato.sezioni_coniche = []
+
+        # Reset sviluppo manuale e ricalcola
+        window_instance.materiale_calcolato.arrotondamento_manuale = 0.0
+        window_instance.edit_arrotondamento.blockSignals(True)
+        window_instance.edit_arrotondamento.setValue(0.0)
+        window_instance.edit_arrotondamento.blockSignals(False)
+        window_instance.arrotondamento_modificato_manualmente = False
+
+        MaterialeBusinessLogic.ricalcola_tutto(window_instance)
+
+    @staticmethod
+    def aggiungi_sezione_conica(window_instance):
+        """Aggiunge una riga sezione conica con i relativi widget"""
+        idx = len(window_instance.sezioni_widgets) + 1
+
+        row_widget = QWidget()
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(0, 0, 0, 0)
+        row_layout.setSpacing(4)
+
+        # Numero sezione
+        lbl_num = QLabel(str(idx))
+        lbl_num.setFixedWidth(20)
+        lbl_num.setAlignment(Qt.AlignCenter)
+        lbl_num.setStyleSheet("font-size: 12px; font-weight: 600; color: #718096;")
+        row_layout.addWidget(lbl_num)
+
+        # Lunghezza sezione (mm) - intero
+        spin_lunghezza = QSpinBox()
+        spin_lunghezza.setMaximum(99999)
+        spin_lunghezza.setValue(0)
+        spin_lunghezza.setSuffix(" mm")
+        spin_lunghezza.setMinimumHeight(32)
+        spin_lunghezza.valueChanged.connect(window_instance.on_sezione_changed)
+        row_layout.addWidget(spin_lunghezza)
+
+        # Diametro inizio (mm) - decimale
+        spin_d_inizio = QDoubleSpinBox()
+        spin_d_inizio.setMaximum(99999.99)
+        spin_d_inizio.setDecimals(2)
+        spin_d_inizio.setValue(0.0)
+        spin_d_inizio.setSuffix(" mm")
+        spin_d_inizio.setMinimumHeight(32)
+        spin_d_inizio.valueChanged.connect(window_instance.on_sezione_changed)
+        row_layout.addWidget(spin_d_inizio)
+
+        # Diametro fine (mm) - decimale
+        spin_d_fine = QDoubleSpinBox()
+        spin_d_fine.setMaximum(99999.99)
+        spin_d_fine.setDecimals(2)
+        spin_d_fine.setValue(0.0)
+        spin_d_fine.setSuffix(" mm")
+        spin_d_fine.setMinimumHeight(32)
+        spin_d_fine.valueChanged.connect(window_instance.on_sezione_changed)
+        row_layout.addWidget(spin_d_fine)
+
+        # Se c'è una sezione precedente, usa il suo d_fine come d_inizio di questa
+        if window_instance.sezioni_widgets:
+            prev = window_instance.sezioni_widgets[-1]
+            prev_d_fine = prev['d_fine'].value()
+            spin_d_inizio.setValue(prev_d_fine)
+
+        # Inserisci prima dello stretch
+        stretch_index = window_instance.sezioni_layout.count() - 1
+        window_instance.sezioni_layout.insertWidget(stretch_index, row_widget)
+
+        window_instance.sezioni_widgets.append({
+            'widget': row_widget,
+            'lbl_num': lbl_num,
+            'lunghezza': spin_lunghezza,
+            'd_inizio': spin_d_inizio,
+            'd_fine': spin_d_fine
+        })
+
+        # Aggiorna calcoli
+        MaterialeBusinessLogic.on_sezione_changed(window_instance)
+
+    @staticmethod
+    def rimuovi_sezione_conica(window_instance):
+        """Rimuove l'ultima sezione conica"""
+        if not window_instance.sezioni_widgets:
+            return
+
+        last = window_instance.sezioni_widgets.pop()
+        last['widget'].setParent(None)
+        last['widget'].deleteLater()
+
+        # Aggiorna calcoli
+        MaterialeBusinessLogic.on_sezione_changed(window_instance)
+
+    @staticmethod
+    def on_sezione_changed(window_instance):
+        """Legge i valori dalle sezioni e ricalcola tutto"""
+        sezioni = []
+        for sw in window_instance.sezioni_widgets:
+            sezioni.append({
+                'lunghezza': sw['lunghezza'].value(),
+                'd_inizio': sw['d_inizio'].value(),
+                'd_fine': sw['d_fine'].value()
+            })
+        window_instance.materiale_calcolato.sezioni_coniche = sezioni
+
+        # Reset sviluppo manuale
+        window_instance.materiale_calcolato.arrotondamento_manuale = 0.0
+        window_instance.edit_arrotondamento.blockSignals(True)
+        window_instance.edit_arrotondamento.setValue(0.0)
+        window_instance.edit_arrotondamento.blockSignals(False)
+        window_instance.arrotondamento_modificato_manualmente = False
+
+        MaterialeBusinessLogic.ricalcola_tutto(window_instance)
+
     @staticmethod
     def gestisci_chiusura_finestra(window_instance, event):
         """Gestisce la chiusura della finestra"""

@@ -107,8 +107,26 @@ class MaterialeWindow(QMainWindow):
         """Compatibilità con codice esistente - DELEGATO"""
         self.on_sviluppo_manuale_changed()
     
+    # ========== CONICA METHODS ==========
+
+    def toggle_conica(self):
+        """Attiva/disattiva modalità conica"""
+        MaterialeBusinessLogic.toggle_conica(self)
+
+    def aggiungi_sezione_conica(self):
+        """Aggiunge una sezione conica"""
+        MaterialeBusinessLogic.aggiungi_sezione_conica(self)
+
+    def rimuovi_sezione_conica(self):
+        """Rimuove l'ultima sezione conica"""
+        MaterialeBusinessLogic.rimuovi_sezione_conica(self)
+
+    def on_sezione_changed(self):
+        """Callback quando un valore di sezione cambia"""
+        MaterialeBusinessLogic.on_sezione_changed(self)
+
     # ========== EVENT HANDLERS ==========
-    
+
     def closeEvent(self, event):
         """Gestisce chiusura finestra - DELEGATO"""
         MaterialeBusinessLogic.gestisci_chiusura_finestra(self, event)
