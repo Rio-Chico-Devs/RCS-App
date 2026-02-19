@@ -10,10 +10,10 @@ Last Updated: 23/09/2025
 Author: Antonio VB + Claude
 """
 
-from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QWidget, QLabel, 
+from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QWidget, QLabel,
                              QLineEdit, QFormLayout, QGroupBox, QDoubleSpinBox, QFrame,
                              QGridLayout, QGraphicsDropShadowEffect, QComboBox, QSpinBox,
-                             QSizePolicy)
+                             QSizePolicy, QScrollArea)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QFont
 
@@ -144,57 +144,128 @@ class MaterialeUIComponents:
         """Sezione input con design unificato"""
         input_group = QGroupBox("Parametri")
         input_group.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        input_group.setFixedWidth(450)
+        input_group.setFixedWidth(500)
         input_group.setGraphicsEffect(MaterialeUIComponents.create_shadow_effect())
-        
+
         layout = QVBoxLayout(input_group)
         layout.setContentsMargins(25, 28, 25, 25)
-        layout.setSpacing(18)
-        
-        # Form layout
-        form_layout = QFormLayout()
-        form_layout.setVerticalSpacing(16)
-        form_layout.setHorizontalSpacing(16)
-        form_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        
-        # Input fields standardizzati con FIX per sviluppo manuale
+        layout.setSpacing(12)
+
+        # === RIGA CILINDRICA (diametro + lunghezza) - visibile in modalità cilindrica ===
+        window_instance.cilindrico_widget = QWidget()
+        cilindrico_layout = QFormLayout(window_instance.cilindrico_widget)
+        cilindrico_layout.setVerticalSpacing(12)
+        cilindrico_layout.setHorizontalSpacing(16)
+        cilindrico_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        cilindrico_layout.setContentsMargins(0, 0, 0, 0)
+
         window_instance.edit_diametro = MaterialeUIComponents.create_standard_input("mm", window_instance.on_parametro_changed)
-        form_layout.addRow(MaterialeUIComponents.create_standard_label("Diametro"), window_instance.edit_diametro)
-        
+        cilindrico_layout.addRow(MaterialeUIComponents.create_standard_label("Diametro"), window_instance.edit_diametro)
+
         window_instance.edit_lunghezza = MaterialeUIComponents.create_standard_input("mm", window_instance.on_parametro_changed, decimals=0, default_value=1000)
-        form_layout.addRow(MaterialeUIComponents.create_standard_label("Lunghezza"), window_instance.edit_lunghezza)
-        
-        # Campo Metri sotto Lunghezza
-        MaterialeUIComponents.create_metri_field(window_instance, form_layout)
-        
-        # Materiale combo - FIX: reset sviluppo manuale quando cambia materiale
+        cilindrico_layout.addRow(MaterialeUIComponents.create_standard_label("Lunghezza"), window_instance.edit_lunghezza)
+
+        layout.addWidget(window_instance.cilindrico_widget)
+
+        # === SEZIONI CONICHE - visibile in modalità conica ===
+        window_instance.conica_widget = QWidget()
+        conica_layout = QVBoxLayout(window_instance.conica_widget)
+        conica_layout.setContentsMargins(0, 0, 0, 0)
+        conica_layout.setSpacing(6)
+
+        # Header sezioni + pulsanti
+        sezioni_header = QHBoxLayout()
+        lbl_sezioni = QLabel("Sezioni coniche:")
+        lbl_sezioni.setStyleSheet("font-size: 13px; font-weight: 600; color: #4a5568;")
+        sezioni_header.addWidget(lbl_sezioni)
+        sezioni_header.addStretch()
+
+        window_instance.btn_aggiungi_sezione = QPushButton("+")
+        window_instance.btn_aggiungi_sezione.setFixedSize(30, 30)
+        window_instance.btn_aggiungi_sezione.setStyleSheet("""
+            QPushButton { background-color: #48bb78; color: white; font-size: 16px; font-weight: 700; border-radius: 4px; padding: 0; }
+            QPushButton:hover { background-color: #38a169; }
+        """)
+        window_instance.btn_aggiungi_sezione.clicked.connect(window_instance.aggiungi_sezione_conica)
+
+        window_instance.btn_rimuovi_sezione = QPushButton("-")
+        window_instance.btn_rimuovi_sezione.setFixedSize(30, 30)
+        window_instance.btn_rimuovi_sezione.setStyleSheet("""
+            QPushButton { background-color: #e53e3e; color: white; font-size: 16px; font-weight: 700; border-radius: 4px; padding: 0; }
+            QPushButton:hover { background-color: #c53030; }
+        """)
+        window_instance.btn_rimuovi_sezione.clicked.connect(window_instance.rimuovi_sezione_conica)
+
+        sezioni_header.addWidget(window_instance.btn_aggiungi_sezione)
+        sezioni_header.addWidget(window_instance.btn_rimuovi_sezione)
+        conica_layout.addLayout(sezioni_header)
+
+        # Header colonne
+        col_header = QHBoxLayout()
+        col_header.setSpacing(4)
+        for txt in ["#", "Lungh. (mm)", "Ø Inizio", "Ø Fine"]:
+            lbl = QLabel(txt)
+            lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #718096;")
+            lbl.setAlignment(Qt.AlignCenter)
+            if txt == "#":
+                lbl.setFixedWidth(20)
+            col_header.addWidget(lbl)
+        conica_layout.addLayout(col_header)
+
+        # Scroll area per le righe sezioni
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        scroll.setMaximumHeight(200)
+
+        window_instance.sezioni_container = QWidget()
+        window_instance.sezioni_layout = QVBoxLayout(window_instance.sezioni_container)
+        window_instance.sezioni_layout.setContentsMargins(0, 0, 0, 0)
+        window_instance.sezioni_layout.setSpacing(4)
+        window_instance.sezioni_layout.addStretch()
+        scroll.setWidget(window_instance.sezioni_container)
+
+        conica_layout.addWidget(scroll)
+
+        # Lista per tenere traccia dei widget delle sezioni
+        window_instance.sezioni_widgets = []
+
+        window_instance.conica_widget.hide()
+        layout.addWidget(window_instance.conica_widget)
+
+        # === CAMPI COMUNI: Metri, Materiale, Giri ===
+        common_form = QFormLayout()
+        common_form.setVerticalSpacing(12)
+        common_form.setHorizontalSpacing(16)
+        common_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        MaterialeUIComponents.create_metri_field(window_instance, common_form)
+
         window_instance.combo_materiale = QComboBox()
         window_instance.combo_materiale.currentIndexChanged.connect(window_instance.on_materiale_changed)
-        form_layout.addRow(MaterialeUIComponents.create_standard_label("Materiale"), window_instance.combo_materiale)
-        
-        # Giri - FIX: reset sviluppo manuale quando cambiano giri
+        common_form.addRow(MaterialeUIComponents.create_standard_label("Materiale"), window_instance.combo_materiale)
+
         window_instance.edit_giri = QSpinBox()
         window_instance.edit_giri.setMaximum(9999)
         window_instance.edit_giri.setValue(1)
         window_instance.edit_giri.valueChanged.connect(window_instance.on_parametro_changed)
-        form_layout.addRow(MaterialeUIComponents.create_standard_label("Giri"), window_instance.edit_giri)
-        
-        layout.addLayout(form_layout)
-        
-        # Nota per i campi non editabili
-        note_label = QLabel("* I valori in grassetto non sono editabili")
-        note_label.setStyleSheet("""
-            QLabel {
-                color: #718096;
-                font-size: 12px;
-                font-style: italic;
-                padding: 8px 0 0 0;
-            }
+        common_form.addRow(MaterialeUIComponents.create_standard_label("Giri"), window_instance.edit_giri)
+
+        layout.addLayout(common_form)
+
+        # === TOGGLE CONICA ===
+        window_instance.btn_conica = QPushButton("Conica")
+        window_instance.btn_conica.setCheckable(True)
+        window_instance.btn_conica.setFixedHeight(36)
+        window_instance.btn_conica.setStyleSheet("""
+            QPushButton { background-color: #edf2f7; color: #4a5568; border: 1px solid #e2e8f0; font-size: 13px; font-weight: 600; }
+            QPushButton:hover { background-color: #e2e8f0; }
+            QPushButton:checked { background-color: #4299e1; color: white; border: 1px solid #3182ce; }
         """)
-        layout.addWidget(note_label)
-        
+        window_instance.btn_conica.clicked.connect(window_instance.toggle_conica)
+        layout.addWidget(window_instance.btn_conica)
+
         layout.addStretch()
-        
         parent_layout.addWidget(input_group)
     
     @staticmethod

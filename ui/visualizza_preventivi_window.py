@@ -580,14 +580,14 @@ class VisualizzaPreventiviWindow(QMainWindow):
         # Importa qui per evitare circular import
         from ui.preventivo_window import PreventivoWindow
 
-        preventivo_window = PreventivoWindow(
+        self.preventivo_window = PreventivoWindow(
             self.db_manager,
             self,
             preventivo_id=preventivo_id,
             modalita='visualizza'
         )
-        preventivo_window.preventivo_salvato.connect(self.on_preventivo_modificato)
-        preventivo_window.show()
+        self.preventivo_window.preventivo_salvato.connect(self.on_preventivo_modificato)
+        self.preventivo_window.show()
 
     def modifica_preventivo(self) -> None:
         """Apre un preventivo per la modifica DIRETTA (con versioning)"""
@@ -600,14 +600,14 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
         from ui.preventivo_window import PreventivoWindow
 
-        preventivo_window = PreventivoWindow(
+        self.preventivo_window = PreventivoWindow(
             self.db_manager,
             self,
             preventivo_id=preventivo_id,
             modalita='modifica'
         )
-        preventivo_window.preventivo_salvato.connect(self.on_preventivo_modificato)
-        preventivo_window.show()
+        self.preventivo_window.preventivo_salvato.connect(self.on_preventivo_modificato)
+        self.preventivo_window.show()
 
     def crea_revisione(self) -> None:
         """Crea una revisione di un preventivo esistente"""
@@ -626,15 +626,15 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
         from ui.preventivo_window import PreventivoWindow
 
-        preventivo_window = PreventivoWindow(
+        self.preventivo_window = PreventivoWindow(
             self.db_manager,
             self,
             preventivo_id=preventivo_id,
             modalita='revisione',
             note_revisione=note_revisione
         )
-        preventivo_window.preventivo_salvato.connect(self.on_preventivo_modificato)
-        preventivo_window.show()
+        self.preventivo_window.preventivo_salvato.connect(self.on_preventivo_modificato)
+        self.preventivo_window.show()
 
     def visualizza_modifiche(self) -> None:
         """NUOVO: Apre il dialog per visualizzare lo storico modifiche"""

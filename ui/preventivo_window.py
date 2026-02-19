@@ -108,7 +108,10 @@ class PreventivoWindow(QMainWindow):
                 materiale.lunghezza_utilizzata = mat_data.get('lunghezza_utilizzata', 0.0)
                 materiale.costo_totale = mat_data.get('costo_totale', 0.0)
                 materiale.maggiorazione = mat_data.get('maggiorazione', 0.0)
-                
+                # Dati conici
+                materiale.is_conica = mat_data.get('is_conica', False)
+                materiale.sezioni_coniche = mat_data.get('sezioni_coniche', [])
+
                 self.preventivo.materiali_calcolati.append(materiale)
         except (json.JSONDecodeError, TypeError):
             QMessageBox.warning(self, "Attenzione", "Errore nel caricamento dei materiali del preventivo.")

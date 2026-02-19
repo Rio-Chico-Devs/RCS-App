@@ -333,7 +333,7 @@ class DocumentUtils:
                 from odf.opendocument import OpenDocumentText
                 from odf.style import Style, TextProperties, ParagraphProperties, TableColumnProperties, TableCellProperties, TableRowProperties
                 from odf.text import P, Span
-                from odf.table import Table, TableColumn, TableRow, TableCell
+                from odf.table import Table, TableColumn, TableRow, TableCell, CoveredTableCell
             except ImportError:
                 if parent:
                     QMessageBox.information(
@@ -506,8 +506,8 @@ class DocumentUtils:
             tc_desc.addElement(P(stylename=style_normal, text=f"Descrizione: {descrizione}"))
             tr3.addElement(tc_desc)
             # Celle coperte dal colspan
-            tr3.addElement(TableCell())
-            tr3.addElement(TableCell())
+            tr3.addElement(CoveredTableCell())
+            tr3.addElement(CoveredTableCell())
             info_table.addElement(tr3)
 
             doc.text.addElement(info_table)
