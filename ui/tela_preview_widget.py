@@ -195,7 +195,11 @@ class TelaPreviewWidget(QWidget):
                          Qt.AlignCenter, d_text)
 
     def _disegna_conica(self, painter):
-        """Disegna la tela conica con le sezioni trapezoidali."""
+        """Disegna la tela conica come rettangolo di taglio (come viene realmente tagliata).
+        Il rettangolo rappresenta il foglio di tela tagliato (sviluppo_max x lunghezza_totale).
+        Il profilo conico è disegnato come linea di riferimento all'interno.
+        Lo scarto (triangolo) è evidenziato tra il rettangolo e il profilo conico.
+        """
         w = self.width()
         h = self.height()
         margine_sx = 55
@@ -237,47 +241,82 @@ class TelaPreviewWidget(QWidget):
 
         # Fattori di scala
         scala_x = draw_w / lunghezza_totale
-        scala_y = draw_h / sviluppo_max  # Scala in base allo sviluppo max
+        scala_y = draw_h / sviluppo_max
 
-        # Centro verticale per la tela
-        centro_y = margine_top + draw_h / 2
-
-        # --- Disegna il rettangolo di taglio (scarto) ---
-        rect_top = centro_y - (sviluppo_max * scala_y) / 2
-        rect_bot = centro_y + (sviluppo_max * scala_y) / 2
+        # Il rettangolo di taglio è allineato in basso (bordo inferiore comune)
         rect_left = margine_sx
         rect_right = margine_sx + lunghezza_totale * scala_x
+        rect_h = sviluppo_max * scala_y
+        rect_top = margine_top + (draw_h - rect_h)
+        rect_bot = rect_top + rect_h
 
-        # Rettangolo scarto (tratteggiato)
-        if sviluppo_max != sviluppo_min:
-            pen_scarto = QPen(QColor(200, 100, 100, 120), 1, Qt.DashLine)
-            painter.setPen(pen_scarto)
-            painter.setBrush(QBrush(self._scarto_fill))
-            painter.drawRect(QRectF(rect_left, rect_top, rect_right - rect_left, rect_bot - rect_top))
-
-        # --- Disegna la tela (poligono trapezoidale) ---
-        polygon_top = []  # Bordo superiore
-        polygon_bot = []  # Bordo inferiore
-
-        for pos_mm, sv in punti_sviluppo:
-            x = margine_sx + pos_mm * scala_x
-            half_sv = (sv * scala_y) / 2
-            polygon_top.append(QPointF(x, centro_y - half_sv))
-            polygon_bot.append(QPointF(x, centro_y + half_sv))
-
-        # Costruisci poligono chiuso
-        poly_points = polygon_top + list(reversed(polygon_bot))
-        polygon = QPolygonF(poly_points)
-
+        # --- 1. Disegna il rettangolo di taglio (la tela reale) ---
         pen_tela = QPen(self._tela_border, 2)
         painter.setPen(pen_tela)
         painter.setBrush(QBrush(self._tela_fill))
-        painter.drawPolygon(polygon)
+        painter.drawRect(QRectF(rect_left, rect_top, rect_right - rect_left, rect_bot - rect_top))
 
-        # --- Linee verticali di separazione sezioni ---
+        # --- 2. Disegna lo scarto (area tra rettangolo e profilo conico) ---
+        # Il profilo conico ha bordo inferiore allineato al rettangolo,
+        # bordo superiore variabile in base allo sviluppo di ogni punto.
+        if sviluppo_max != sviluppo_min:
+            # Costruisci il poligono dello scarto:
+            # - bordo superiore del rettangolo (da sinistra a destra)
+            # - bordo superiore del profilo conico (da destra a sinistra)
+            scarto_poly = []
+
+            # Bordo superiore rettangolo: angolo top-left -> top-right
+            scarto_poly.append(QPointF(rect_left, rect_top))
+            scarto_poly.append(QPointF(rect_right, rect_top))
+
+            # Bordo superiore profilo conico: da destra a sinistra
+            for pos_mm, sv in reversed(punti_sviluppo):
+                x = margine_sx + pos_mm * scala_x
+                sv_h = sv * scala_y
+                y_top_cono = rect_bot - sv_h  # Allineato in basso
+                scarto_poly.append(QPointF(x, y_top_cono))
+
+            scarto_polygon = QPolygonF(scarto_poly)
+            painter.setPen(Qt.NoPen)
+            painter.setBrush(QBrush(QColor(255, 150, 150, 100)))
+            painter.drawPolygon(scarto_polygon)
+
+            # Etichetta "SCARTO" nell'area dello scarto
+            if self._scarto > 0:
+                # Posiziona l'etichetta verso il lato dove lo scarto è più grande
+                # (dove lo sviluppo è minore = dove il bordo conico è più lontano dal rettangolo)
+                min_idx = tutti_sviluppi.index(sviluppo_min)
+                if min_idx < len(punti_sviluppo):
+                    pos_min_mm, sv_min = punti_sviluppo[min_idx]
+                    x_label = margine_sx + pos_min_mm * scala_x
+                    y_label_top = rect_top
+                    y_label_bot = rect_bot - sv_min * scala_y
+                    y_label = (y_label_top + y_label_bot) / 2
+
+                    font_sc = QFont("system-ui", 7)
+                    font_sc.setItalic(True)
+                    painter.setFont(font_sc)
+                    painter.setPen(QPen(QColor(200, 80, 80), 1))
+                    # Offset per non uscire dal widget
+                    lbl_x = max(rect_left + 2, min(x_label - 25, rect_right - 55))
+                    painter.drawText(QRectF(lbl_x, y_label - 8, 55, 16),
+                                     Qt.AlignCenter, "SCARTO")
+
+        # --- 3. Disegna il profilo conico (linea diagonale di riferimento) ---
+        profilo_points = []
+        for pos_mm, sv in punti_sviluppo:
+            x = margine_sx + pos_mm * scala_x
+            sv_h = sv * scala_y
+            y_top_cono = rect_bot - sv_h
+            profilo_points.append(QPointF(x, y_top_cono))
+
+        pen_profilo = QPen(QColor(44, 62, 80, 180), 1.5, Qt.DashLine)
+        painter.setPen(pen_profilo)
+        for j in range(len(profilo_points) - 1):
+            painter.drawLine(profilo_points[j], profilo_points[j + 1])
+
+        # --- 4. Linee verticali di separazione sezioni ---
         pen_sep = QPen(QColor(150, 160, 175), 1, Qt.DashDotLine)
-        font_quota = QFont("system-ui", 8)
-        painter.setFont(font_quota)
 
         pos_mm = 0
         for i, sez in enumerate(self._sezioni):
@@ -288,21 +327,12 @@ class TelaPreviewWidget(QWidget):
             x_ini = margine_sx + pos_mm * scala_x
             x_fin = margine_sx + (pos_mm + l_sez) * scala_x
 
-            # Linea verticale di inizio sezione
-            sv_ini = d_ini * 3.14
-            half_ini = (sv_ini * scala_y) / 2
-            painter.setPen(pen_sep)
-            painter.drawLine(QPointF(x_ini, centro_y - half_ini),
-                             QPointF(x_ini, centro_y + half_ini))
+            # Linea verticale tratteggiata per separare le sezioni
+            if i > 0:
+                painter.setPen(pen_sep)
+                painter.drawLine(QPointF(x_ini, rect_top), QPointF(x_ini, rect_bot))
 
-            # Se ultima sezione, disegna anche la linea di fine
-            if i == len(self._sezioni) - 1:
-                sv_fin = d_fin * 3.14
-                half_fin = (sv_fin * scala_y) / 2
-                painter.drawLine(QPointF(x_fin, centro_y - half_fin),
-                                 QPointF(x_fin, centro_y + half_fin))
-
-            # --- Quote diametri (sopra) ---
+            # --- Quote diametri (sopra il rettangolo) ---
             painter.setPen(QPen(self._dim_color, 1))
             font_diam = QFont("system-ui", 8)
             font_diam.setBold(True)
@@ -310,17 +340,13 @@ class TelaPreviewWidget(QWidget):
 
             # Diametro inizio (solo per la prima sezione)
             if i == 0:
-                sv_ini_draw = d_ini * 3.14
-                y_top = centro_y - (sv_ini_draw * scala_y) / 2
                 text_ini = f"Ø{d_ini:.1f}"
-                painter.drawText(QRectF(x_ini - 30, y_top - 18, 60, 16),
+                painter.drawText(QRectF(x_ini - 30, rect_top - 18, 60, 16),
                                  Qt.AlignCenter, text_ini)
 
             # Diametro fine
-            sv_fin_draw = d_fin * 3.14
-            y_top_fin = centro_y - (sv_fin_draw * scala_y) / 2
             text_fin = f"Ø{d_fin:.1f}"
-            painter.drawText(QRectF(x_fin - 30, y_top_fin - 18, 60, 16),
+            painter.drawText(QRectF(x_fin - 30, rect_top - 18, 60, 16),
                              Qt.AlignCenter, text_fin)
 
             # --- Quota lunghezza sezione (sotto) ---
@@ -328,19 +354,33 @@ class TelaPreviewWidget(QWidget):
             painter.setFont(font_lung)
             painter.setPen(QPen(self._quota_color, 1))
 
-            # Sviluppo alla fine della sezione per trovare il punto più basso
-            y_bot_max = centro_y + (sviluppo_max * scala_y) / 2
             lung_text = f"{l_sez} mm"
             mid_x = (x_ini + x_fin) / 2
-            painter.drawText(QRectF(mid_x - 35, y_bot_max + 8, 70, 16),
+            painter.drawText(QRectF(mid_x - 35, rect_bot + 8, 70, 16),
                              Qt.AlignCenter, lung_text)
 
             # Frecce quota lunghezza
-            self._disegna_quota_orizzontale(painter, x_ini, x_fin, y_bot_max + 5)
+            self._disegna_quota_orizzontale(painter, x_ini, x_fin, rect_bot + 5)
 
             pos_mm += l_sez
 
-        # --- Etichetta scarto ---
+        # --- 5. Quota sviluppo max a sinistra (altezza rettangolo) ---
+        font_sv = QFont("system-ui", 9)
+        font_sv.setBold(True)
+        painter.setFont(font_sv)
+        painter.setPen(QPen(self._dim_color, 1))
+
+        painter.save()
+        painter.translate(rect_left - 15, (rect_top + rect_bot) / 2)
+        painter.rotate(-90)
+        sv_text = f"Sviluppo: {sviluppo_max:.1f} mm"
+        painter.drawText(QRectF(-60, -15, 120, 25), Qt.AlignCenter, sv_text)
+        painter.restore()
+
+        # Frecce quota laterale
+        self._disegna_quota_verticale(painter, rect_top, rect_bot, rect_left - 8)
+
+        # --- 6. Etichetta scarto ---
         if self._scarto > 0:
             font_scarto = QFont("system-ui", 9)
             font_scarto.setItalic(True)
@@ -352,16 +392,15 @@ class TelaPreviewWidget(QWidget):
             painter.drawText(QRectF(margine_sx, h - 30, draw_w, 20),
                              Qt.AlignRight, scarto_text)
 
-        # --- Lunghezza totale (sotto le quote sezioni) ---
+        # --- 7. Lunghezza totale (sotto le quote sezioni) ---
         if len(self._sezioni) > 1:
             font_tot = QFont("system-ui", 9)
             font_tot.setBold(True)
             painter.setFont(font_tot)
             painter.setPen(QPen(self._dim_color, 1))
 
-            y_bot_max = centro_y + (sviluppo_max * scala_y) / 2
             tot_text = f"Lunghezza totale: {lunghezza_totale:.0f} mm"
-            painter.drawText(QRectF(margine_sx, y_bot_max + 24, draw_w, 18),
+            painter.drawText(QRectF(margine_sx, rect_bot + 24, draw_w, 18),
                              Qt.AlignCenter, tot_text)
 
     # ── Helpers per quotature ─────────────────────────────────────
