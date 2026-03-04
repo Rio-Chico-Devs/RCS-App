@@ -177,6 +177,17 @@ class MaterialeBusinessLogic:
                 window_instance.lbl_costo_totale.setText(f"€{window_instance.materiale_calcolato.costo_totale:.2f}")
             if hasattr(window_instance, 'lbl_maggiorazione'):
                 window_instance.lbl_maggiorazione.setText(f"€{window_instance.materiale_calcolato.maggiorazione:.2f}")
+
+            # Aggiorna anteprima tela
+            if hasattr(window_instance, 'tela_preview'):
+                mc = window_instance.materiale_calcolato
+                if mc.is_conica and mc.sezioni_coniche:
+                    scarto = window_instance.tela_preview.aggiorna_conica(mc.sezioni_coniche)
+                    mc.scarto_mm2 = scarto
+                else:
+                    window_instance.tela_preview.aggiorna_cilindrica(
+                        mc.diametro, mc.lunghezza, mc.sviluppo)
+                    mc.scarto_mm2 = 0.0
         except Exception as e:
             pass
     
@@ -198,6 +209,8 @@ class MaterialeBusinessLogic:
         if hasattr(materiale_originale, 'sezioni_coniche'):
             import copy
             nuovo_materiale.sezioni_coniche = copy.deepcopy(materiale_originale.sezioni_coniche)
+        if hasattr(materiale_originale, 'scarto_mm2'):
+            nuovo_materiale.scarto_mm2 = materiale_originale.scarto_mm2
         nuovo_materiale.ricalcola_tutto()
         return nuovo_materiale
     

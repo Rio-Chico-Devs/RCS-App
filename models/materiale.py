@@ -34,6 +34,9 @@ class MaterialeCalcolato:
         self.is_conica = False
         self.sezioni_coniche = []  # [{lunghezza, d_inizio, d_fine}, ...]
 
+        # Scarto materiale (mm²) - solo per conica
+        self.scarto_mm2 = 0.0
+
     @property
     def stratifica(self):
         """Alias per sviluppo - per compatibilità con codice esistente"""
@@ -163,6 +166,7 @@ class MaterialeCalcolato:
             'costo_totale': self.costo_totale,
             'maggiorazione': self.maggiorazione,
             'is_conica': self.is_conica,
-            'sezioni_coniche': self.sezioni_coniche
+            'sezioni_coniche': self.sezioni_coniche,
+            'scarto_mm2': self.scarto_mm2
         }
         return d
