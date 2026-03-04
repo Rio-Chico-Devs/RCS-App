@@ -144,17 +144,23 @@ class MaterialeUIComponents:
         """Sezione input con design unificato"""
         input_group = QGroupBox("Parametri")
         input_group.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        input_group.setFixedWidth(500)
+        input_group.setFixedWidth(450)
         input_group.setGraphicsEffect(MaterialeUIComponents.create_shadow_effect())
 
         layout = QVBoxLayout(input_group)
         layout.setContentsMargins(25, 28, 25, 25)
-        layout.setSpacing(12)
+        layout.setSpacing(18)
 
-        # === RIGA CILINDRICA (diametro + lunghezza) - visibile in modalità cilindrica ===
+        # Form layout principale
+        form_layout = QFormLayout()
+        form_layout.setVerticalSpacing(16)
+        form_layout.setHorizontalSpacing(16)
+        form_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+
+        # === CAMPI CILINDRICA (diametro + lunghezza) - visibili in modalità cilindrica ===
         window_instance.cilindrico_widget = QWidget()
         cilindrico_layout = QFormLayout(window_instance.cilindrico_widget)
-        cilindrico_layout.setVerticalSpacing(12)
+        cilindrico_layout.setVerticalSpacing(16)
         cilindrico_layout.setHorizontalSpacing(16)
         cilindrico_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
         cilindrico_layout.setContentsMargins(0, 0, 0, 0)
@@ -167,7 +173,7 @@ class MaterialeUIComponents:
 
         layout.addWidget(window_instance.cilindrico_widget)
 
-        # === SEZIONI CONICHE - visibile in modalità conica ===
+        # === SEZIONI CONICHE - visibile solo in modalità conica ===
         window_instance.conica_widget = QWidget()
         conica_layout = QVBoxLayout(window_instance.conica_widget)
         conica_layout.setContentsMargins(0, 0, 0, 0)
@@ -233,27 +239,24 @@ class MaterialeUIComponents:
         window_instance.conica_widget.hide()
         layout.addWidget(window_instance.conica_widget)
 
-        # === CAMPI COMUNI: Metri, Materiale, Giri ===
-        common_form = QFormLayout()
-        common_form.setVerticalSpacing(12)
-        common_form.setHorizontalSpacing(16)
-        common_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        # Campo Metri sotto Lunghezza
+        MaterialeUIComponents.create_metri_field(window_instance, form_layout)
 
-        MaterialeUIComponents.create_metri_field(window_instance, common_form)
-
+        # Materiale combo
         window_instance.combo_materiale = QComboBox()
         window_instance.combo_materiale.currentIndexChanged.connect(window_instance.on_materiale_changed)
-        common_form.addRow(MaterialeUIComponents.create_standard_label("Materiale"), window_instance.combo_materiale)
+        form_layout.addRow(MaterialeUIComponents.create_standard_label("Materiale"), window_instance.combo_materiale)
 
+        # Giri
         window_instance.edit_giri = QSpinBox()
         window_instance.edit_giri.setMaximum(9999)
         window_instance.edit_giri.setValue(1)
         window_instance.edit_giri.valueChanged.connect(window_instance.on_parametro_changed)
-        common_form.addRow(MaterialeUIComponents.create_standard_label("Giri"), window_instance.edit_giri)
+        form_layout.addRow(MaterialeUIComponents.create_standard_label("Giri"), window_instance.edit_giri)
 
-        layout.addLayout(common_form)
+        layout.addLayout(form_layout)
 
-        # === TOGGLE CONICA ===
+        # Toggle Conica
         window_instance.btn_conica = QPushButton("Conica")
         window_instance.btn_conica.setCheckable(True)
         window_instance.btn_conica.setFixedHeight(36)
@@ -265,7 +268,20 @@ class MaterialeUIComponents:
         window_instance.btn_conica.clicked.connect(window_instance.toggle_conica)
         layout.addWidget(window_instance.btn_conica)
 
+        # Nota per i campi non editabili
+        note_label = QLabel("* I valori in grassetto non sono editabili")
+        note_label.setStyleSheet("""
+            QLabel {
+                color: #718096;
+                font-size: 12px;
+                font-style: italic;
+                padding: 8px 0 0 0;
+            }
+        """)
+        layout.addWidget(note_label)
+
         layout.addStretch()
+
         parent_layout.addWidget(input_group)
     
     @staticmethod
