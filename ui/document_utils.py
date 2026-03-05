@@ -671,19 +671,28 @@ class DocumentUtils:
                     nome = f'Materiale {i+1}'
 
                 materiali_html += f"""
-                <div style="width: 120mm; margin: {s['margin_mat']} auto; position: relative; page-break-inside: avoid;">
-                    <div style="position: absolute; left: 50%; top: {s['top_offset']}; transform: translateX(-50%); font-size: {s['font_info']};">
-                        <strong>{lunghezza}mm</strong>
+                <div style="width: 120mm; margin: {s['margin_mat']} auto;">
+                    <div class="no-print" style="text-align: center; margin-bottom: 5px;">
+                        <button onclick="rotateTela('tela-{i}', -90)" title="Ruota -90°">&#8634;</button>
+                        <button onclick="rotateTela('tela-{i}', 90)" title="Ruota +90°">&#8635;</button>
+                        <button onclick="rotateTela('tela-{i}', 180)" title="Ruota 180°">&#8645;</button>
+                        <button onclick="flipTela('tela-{i}', 'h')" title="Capovolgi orizzontale">&#8596;</button>
+                        <button onclick="flipTela('tela-{i}', 'v')" title="Capovolgi verticale">&#8597;</button>
                     </div>
-                    <div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative;">
-                        <input type="text" placeholder="Orient." style="width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent;">
-                        <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; transform: translateX(-50%);">{nome}</strong>
-                    </div>
-                    <div style="position: absolute; left: -2mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
-                        <strong>G{giri}</strong>
-                    </div>
-                    <div style="position: absolute; right: -6mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
-                        <strong>H {int(sviluppo)} mm</strong>
+                    <div id="tela-{i}" style="width: 120mm; position: relative; page-break-inside: avoid; transform-origin: center; transition: transform 0.3s ease;">
+                        <div style="position: absolute; left: 50%; top: {s['top_offset']}; transform: translateX(-50%); font-size: {s['font_info']};">
+                            <strong>{lunghezza}mm</strong>
+                        </div>
+                        <div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative;">
+                            <input type="text" placeholder="Orient." style="width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent;">
+                            <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; transform: translateX(-50%);">{nome}</strong>
+                        </div>
+                        <div style="position: absolute; left: -2mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
+                            <strong>G{giri}</strong>
+                        </div>
+                        <div style="position: absolute; right: -6mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
+                            <strong>H {int(sviluppo)} mm</strong>
+                        </div>
                     </div>
                 </div>
                 """
@@ -761,13 +770,56 @@ class DocumentUtils:
             font-size: {s['font_info']};
             text-align: center;
         }}
+        .no-print button {{
+            margin: 0 2px;
+            padding: 3px 8px;
+            font-size: 15px;
+            cursor: pointer;
+            border: 1px solid #bbb;
+            border-radius: 4px;
+            background: #f5f5f5;
+            line-height: 1;
+        }}
+        .no-print button:hover {{
+            background: #e0e0e0;
+        }}
         @media print {{
             body {{ margin: 0; }}
             .editable-field {{
                 border-bottom: 1px solid #000 !important;
             }}
+            .no-print {{
+                display: none !important;
+            }}
         }}
     </style>
+    <script>
+        var telaState = {{}};
+
+        function rotateTela(id, delta) {{
+            if (!telaState[id]) telaState[id] = {{rot: 0, flipH: false, flipV: false}};
+            telaState[id].rot = ((telaState[id].rot + delta) + 360) % 360;
+            applyTelaTransform(id);
+        }}
+
+        function flipTela(id, dir) {{
+            if (!telaState[id]) telaState[id] = {{rot: 0, flipH: false, flipV: false}};
+            if (dir === 'h') {{
+                telaState[id].flipH = !telaState[id].flipH;
+            }} else {{
+                telaState[id].flipV = !telaState[id].flipV;
+            }}
+            applyTelaTransform(id);
+        }}
+
+        function applyTelaTransform(id) {{
+            var s = telaState[id];
+            var el = document.getElementById(id);
+            var sx = s.flipH ? -1 : 1;
+            var sy = s.flipV ? -1 : 1;
+            el.style.transform = 'scale(' + sx + ', ' + sy + ') rotate(' + s.rot + 'deg)';
+        }}
+    </script>
 </head>
 <body>
     {title_html}
