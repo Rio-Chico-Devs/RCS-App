@@ -9,13 +9,15 @@ Disegna la forma della tela (rettangolo per cilindrica, trapezio per conica)
 con le quote dei diametri e delle lunghezze per ogni sezione.
 """
 
-from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import QWidget, QPushButton
 from PyQt5.QtCore import Qt, QPointF, QRectF
 from PyQt5.QtGui import QPainter, QPen, QColor, QFont, QPolygonF, QBrush, QPainterPath
 
 
 class TelaPreviewWidget(QWidget):
     """Widget che disegna l'anteprima CAD della tela tagliata."""
+
+    _ROTAZIONE_LABELS = ["0°", "90°", "180°", "270°"]
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -26,6 +28,7 @@ class TelaPreviewWidget(QWidget):
         self._lunghezza = 0.0    # Per cilindrica
         self._sviluppo = 0.0     # Per cilindrica
         self._scarto = 0.0       # Scarto calcolato (mm²)
+        self._rotazione = 0      # 0=0°, 1=90°, 2=180°, 3=270°
 
         # Colori stile CAD
         self._bg_color = QColor(255, 255, 255)
@@ -35,6 +38,26 @@ class TelaPreviewWidget(QWidget):
         self._quota_color = QColor(100, 100, 100)
         self._dim_color = QColor(44, 62, 80)
         self._grid_color = QColor(230, 235, 240)
+
+        # Pulsante rotazione
+        self._btn_ruota = QPushButton("⟳ 0°", self)
+        self._btn_ruota.setFixedSize(50, 26)
+        self._btn_ruota.setToolTip("Ruota anteprima")
+        self._btn_ruota.setStyleSheet(
+            "QPushButton { background: #f0f4f8; border: 1px solid #cbd5e0; "
+            "border-radius: 4px; font-size: 11px; color: #4a5568; } "
+            "QPushButton:hover { background: #e2e8f0; }"
+        )
+        self._btn_ruota.clicked.connect(self._ruota_vista)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._btn_ruota.move(self.width() - self._btn_ruota.width() - 6, 6)
+
+    def _ruota_vista(self):
+        self._rotazione = (self._rotazione + 1) % 4
+        self._btn_ruota.setText(f"⟳ {self._ROTAZIONE_LABELS[self._rotazione]}")
+        self.update()
 
     # ── API pubblica ──────────────────────────────────────────────
 
