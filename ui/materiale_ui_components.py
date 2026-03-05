@@ -583,8 +583,57 @@ class MaterialeUIComponents:
         layout.setContentsMargins(15, 28, 15, 15)
         layout.setSpacing(8)
 
+        # Barra pulsanti trasformazione
+        btn_style = """
+            QPushButton {
+                background-color: #edf2f7;
+                color: #4a5568;
+                border: 1px solid #e2e8f0;
+                border-radius: 4px;
+                font-size: 16px;
+                padding: 0;
+            }
+            QPushButton:hover { background-color: #e2e8f0; }
+            QPushButton:pressed { background-color: #cbd5e0; }
+        """
+        transform_layout = QHBoxLayout()
+        transform_layout.setSpacing(6)
+        transform_layout.addStretch()
+
+        btn_rotate_left = QPushButton("↺")
+        btn_rotate_left.setToolTip("Ruota a sinistra (90°)")
+        btn_rotate_left.setFixedSize(32, 32)
+        btn_rotate_left.setStyleSheet(btn_style)
+        transform_layout.addWidget(btn_rotate_left)
+
+        btn_rotate_right = QPushButton("↻")
+        btn_rotate_right.setToolTip("Ruota a destra (90°)")
+        btn_rotate_right.setFixedSize(32, 32)
+        btn_rotate_right.setStyleSheet(btn_style)
+        transform_layout.addWidget(btn_rotate_right)
+
+        btn_flip_h = QPushButton("↔")
+        btn_flip_h.setToolTip("Capovolgi orizzontalmente")
+        btn_flip_h.setFixedSize(32, 32)
+        btn_flip_h.setStyleSheet(btn_style)
+        transform_layout.addWidget(btn_flip_h)
+
+        btn_flip_v = QPushButton("↕")
+        btn_flip_v.setToolTip("Capovolgi verticalmente")
+        btn_flip_v.setFixedSize(32, 32)
+        btn_flip_v.setStyleSheet(btn_style)
+        transform_layout.addWidget(btn_flip_v)
+
+        layout.addLayout(transform_layout)
+
         # Widget di anteprima CAD
         window_instance.tela_preview = TelaPreviewWidget()
+
+        btn_rotate_left.clicked.connect(window_instance.tela_preview.rotate_left)
+        btn_rotate_right.clicked.connect(window_instance.tela_preview.rotate_right)
+        btn_flip_h.clicked.connect(window_instance.tela_preview.flip_horizontal)
+        btn_flip_v.clicked.connect(window_instance.tela_preview.flip_vertical)
+
         layout.addWidget(window_instance.tela_preview, 1)
 
         parent_layout.addWidget(preview_group, 1)  # stretch=1 per prendere spazio rimanente

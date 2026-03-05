@@ -27,6 +27,11 @@ class TelaPreviewWidget(QWidget):
         self._sviluppo = 0.0     # Per cilindrica
         self._scarto = 0.0       # Scarto calcolato (mm²)
 
+        # Trasformazioni disegno
+        self._rotation = 0       # Gradi: 0, 90, 180, 270
+        self._flip_h = False     # Capovolgi orizzontalmente
+        self._flip_v = False     # Capovolgi verticalmente
+
         # Colori stile CAD
         self._bg_color = QColor(255, 255, 255)
         self._tela_fill = QColor(200, 220, 240, 80)
@@ -62,6 +67,26 @@ class TelaPreviewWidget(QWidget):
     def get_scarto_mm2(self):
         """Restituisce lo scarto attuale in mm²."""
         return self._scarto
+
+    def rotate_left(self):
+        """Ruota il disegno di 90° in senso antiorario."""
+        self._rotation = (self._rotation - 90) % 360
+        self.update()
+
+    def rotate_right(self):
+        """Ruota il disegno di 90° in senso orario."""
+        self._rotation = (self._rotation + 90) % 360
+        self.update()
+
+    def flip_horizontal(self):
+        """Capovolge il disegno orizzontalmente (specchio sinistra-destra)."""
+        self._flip_h = not self._flip_h
+        self.update()
+
+    def flip_vertical(self):
+        """Capovolge il disegno verticalmente (specchio sopra-sotto)."""
+        self._flip_v = not self._flip_v
+        self.update()
 
     # ── Calcolo scarto ────────────────────────────────────────────
 
@@ -122,12 +147,28 @@ class TelaPreviewWidget(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
         painter.fillRect(self.rect(), self._bg_color)
 
+        # Applica trasformazioni globali (rotate + flip) centrate sul widget
+        has_transform = self._rotation != 0 or self._flip_h or self._flip_v
+        if has_transform:
+            painter.save()
+            cx, cy = self.width() / 2.0, self.height() / 2.0
+            painter.translate(cx, cy)
+            if self._flip_h:
+                painter.scale(-1, 1)
+            if self._flip_v:
+                painter.scale(1, -1)
+            painter.rotate(self._rotation)
+            painter.translate(-cx, -cy)
+
         if self._is_conica and self._sezioni:
             self._disegna_conica(painter)
         elif not self._is_conica and self._lunghezza > 0 and self._sviluppo > 0:
             self._disegna_cilindrica(painter)
         else:
             self._disegna_placeholder(painter)
+
+        if has_transform:
+            painter.restore()
 
         painter.end()
 
