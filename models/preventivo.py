@@ -13,6 +13,7 @@ class Preventivo:
         self.maggiorazione_25 = 0.0
         self.preventivo_finale = 0.0
         self.prezzo_cliente = 0.0
+        self.scarto_totale_mm2 = 0.0  # Somma scarti di tutti i materiali
     
     def aggiungi_materiale(self, materiale_calcolato):
         """Aggiunge un materiale calcolato al preventivo"""
@@ -67,9 +68,17 @@ class Preventivo:
         self.preventivo_finale = self.subtotale + self.maggiorazione_25
         return self.preventivo_finale
     
+    def ricalcola_scarto_totale(self):
+        """Ricalcola lo scarto totale sommando gli scarti di tutti i materiali"""
+        self.scarto_totale_mm2 = sum(
+            getattr(m, 'scarto_mm2', 0.0) for m in self.materiali_calcolati
+        )
+        return self.scarto_totale_mm2
+
     def ricalcola_tutto(self):
         """Ricalcola tutti i valori del preventivo"""
         self.ricalcola_costo_totale_materiali()
+        self.ricalcola_scarto_totale()
         self.calcola_tot_mano_opera()
         self.calcola_subtotale()
         self.calcola_maggiorazione_25()
@@ -90,5 +99,6 @@ class Preventivo:
             'maggiorazione_25': self.maggiorazione_25,
             'preventivo_finale': self.preventivo_finale,
             'prezzo_cliente': self.prezzo_cliente,
+            'scarto_totale_mm2': self.scarto_totale_mm2,
             'materiali_utilizzati': [m.to_dict() for m in self.materiali_calcolati]
         }
