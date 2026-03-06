@@ -115,6 +115,29 @@ class DocumentUtils:
             return None
     
     @staticmethod
+    def anteprima_html(preventivo, dati_cliente, parent=None):
+        """Mostra anteprima del documento HTML nel browser senza salvarlo"""
+        import tempfile
+        import webbrowser
+
+        try:
+            html_content = DocumentUtils._genera_html_template_specifico(preventivo, dati_cliente)
+
+            # Scrivi in un file temporaneo (delete=False perché il browser deve poterlo aprire)
+            with tempfile.NamedTemporaryFile(
+                mode='w', suffix='.html', encoding='utf-8', delete=False
+            ) as f:
+                f.write(html_content)
+                temp_path = f.name
+
+            webbrowser.open(f'file://{temp_path}')
+
+        except Exception as e:
+            print(f"DEBUG: Errore anteprima HTML: {e}")
+            if parent:
+                QMessageBox.warning(parent, "Errore", f"Errore nella generazione anteprima:\n{e}")
+
+    @staticmethod
     def genera_documento_docx(preventivo, dati_cliente, parent=None):
         """Genera documento DOCX editabile per la produzione"""
         try:
