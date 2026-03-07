@@ -50,10 +50,9 @@ class MaterialeCalcolato:
     def calcola_diametro_finale(self):
         """Calcola il diametro finale"""
         if self.is_conica and self.sezioni_coniche:
-            # Per la conica: d_fine dell'ultima sezione + spessore da avvolgimento
+            # Per la conica: d_fine dell'ultima sezione è già la dimensione finale desiderata
             ultima_sezione = self.sezioni_coniche[-1]
-            d_fine_ultima = ultima_sezione.get('d_fine', 0.0)
-            self.diametro_finale = d_fine_ultima + (self.spessore * (self.giri * 2))
+            self.diametro_finale = ultima_sezione.get('d_fine', 0.0)
         else:
             # Cilindrico standard
             self.diametro_finale = self.diametro + (self.spessore * (self.giri * 2))
@@ -82,8 +81,9 @@ class MaterialeCalcolato:
             d_fin = sez.get('d_fine', 0)
             d_medio = (d_ini + d_fin) / 2
 
-            # Sviluppo di questa sezione (formula cilindrica con diametro medio)
-            sviluppo_sez = ((d_medio + self.giri * self.spessore) * 3.14) * self.giri
+            # d_inizio e d_fine sono le dimensioni FINALI del tubo:
+            # il diametro a metà strato = d_medio - giri*spessore
+            sviluppo_sez = ((d_medio - self.giri * self.spessore) * 3.14) * self.giri
 
             # Area trapezoidale della sezione (mm²)
             area_totale += l_sez * sviluppo_sez
@@ -116,7 +116,7 @@ class MaterialeCalcolato:
                 d_ini = sez.get('d_inizio', 0)
                 d_fin = sez.get('d_fine', 0)
                 d_medio = (d_ini + d_fin) / 2
-                sviluppo_sez = ((d_medio + self.giri * self.spessore) * 3.14) * self.giri
+                sviluppo_sez = ((d_medio - self.giri * self.spessore) * 3.14) * self.giri
                 area_totale += l_sez * sviluppo_sez
             lunghezza_totale = sum(s.get('lunghezza', 0) for s in self.sezioni_coniche)
             if lunghezza_totale > 0:
