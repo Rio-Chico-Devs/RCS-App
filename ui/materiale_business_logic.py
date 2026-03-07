@@ -136,8 +136,20 @@ class MaterialeBusinessLogic:
 
         # Aggiorna valori in base alla modalità
         if window_instance.materiale_calcolato.is_conica:
-            # Modalità conica: le sezioni sono già sincronizzate da on_sezione_changed
-            pass
+            # Ricalcola d_fine di ogni sezione con giri/spessore aggiornati
+            spessore = window_instance.materiale_calcolato.spessore
+            giri = window_instance.materiale_calcolato.giri
+            sezioni = []
+            for sw in window_instance.sezioni_widgets:
+                d_inizio = sw['d_inizio'].value()
+                d_fine = d_inizio + spessore * giri * 2
+                sw['lbl_d_fine'].setText(f"{d_fine:.2f} mm")
+                sezioni.append({
+                    'lunghezza': sw['lunghezza'].value(),
+                    'd_inizio': d_inizio,
+                    'd_fine': d_fine
+                })
+            window_instance.materiale_calcolato.sezioni_coniche = sezioni
         else:
             # Modalità cilindrica standard
             window_instance.materiale_calcolato.diametro = window_instance.edit_diametro.value()
@@ -265,13 +277,11 @@ class MaterialeBusinessLogic:
                     last = window_instance.sezioni_widgets[-1]
                     last['lunghezza'].blockSignals(True)
                     last['d_inizio'].blockSignals(True)
-                    last['d_fine'].blockSignals(True)
                     last['lunghezza'].setValue(int(sez.get('lunghezza', 0)))
                     last['d_inizio'].setValue(float(sez.get('d_inizio', 0.0)))
-                    last['d_fine'].setValue(float(sez.get('d_fine', 0.0)))
                     last['lunghezza'].blockSignals(False)
                     last['d_inizio'].blockSignals(False)
-                    last['d_fine'].blockSignals(False)
+                    # d_fine verrà calcolato automaticamente da on_sezione_changed
 
                 # Sincronizza sezioni nel modello
                 MaterialeBusinessLogic.on_sezione_changed(window_instance)
@@ -406,21 +416,21 @@ class MaterialeBusinessLogic:
         spin_d_inizio.valueChanged.connect(window_instance.on_sezione_changed)
         row_layout.addWidget(spin_d_inizio)
 
-        # Diametro fine (mm) - decimale
-        spin_d_fine = QDoubleSpinBox()
-        spin_d_fine.setMaximum(99999.99)
-        spin_d_fine.setDecimals(2)
-        spin_d_fine.setValue(0.0)
-        spin_d_fine.setSuffix(" mm")
-        spin_d_fine.setMinimumHeight(32)
-        spin_d_fine.valueChanged.connect(window_instance.on_sezione_changed)
-        row_layout.addWidget(spin_d_fine)
+        # Diametro fine (mm) - calcolato automaticamente (d_inizio + spessore * giri * 2)
+        lbl_d_fine = QLabel("0.00 mm")
+        lbl_d_fine.setAlignment(Qt.AlignCenter)
+        lbl_d_fine.setMinimumHeight(32)
+        lbl_d_fine.setStyleSheet("font-size: 12px; font-weight: 600; color: #2d3748; background: #edf2f7; border-radius: 4px; padding: 0 4px;")
+        row_layout.addWidget(lbl_d_fine)
 
-        # Se c'è una sezione precedente, usa il suo d_fine come d_inizio di questa
+        # Se c'è una sezione precedente, usa il d_fine calcolato come d_inizio di questa
         if window_instance.sezioni_widgets:
             prev = window_instance.sezioni_widgets[-1]
-            prev_d_fine = prev['d_fine'].value()
-            spin_d_inizio.setValue(prev_d_fine)
+            prev_d_fine_text = prev['lbl_d_fine'].text().replace(" mm", "").strip()
+            try:
+                spin_d_inizio.setValue(float(prev_d_fine_text))
+            except ValueError:
+                pass
 
         # Inserisci prima dello stretch
         stretch_index = window_instance.sezioni_layout.count() - 1
@@ -431,7 +441,7 @@ class MaterialeBusinessLogic:
             'lbl_num': lbl_num,
             'lunghezza': spin_lunghezza,
             'd_inizio': spin_d_inizio,
-            'd_fine': spin_d_fine
+            'lbl_d_fine': lbl_d_fine
         })
 
         # Aggiorna calcoli
@@ -453,12 +463,18 @@ class MaterialeBusinessLogic:
     @staticmethod
     def on_sezione_changed(window_instance):
         """Legge i valori dalle sezioni e ricalcola tutto"""
+        spessore = window_instance.materiale_calcolato.spessore
+        giri = window_instance.materiale_calcolato.giri
+
         sezioni = []
         for sw in window_instance.sezioni_widgets:
+            d_inizio = sw['d_inizio'].value()
+            d_fine = d_inizio + spessore * giri * 2
+            sw['lbl_d_fine'].setText(f"{d_fine:.2f} mm")
             sezioni.append({
                 'lunghezza': sw['lunghezza'].value(),
-                'd_inizio': sw['d_inizio'].value(),
-                'd_fine': sw['d_fine'].value()
+                'd_inizio': d_inizio,
+                'd_fine': d_fine
             })
         window_instance.materiale_calcolato.sezioni_coniche = sezioni
 

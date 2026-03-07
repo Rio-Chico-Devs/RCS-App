@@ -209,7 +209,7 @@ class MaterialeUIComponents:
         # Header colonne
         col_header = QHBoxLayout()
         col_header.setSpacing(4)
-        for txt in ["#", "Lungh. (mm)", "Ø Inizio", "Ø Fine"]:
+        for txt in ["#", "Lungh. (mm)", "Ø Inizio", "Ø Fine (calc.)"]:
             lbl = QLabel(txt)
             lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #718096;")
             lbl.setAlignment(Qt.AlignCenter)
