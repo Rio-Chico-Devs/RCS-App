@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
                              QTableWidget, QTableWidgetItem, QHeaderView)
 from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QColor, QPainter, QLinearGradient
+from ui.materiale_ui_components import NoScrollDoubleSpinBox
 from datetime import datetime, timedelta
 
 
@@ -488,7 +489,7 @@ class MagazzinoWindow(QMainWindow):
             combo_mat.addItem(f"{nome} (giacenza: {giacenza:.2f} m²)", mat_id)
 
         # Quantità
-        edit_quantita = QDoubleSpinBox()
+        edit_quantita = NoScrollDoubleSpinBox()
         edit_quantita.setDecimals(2)
         edit_quantita.setMaximum(99999.99)
         edit_quantita.setSuffix(" m²")

@@ -10,9 +10,10 @@ Last Updated: 23/09/2025
 Author: Antonio VB + Claude
 """
 
-from PyQt5.QtWidgets import QMessageBox, QHBoxLayout, QLabel, QSpinBox, QDoubleSpinBox, QWidget
+from PyQt5.QtWidgets import QMessageBox, QHBoxLayout, QLabel, QWidget
 from PyQt5.QtCore import Qt
 from models.materiale import MaterialeCalcolato
+from ui.materiale_ui_components import NoScrollSpinBox, NoScrollDoubleSpinBox
 
 class MaterialeBusinessLogic:
     """Classe per gestire la logica di business per MaterialeWindow"""
@@ -395,7 +396,7 @@ class MaterialeBusinessLogic:
         row_layout.addWidget(lbl_num)
 
         # Lunghezza sezione (mm) - intero
-        spin_lunghezza = QSpinBox()
+        spin_lunghezza = NoScrollSpinBox()
         spin_lunghezza.setMaximum(99999)
         spin_lunghezza.setValue(0)
         spin_lunghezza.setSuffix(" mm")
@@ -404,7 +405,7 @@ class MaterialeBusinessLogic:
         row_layout.addWidget(spin_lunghezza)
 
         # Diametro inizio (mm) - decimale
-        spin_d_inizio = QDoubleSpinBox()
+        spin_d_inizio = NoScrollDoubleSpinBox()
         spin_d_inizio.setMaximum(99999.99)
         spin_d_inizio.setDecimals(2)
         spin_d_inizio.setValue(0.0)
@@ -414,7 +415,7 @@ class MaterialeBusinessLogic:
         row_layout.addWidget(spin_d_inizio)
 
         # Diametro fine (mm) - input libero (dimensione finale desiderata del tubo)
-        spin_d_fine = QDoubleSpinBox()
+        spin_d_fine = NoScrollDoubleSpinBox()
         spin_d_fine.setMaximum(99999.99)
         spin_d_fine.setDecimals(2)
         spin_d_fine.setValue(0.0)

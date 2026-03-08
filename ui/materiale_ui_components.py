@@ -18,6 +18,18 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QFont
 from ui.tela_preview_widget import TelaPreviewWidget
 
+
+class NoScrollSpinBox(QSpinBox):
+    """QSpinBox che ignora la rotella del mouse"""
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+class NoScrollDoubleSpinBox(QDoubleSpinBox):
+    """QDoubleSpinBox che ignora la rotella del mouse"""
+    def wheelEvent(self, event):
+        event.ignore()
+
 class MaterialeUIComponents:
     """Classe per creare componenti UI standardizzati per MaterialeWindow"""
     
@@ -248,7 +260,7 @@ class MaterialeUIComponents:
         form_layout.addRow(MaterialeUIComponents.create_standard_label("Materiale"), window_instance.combo_materiale)
 
         # Giri
-        window_instance.edit_giri = QSpinBox()
+        window_instance.edit_giri = NoScrollSpinBox()
         window_instance.edit_giri.setMaximum(9999)
         window_instance.edit_giri.setValue(1)
         window_instance.edit_giri.valueChanged.connect(window_instance.on_parametro_changed)
@@ -287,7 +299,7 @@ class MaterialeUIComponents:
     @staticmethod
     def create_standard_input(suffix="", callback=None, decimals=2, default_value=0):
         """Input standardizzato per tutto il form"""
-        field = QDoubleSpinBox()
+        field = NoScrollDoubleSpinBox()
         field.setMaximum(999999.99)
         field.setDecimals(decimals)
         if suffix:
@@ -475,7 +487,7 @@ class MaterialeUIComponents:
         input_container.setFixedHeight(36)
         
         # FIX: Input con callback specifico per sviluppo manuale
-        window_instance.edit_arrotondamento = QDoubleSpinBox()
+        window_instance.edit_arrotondamento = NoScrollDoubleSpinBox()
         window_instance.edit_arrotondamento.setMaximum(999999.99)
         window_instance.edit_arrotondamento.setDecimals(2)
         window_instance.edit_arrotondamento.setFixedHeight(36)
