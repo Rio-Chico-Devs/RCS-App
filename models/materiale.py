@@ -48,84 +48,26 @@ class MaterialeCalcolato:
         self.sviluppo = value
 
     def calcola_diametro_finale(self):
-        """Calcola il diametro finale"""
-        if self.is_conica and self.sezioni_coniche:
-            # Per la conica: d_fine dell'ultima sezione è già la dimensione finale desiderata
-            ultima_sezione = self.sezioni_coniche[-1]
-            self.diametro_finale = ultima_sezione.get('d_fine', 0.0)
-        else:
-            # Cilindrico standard
-            self.diametro_finale = self.diametro + (self.spessore * (self.giri * 2))
+        """Calcola il diametro finale (sempre cilindrico; la conica è solo visiva)"""
+        self.diametro_finale = self.diametro + (self.spessore * (self.giri * 2))
         return self.diametro_finale
 
     def calcola_sviluppo(self):
-        """Calcola lo sviluppo"""
+        """Calcola lo sviluppo (sempre cilindrico; la conica è solo visiva)"""
         if self.arrotondamento_manuale > 0:
             self.sviluppo = self.arrotondamento_manuale
-        elif self.is_conica and self.sezioni_coniche:
-            self._calcola_sviluppo_conico()
         else:
-            # Cilindrico standard
             self.sviluppo = ((self.diametro + self.giri * self.spessore) * 3.14) * self.giri + 5
         return self.sviluppo
-
-    def _calcola_sviluppo_conico(self):
-        """Calcola sviluppo e lunghezza_utilizzata per tubo conico.
-        Ogni sezione ha forma trapezoidale: usa la media dei diametri."""
-        lunghezza_totale = 0
-        area_totale = 0
-
-        for sez in self.sezioni_coniche:
-            l_sez = sez.get('lunghezza', 0)
-            d_ini = sez.get('d_inizio', 0)
-            d_fin = sez.get('d_fine', 0)
-            d_medio = (d_ini + d_fin) / 2
-
-            # d_inizio e d_fine sono le dimensioni FINALI del tubo:
-            # il diametro a metà strato = d_medio - giri*spessore
-            sviluppo_sez = ((d_medio - self.giri * self.spessore) * 3.14) * self.giri
-
-            # Area trapezoidale della sezione (mm²)
-            area_totale += l_sez * sviluppo_sez
-            lunghezza_totale += l_sez
-
-        # Aggiungi offset una volta
-        if lunghezza_totale > 0:
-            area_totale += lunghezza_totale * 5  # +5mm di margine sulla larghezza
-
-        # Sviluppo equivalente medio (per display)
-        if lunghezza_totale > 0:
-            self.sviluppo = area_totale / lunghezza_totale
-        else:
-            self.sviluppo = 0
-
-        # Aggiorna lunghezza totale
-        self.lunghezza = lunghezza_totale
 
     def calcola_stratifica(self):
         """Alias per calcola_sviluppo - per compatibilità"""
         return self.calcola_sviluppo()
 
     def calcola_lunghezza_utilizzata(self):
-        """Calcola lunghezza utilizzata in m²"""
-        if self.is_conica and self.sezioni_coniche and self.arrotondamento_manuale <= 0:
-            # Per la conica, calcola direttamente dalla somma delle aree trapezoidali
-            area_totale = 0
-            for sez in self.sezioni_coniche:
-                l_sez = sez.get('lunghezza', 0)
-                d_ini = sez.get('d_inizio', 0)
-                d_fin = sez.get('d_fine', 0)
-                d_medio = (d_ini + d_fin) / 2
-                sviluppo_sez = ((d_medio - self.giri * self.spessore) * 3.14) * self.giri
-                area_totale += l_sez * sviluppo_sez
-            lunghezza_totale = sum(s.get('lunghezza', 0) for s in self.sezioni_coniche)
-            if lunghezza_totale > 0:
-                area_totale += lunghezza_totale * 5
-            self.lunghezza_utilizzata = area_totale / 1000000
-        else:
-            # Cilindrico standard
-            if self.sviluppo > 0:
-                self.lunghezza_utilizzata = (self.lunghezza * self.sviluppo) / 1000000
+        """Calcola lunghezza utilizzata in m² (sempre cilindrico; la conica è solo visiva)"""
+        if self.sviluppo > 0:
+            self.lunghezza_utilizzata = (self.lunghezza * self.sviluppo) / 1000000
         return self.lunghezza_utilizzata
 
     def calcola_costo_totale(self):

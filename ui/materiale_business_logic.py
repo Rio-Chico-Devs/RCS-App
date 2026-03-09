@@ -135,9 +135,12 @@ class MaterialeBusinessLogic:
         # Aggiorna giri dal form
         window_instance.materiale_calcolato.giri = window_instance.edit_giri.value()
 
-        # Aggiorna valori in base alla modalità
+        # Leggi sempre diametro e lunghezza dai campi cilindrici (base per i calcoli)
+        window_instance.materiale_calcolato.diametro = window_instance.edit_diametro.value()
+        window_instance.materiale_calcolato.lunghezza = window_instance.edit_lunghezza.value()
+
+        # Aggiorna sezioni coniche solo per l'anteprima visiva (non influenzano i calcoli)
         if window_instance.materiale_calcolato.is_conica:
-            # Ricalcola d_fine di ogni sezione con giri/spessore aggiornati
             sezioni = []
             for sw in window_instance.sezioni_widgets:
                 sezioni.append({
@@ -146,10 +149,6 @@ class MaterialeBusinessLogic:
                     'd_fine': sw['d_fine'].value()
                 })
             window_instance.materiale_calcolato.sezioni_coniche = sezioni
-        else:
-            # Modalità cilindrica standard
-            window_instance.materiale_calcolato.diametro = window_instance.edit_diametro.value()
-            window_instance.materiale_calcolato.lunghezza = window_instance.edit_lunghezza.value()
         
         # FIX: Logica sviluppo manuale corretta
         if window_instance.arrotondamento_modificato_manualmente and window_instance.edit_arrotondamento.value() > 0:
@@ -263,7 +262,7 @@ class MaterialeBusinessLogic:
         if hasattr(window_instance.materiale_esistente, 'is_conica') and window_instance.materiale_esistente.is_conica:
             window_instance.btn_conica.setChecked(True)
             window_instance.materiale_calcolato.is_conica = True
-            window_instance.cilindrico_widget.hide()
+            # I campi cilindrici rimangono visibili perché usati per i calcoli
             window_instance.conica_widget.show()
 
             # Ricrea le sezioni dal materiale esistente
@@ -298,26 +297,13 @@ class MaterialeBusinessLogic:
             QMessageBox.warning(window_instance, "Attenzione", "Inserisci un numero di giri valido.")
             return
 
-        # Validazione specifica per modalità conica vs cilindrica
-        if window_instance.materiale_calcolato.is_conica:
-            if not window_instance.materiale_calcolato.sezioni_coniche:
-                QMessageBox.warning(window_instance, "Attenzione", "Aggiungi almeno una sezione conica.")
-                return
-            # Controlla che tutte le sezioni abbiano valori validi
-            for i, sez in enumerate(window_instance.materiale_calcolato.sezioni_coniche):
-                if sez.get('lunghezza', 0) <= 0:
-                    QMessageBox.warning(window_instance, "Attenzione", f"Sezione {i+1}: inserisci una lunghezza valida.")
-                    return
-                if sez.get('d_inizio', 0) <= 0 and sez.get('d_fine', 0) <= 0:
-                    QMessageBox.warning(window_instance, "Attenzione", f"Sezione {i+1}: inserisci almeno un diametro valido.")
-                    return
-        else:
-            if window_instance.materiale_calcolato.diametro <= 0:
-                QMessageBox.warning(window_instance, "Attenzione", "Inserisci un diametro valido.")
-                return
-            if window_instance.materiale_calcolato.lunghezza <= 0:
-                QMessageBox.warning(window_instance, "Attenzione", "Inserisci una lunghezza valida.")
-                return
+        # Validazione sempre sui campi cilindrici (la conica è solo visiva)
+        if window_instance.materiale_calcolato.diametro <= 0:
+            QMessageBox.warning(window_instance, "Attenzione", "Inserisci un diametro valido.")
+            return
+        if window_instance.materiale_calcolato.lunghezza <= 0:
+            QMessageBox.warning(window_instance, "Attenzione", "Inserisci una lunghezza valida.")
+            return
         
         # Controllo sviluppo manuale personalizzato
         if window_instance.arrotondamento_modificato_manualmente and window_instance.edit_arrotondamento.value() != 0:
@@ -357,13 +343,12 @@ class MaterialeBusinessLogic:
         window_instance.materiale_calcolato.is_conica = is_conica
 
         if is_conica:
-            window_instance.cilindrico_widget.hide()
+            # Mostra sezione conica mantenendo visibili i campi cilindrici (usati per i calcoli)
             window_instance.conica_widget.show()
             # Aggiungi una sezione iniziale se vuota
             if len(window_instance.sezioni_widgets) == 0:
                 MaterialeBusinessLogic.aggiungi_sezione_conica(window_instance)
         else:
-            window_instance.cilindrico_widget.show()
             window_instance.conica_widget.hide()
             # Ripristina modalità cilindrica
             window_instance.materiale_calcolato.is_conica = False
@@ -461,29 +446,19 @@ class MaterialeBusinessLogic:
 
     @staticmethod
     def on_sezione_changed(window_instance):
-        """Legge i valori dalle sezioni e ricalcola tutto"""
-        spessore = window_instance.materiale_calcolato.spessore
-        giri = window_instance.materiale_calcolato.giri
-
+        """Legge i valori dalle sezioni e aggiorna l'anteprima visiva (senza toccare i calcoli)"""
         sezioni = []
         for sw in window_instance.sezioni_widgets:
-            d_inizio = sw['d_inizio'].value()
-            d_fine = sw['d_fine'].value()
             sezioni.append({
                 'lunghezza': sw['lunghezza'].value(),
-                'd_inizio': d_inizio,
-                'd_fine': d_fine
+                'd_inizio': sw['d_inizio'].value(),
+                'd_fine': sw['d_fine'].value()
             })
         window_instance.materiale_calcolato.sezioni_coniche = sezioni
 
-        # Reset sviluppo manuale
-        window_instance.materiale_calcolato.arrotondamento_manuale = 0.0
-        window_instance.edit_arrotondamento.blockSignals(True)
-        window_instance.edit_arrotondamento.setValue(0.0)
-        window_instance.edit_arrotondamento.blockSignals(False)
-        window_instance.arrotondamento_modificato_manualmente = False
-
-        MaterialeBusinessLogic.ricalcola_tutto(window_instance)
+        # Aggiorna solo l'anteprima visiva conica, senza alterare i calcoli
+        if hasattr(window_instance, 'tela_preview') and window_instance.materiale_calcolato.is_conica:
+            window_instance.tela_preview.aggiorna_conica(sezioni)
 
     @staticmethod
     def gestisci_chiusura_finestra(window_instance, event):
