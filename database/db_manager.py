@@ -748,6 +748,18 @@ class DatabaseManager:
             """, (nome_fornitore,))
             return cursor.fetchall()
 
+    def rename_fornitore(self, old_nome, new_nome):
+        """Rinomina un fornitore aggiornando anche tutti i materiali collegati"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute("UPDATE fornitori SET nome = ? WHERE nome = ?", (new_nome, old_nome))
+                cursor.execute("UPDATE materiali SET fornitore = ? WHERE fornitore = ?", (new_nome, old_nome))
+                conn.commit()
+                return True
+            except sqlite3.IntegrityError:
+                return False
+
     def assegna_materiali_a_fornitore(self, nome_fornitore, materiale_ids):
         """Assegna i materiali selezionati al fornitore (aggiorna campo fornitore)"""
         with sqlite3.connect(self.db_path) as conn:

@@ -15,7 +15,8 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
                              QComboBox, QDoubleSpinBox, QDialog, QFormLayout,
                              QLineEdit, QTextEdit, QTabWidget, QGridLayout,
                              QTableWidget, QTableWidgetItem, QHeaderView,
-                             QListWidget, QListWidgetItem, QAbstractItemView)
+                             QListWidget, QListWidgetItem, QAbstractItemView,
+                             QStackedWidget)
 from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QColor, QPainter, QLinearGradient
 from ui.materiale_ui_components import NoScrollDoubleSpinBox
@@ -76,9 +77,10 @@ class MagazzinoWindow(QMainWindow):
     def __init__(self, db_manager, parent=None):
         super().__init__(None)  # No parent per evitare bug ridimensionamento
         self.db_manager = db_manager
+        self.fornitore_corrente_scorte = None
         self.init_ui()
-        self.carica_scorte()
         self.carica_fornitori()
+        self.carica_fornitori_scorte()
 
     def init_ui(self):
         self.setWindowTitle("Gestione Magazzino - Software Aziendale RCS")
@@ -237,10 +239,48 @@ class MagazzinoWindow(QMainWindow):
     def setup_tab_scorte(self):
         layout = QVBoxLayout(self.tab_scorte)
         layout.setContentsMargins(0, 20, 0, 0)
-        layout.setSpacing(16)
+        layout.setSpacing(0)
 
-        # Barra filtri
-        filtri_layout = QHBoxLayout()
+        self.stack_scorte = QStackedWidget()
+
+        # ---- Pagina 0: Selezione Fornitore ----
+        page0 = QWidget()
+        p0_layout = QVBoxLayout(page0)
+        p0_layout.setContentsMargins(0, 0, 0, 0)
+        p0_layout.setSpacing(16)
+
+        lbl_scegli = QLabel("Seleziona un Fornitore per visualizzare le scorte:")
+        lbl_scegli.setStyleSheet("font-size: 15px; font-weight: 600; color: #4a5568; padding-bottom: 4px;")
+        p0_layout.addWidget(lbl_scegli)
+
+        scroll0 = QScrollArea()
+        scroll0.setWidgetResizable(True)
+        scroll0.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
+        self.fornitori_scorte_container = QWidget()
+        self.fornitori_scorte_layout = QGridLayout(self.fornitori_scorte_container)
+        self.fornitori_scorte_layout.setContentsMargins(0, 0, 0, 0)
+        self.fornitori_scorte_layout.setSpacing(16)
+        scroll0.setWidget(self.fornitori_scorte_container)
+        p0_layout.addWidget(scroll0)
+
+        # ---- Pagina 1: Materiali del fornitore ----
+        page1 = QWidget()
+        p1_layout = QVBoxLayout(page1)
+        p1_layout.setContentsMargins(0, 0, 0, 0)
+        p1_layout.setSpacing(16)
+
+        # Barra superiore: torna + nome fornitore + ordina + carico/scarico
+        top_layout = QHBoxLayout()
+
+        btn_torna = QPushButton("← Torna ai Fornitori")
+        btn_torna.setStyleSheet("""
+            QPushButton { background-color: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; min-height: 36px; padding: 8px 16px; }
+            QPushButton:hover { background-color: #edf2f7; }
+        """)
+        btn_torna.clicked.connect(self.torna_a_fornitori_scorte)
+
+        self.lbl_fornitore_corrente = QLabel("")
+        self.lbl_fornitore_corrente.setStyleSheet("font-size: 16px; font-weight: 700; color: #2d3748;")
 
         lbl_ordina = QLabel("Ordina per:")
         lbl_ordina.setStyleSheet("font-weight: 600;")
@@ -264,30 +304,36 @@ class MagazzinoWindow(QMainWindow):
         """)
         btn_scarico.clicked.connect(self.apri_dialog_scarico)
 
-        filtri_layout.addWidget(lbl_ordina)
-        filtri_layout.addWidget(self.combo_ordinamento)
-        filtri_layout.addStretch()
-        filtri_layout.addWidget(btn_carico)
-        filtri_layout.addSpacing(8)
-        filtri_layout.addWidget(btn_scarico)
-
-        layout.addLayout(filtri_layout)
+        top_layout.addWidget(btn_torna)
+        top_layout.addSpacing(12)
+        top_layout.addWidget(self.lbl_fornitore_corrente)
+        top_layout.addStretch()
+        top_layout.addWidget(lbl_ordina)
+        top_layout.addWidget(self.combo_ordinamento)
+        top_layout.addSpacing(8)
+        top_layout.addWidget(btn_carico)
+        top_layout.addSpacing(8)
+        top_layout.addWidget(btn_scarico)
+        p1_layout.addLayout(top_layout)
 
         # Scroll area per le scorte
         self.scroll_scorte = QScrollArea()
         self.scroll_scorte.setWidgetResizable(True)
         self.scroll_scorte.setStyleSheet("QScrollArea { border: none; background-color: transparent; }")
-
         self.scorte_container = QWidget()
         self.scorte_layout = QVBoxLayout(self.scorte_container)
         self.scorte_layout.setContentsMargins(0, 0, 0, 0)
         self.scorte_layout.setSpacing(8)
         self.scroll_scorte.setWidget(self.scorte_container)
+        p1_layout.addWidget(self.scroll_scorte)
 
-        layout.addWidget(self.scroll_scorte)
+        self.stack_scorte.addWidget(page0)  # index 0
+        self.stack_scorte.addWidget(page1)  # index 1
+        self.stack_scorte.setCurrentIndex(0)
+        layout.addWidget(self.stack_scorte)
 
     def carica_scorte(self):
-        """Carica e visualizza le scorte di tutti i materiali"""
+        """Carica e visualizza le scorte del fornitore corrente"""
         # Pulisci layout
         while self.scorte_layout.count():
             child = self.scorte_layout.takeAt(0)
@@ -297,8 +343,12 @@ class MagazzinoWindow(QMainWindow):
         ordina_per = self.combo_ordinamento.currentData() or 'giacenza_asc'
         scorte = self.db_manager.get_scorte(ordina_per)
 
+        # Filtra per fornitore corrente
+        if self.fornitore_corrente_scorte:
+            scorte = [s for s in scorte if s[4] == self.fornitore_corrente_scorte]
+
         if not scorte:
-            lbl_vuoto = QLabel("Nessun materiale nel database. Aggiungi materiali da 'Gestisci Materiali'.")
+            lbl_vuoto = QLabel("Nessun materiale associato a questo fornitore.\nAssegna il fornitore ai materiali da 'Gestione Materiali'.")
             lbl_vuoto.setAlignment(Qt.AlignCenter)
             lbl_vuoto.setStyleSheet("color: #718096; font-size: 16px; padding: 40px;")
             self.scorte_layout.addWidget(lbl_vuoto)
@@ -311,6 +361,82 @@ class MagazzinoWindow(QMainWindow):
             self.scorte_layout.addWidget(card)
 
         self.scorte_layout.addStretch()
+
+    def carica_fornitori_scorte(self):
+        """Carica le card dei fornitori nella pagina 0 di Scorte Magazzino"""
+        while self.fornitori_scorte_layout.count():
+            child = self.fornitori_scorte_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+        fornitori = self.db_manager.get_all_fornitori()
+
+        if not fornitori:
+            lbl = QLabel("Nessun fornitore presente. Aggiungili dalla tab 'Gestione Fornitori'.")
+            lbl.setAlignment(Qt.AlignCenter)
+            lbl.setStyleSheet("color: #718096; font-size: 16px; padding: 40px;")
+            self.fornitori_scorte_layout.addWidget(lbl, 0, 0)
+            return
+
+        col_count = 3
+        for idx, (forn_id, nome) in enumerate(fornitori):
+            row = idx // col_count
+            col = idx % col_count
+            card = self._crea_card_fornitore_scorte(nome)
+            self.fornitori_scorte_layout.addWidget(card, row, col)
+
+        self.fornitori_scorte_layout.setRowStretch(len(fornitori) // col_count + 1, 1)
+
+    def _crea_card_fornitore_scorte(self, nome):
+        """Crea card fornitore per la pagina di selezione nelle Scorte"""
+        materiali = self.db_manager.get_scorte_per_fornitore(nome)
+        n_materiali = len(materiali)
+
+        card = QFrame()
+        card.setStyleSheet("""
+            QFrame { background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; }
+            QFrame:hover { border-color: #38a169; background-color: #f0fff4; }
+        """)
+        card.setCursor(Qt.PointingHandCursor)
+        card.setMinimumHeight(130)
+
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(24, 20, 24, 20)
+        card_layout.setSpacing(8)
+
+        lbl_nome = QLabel(nome)
+        lbl_nome.setStyleSheet("font-size: 22px; font-weight: 700; color: #2d3748;")
+        lbl_nome.setAlignment(Qt.AlignCenter)
+
+        lbl_mat = QLabel(f"{n_materiali} materiali")
+        lbl_mat.setStyleSheet("font-size: 13px; color: #718096;")
+        lbl_mat.setAlignment(Qt.AlignCenter)
+
+        btn_vedi = QPushButton("Visualizza Scorte →")
+        btn_vedi.setStyleSheet("""
+            QPushButton { background-color: #38a169; color: #ffffff; border-radius: 6px; min-height: 34px; font-size: 13px; font-weight: 600; }
+            QPushButton:hover { background-color: #2f855a; }
+        """)
+        btn_vedi.clicked.connect(lambda checked, n=nome: self.seleziona_fornitore_scorte(n))
+
+        card_layout.addWidget(lbl_nome)
+        card_layout.addWidget(lbl_mat)
+        card_layout.addWidget(btn_vedi)
+
+        return card
+
+    def seleziona_fornitore_scorte(self, nome):
+        """Entra nella vista materiali per il fornitore selezionato"""
+        self.fornitore_corrente_scorte = nome
+        self.lbl_fornitore_corrente.setText(f"Fornitore: {nome}")
+        self.stack_scorte.setCurrentIndex(1)
+        self.carica_scorte()
+
+    def torna_a_fornitori_scorte(self):
+        """Torna alla selezione dei fornitori"""
+        self.fornitore_corrente_scorte = None
+        self.stack_scorte.setCurrentIndex(0)
+        self.carica_fornitori_scorte()
 
     def _crea_card_scorta(self, mat_id, nome, giacenza, capacita, fornitore, prezzo_fornitore):
         """Crea una card per un materiale con barra gradiente"""
@@ -459,7 +585,7 @@ class MagazzinoWindow(QMainWindow):
         dialog = QDialog(self)
         titolo = "Carico Materiale" if tipo == 'carico' else "Scarico Materiale"
         dialog.setWindowTitle(titolo)
-        dialog.setFixedSize(450, 350)
+        dialog.setFixedSize(480, 420)
         dialog.setStyleSheet("""
             QDialog { background-color: #fafbfc; font-family: system-ui, -apple-system, sans-serif; }
             QLabel { color: #2d3748; font-size: 14px; font-weight: 500; }
@@ -486,13 +612,35 @@ class MagazzinoWindow(QMainWindow):
         form = QFormLayout()
         form.setVerticalSpacing(16)
 
+        # Selezione fornitore
+        combo_forn = QComboBox()
+        combo_forn.addItem("Tutti i fornitori", None)
+        fornitori = self.db_manager.get_all_fornitori()
+        for forn_id, forn_nome in fornitori:
+            combo_forn.addItem(forn_nome, forn_nome)
+
         # Selezione materiale
+        tutti_materiali = self.db_manager.get_all_materiali()
         combo_mat = QComboBox()
-        materiali = self.db_manager.get_all_materiali()
-        for mat in materiali:
-            mat_id, nome = mat[0], mat[1]
-            giacenza = mat[7] if len(mat) > 7 else 0.0
-            combo_mat.addItem(f"{nome} (giacenza: {giacenza:.2f} m²)", mat_id)
+
+        def aggiorna_materiali():
+            fornitore_sel = combo_forn.currentData()
+            combo_mat.clear()
+            for mat in tutti_materiali:
+                mat_id, nome = mat[0], mat[1]
+                mat_fornitore = mat[4] if len(mat) > 4 else ""
+                giacenza = mat[7] if len(mat) > 7 else 0.0
+                if fornitore_sel is None or mat_fornitore == fornitore_sel:
+                    combo_mat.addItem(f"{nome} (giacenza: {giacenza:.2f} m²)", mat_id)
+
+        combo_forn.currentIndexChanged.connect(aggiorna_materiali)
+        aggiorna_materiali()
+
+        # Pre-seleziona il fornitore corrente se siamo in una vista filtrata
+        if self.fornitore_corrente_scorte:
+            idx = combo_forn.findData(self.fornitore_corrente_scorte)
+            if idx >= 0:
+                combo_forn.setCurrentIndex(idx)
 
         # Quantità
         edit_quantita = NoScrollDoubleSpinBox()
@@ -505,6 +653,7 @@ class MagazzinoWindow(QMainWindow):
         edit_note = QLineEdit()
         edit_note.setPlaceholderText("Note opzionali...")
 
+        form.addRow("Fornitore:", combo_forn)
         form.addRow("Materiale:", combo_mat)
         form.addRow("Quantità:", edit_quantita)
         form.addRow("Note:", edit_note)
@@ -547,6 +696,7 @@ class MagazzinoWindow(QMainWindow):
                                     f"Movimento registrato: {quantita:.2f} m² {verbo}.")
             dialog.accept()
             self.carica_scorte()
+            self.carica_fornitori_scorte()
             self.magazzino_aggiornato.emit()
 
         btn_conferma.clicked.connect(conferma)
@@ -783,24 +933,29 @@ class MagazzinoWindow(QMainWindow):
         lbl_mat.setStyleSheet("font-size: 13px; color: #718096;")
         lbl_mat.setAlignment(Qt.AlignCenter)
 
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+
         btn_vedi = QPushButton("Vedi Scorte")
         btn_vedi.setStyleSheet("""
-            QPushButton {
-                background-color: #edf2f7;
-                color: #2d3748;
-                border: none;
-                border-radius: 6px;
-                min-height: 32px;
-                font-size: 13px;
-                font-weight: 600;
-            }
+            QPushButton { background-color: #edf2f7; color: #2d3748; border: none; border-radius: 6px; min-height: 32px; font-size: 13px; font-weight: 600; }
             QPushButton:hover { background-color: #e2e8f0; }
         """)
         btn_vedi.clicked.connect(lambda checked, n=nome: self.mostra_scorte_fornitore(n))
 
+        btn_modifica = QPushButton("Modifica")
+        btn_modifica.setStyleSheet("""
+            QPushButton { background-color: #ebf8ff; color: #2b6cb0; border: 1px solid #bee3f8; border-radius: 6px; min-height: 32px; font-size: 13px; font-weight: 600; padding: 4px 12px; }
+            QPushButton:hover { background-color: #bee3f8; }
+        """)
+        btn_modifica.clicked.connect(lambda checked, n=nome: self.apri_dialog_modifica_fornitore(n))
+
+        btn_row.addWidget(btn_vedi)
+        btn_row.addWidget(btn_modifica)
+
         card_layout.addWidget(lbl_nome)
         card_layout.addWidget(lbl_mat)
-        card_layout.addWidget(btn_vedi)
+        card_layout.addLayout(btn_row)
 
         return card
 
@@ -958,6 +1113,69 @@ class MagazzinoWindow(QMainWindow):
 
         btn_salva.clicked.connect(salva)
 
+        btn_layout.addWidget(btn_annulla)
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_salva)
+        layout.addLayout(btn_layout)
+
+        dialog.exec_()
+
+    def apri_dialog_modifica_fornitore(self, nome_attuale):
+        """Dialog per modificare il nome di un fornitore esistente"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Modifica Fornitore - {nome_attuale}")
+        dialog.setFixedSize(420, 200)
+        dialog.setStyleSheet("""
+            QDialog { background-color: #fafbfc; font-family: system-ui, -apple-system, sans-serif; }
+            QLabel { color: #2d3748; font-size: 14px; font-weight: 500; }
+            QLineEdit {
+                border: 1px solid #e2e8f0; border-radius: 6px;
+                padding: 10px 14px; font-size: 14px;
+                background-color: #ffffff; color: #2d3748; min-height: 18px;
+            }
+            QPushButton { border: none; border-radius: 6px; font-size: 14px; font-weight: 600; padding: 10px 20px; min-height: 36px; }
+        """)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(30, 25, 30, 25)
+        layout.setSpacing(16)
+
+        lbl_titolo = QLabel(f"Modifica nome fornitore")
+        lbl_titolo.setStyleSheet("font-size: 17px; font-weight: 700;")
+        layout.addWidget(lbl_titolo)
+
+        form = QFormLayout()
+        edit_nome = QLineEdit()
+        edit_nome.setText(nome_attuale)
+        form.addRow("Nuovo nome:", edit_nome)
+        layout.addLayout(form)
+
+        btn_layout = QHBoxLayout()
+        btn_annulla = QPushButton("Annulla")
+        btn_annulla.setStyleSheet("QPushButton { background-color: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; } QPushButton:hover { background-color: #edf2f7; }")
+        btn_annulla.clicked.connect(dialog.reject)
+
+        btn_salva = QPushButton("Salva")
+        btn_salva.setStyleSheet("QPushButton { background-color: #4a5568; color: #ffffff; } QPushButton:hover { background-color: #2d3748; }")
+
+        def salva():
+            nuovo_nome = edit_nome.text().strip().upper()
+            if not nuovo_nome:
+                QMessageBox.warning(dialog, "Attenzione", "Il nome non può essere vuoto.")
+                return
+            if nuovo_nome == nome_attuale:
+                dialog.accept()
+                return
+            result = self.db_manager.rename_fornitore(nome_attuale, nuovo_nome)
+            if not result:
+                QMessageBox.warning(dialog, "Attenzione", f"Il nome '{nuovo_nome}' è già in uso.")
+                return
+            QMessageBox.information(dialog, "Successo", f"Fornitore rinominato in '{nuovo_nome}'.")
+            dialog.accept()
+            self.carica_fornitori()
+            self.carica_fornitori_scorte()
+
+        btn_salva.clicked.connect(salva)
         btn_layout.addWidget(btn_annulla)
         btn_layout.addStretch()
         btn_layout.addWidget(btn_salva)
