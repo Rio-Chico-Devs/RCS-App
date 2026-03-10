@@ -352,6 +352,7 @@ class DocumentUtils:
     def _odt_manifest(svg_paths=None):
         extra = ''
         if svg_paths:
+            extra += '  <manifest:file-entry manifest:media-type="" manifest:full-path="Pictures/"/>\n'
             for path in svg_paths:
                 extra += f'  <manifest:file-entry manifest:media-type="image/svg+xml" manifest:full-path="{path}"/>\n'
         return (
