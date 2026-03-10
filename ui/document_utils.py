@@ -679,35 +679,35 @@ class DocumentUtils:
         Ritorna dict con tutte le misure adattive. Tabella operazioni sempre 5 righe."""
         if num_materiali <= 10:
             return {
-                'margin_mat': '12mm', 'rect_height': '8mm', 'font_nome': '11px',
+                'margin_mat': '3mm', 'rect_height': '8mm', 'font_nome': '11px',
                 'font_info': '10px', 'font_giri': '10px', 'top_offset': '-6mm',
                 'orient_font': '8px', 'orient_width': '18mm',
                 'show_title': True, 'ops_rows': 5, 'ops_height': '8mm',
-                'info_margin': '3mm', 'ops_margin_top': '15mm',
+                'info_margin': '2mm', 'ops_margin_top': '4mm',
             }
         elif num_materiali <= 17:
             return {
-                'margin_mat': '6mm', 'rect_height': '6mm', 'font_nome': '10px',
+                'margin_mat': '2mm', 'rect_height': '6mm', 'font_nome': '10px',
                 'font_info': '9px', 'font_giri': '9px', 'top_offset': '-4mm',
                 'orient_font': '7px', 'orient_width': '15mm',
                 'show_title': False, 'ops_rows': 5, 'ops_height': '6mm',
-                'info_margin': '2mm', 'ops_margin_top': '8mm',
+                'info_margin': '1mm', 'ops_margin_top': '3mm',
             }
         elif num_materiali <= 25:
             return {
-                'margin_mat': '3mm', 'rect_height': '5mm', 'font_nome': '9px',
+                'margin_mat': '1mm', 'rect_height': '5mm', 'font_nome': '9px',
                 'font_info': '8px', 'font_giri': '8px', 'top_offset': '-3mm',
                 'orient_font': '6px', 'orient_width': '12mm',
                 'show_title': False, 'ops_rows': 5, 'ops_height': '5mm',
-                'info_margin': '1mm', 'ops_margin_top': '5mm',
+                'info_margin': '1mm', 'ops_margin_top': '2mm',
             }
         else:  # 26-30
             return {
-                'margin_mat': '2mm', 'rect_height': '4mm', 'font_nome': '8px',
+                'margin_mat': '1mm', 'rect_height': '4mm', 'font_nome': '8px',
                 'font_info': '7px', 'font_giri': '7px', 'top_offset': '-2mm',
                 'orient_font': '6px', 'orient_width': '10mm',
                 'show_title': False, 'ops_rows': 5, 'ops_height': '4mm',
-                'info_margin': '1mm', 'ops_margin_top': '3mm',
+                'info_margin': '1mm', 'ops_margin_top': '2mm',
             }
 
     @staticmethod
@@ -817,9 +817,9 @@ class DocumentUtils:
                 w_h     = '18mm'
 
                 materiali_html += f"""
-                <div style="margin: {s['margin_mat']} auto; page-break-inside: avoid; width: fit-content;">
+                <div style="margin: {s['margin_mat']} auto 0; page-break-inside: avoid; width: fit-content;">
                     <!-- Riga 1: campo compilabile a sinistra + lunghezza centrata sulla tela -->
-                    <div style="display: flex; align-items: center; margin-bottom: 1mm;">
+                    <div style="display: flex; align-items: center; margin-bottom: 0;">
                         <div style="width: {w_campo}; flex-shrink: 0;">
                             <input type="text" placeholder="" style="width: 100%; height: 5mm; border: 1.5px solid #000; background: #fff; color: #000; font-size: {s['font_info']}; padding: 0 1mm; box-sizing: border-box;">
                         </div>
@@ -874,7 +874,7 @@ class DocumentUtils:
         }}
         .header {{
             text-align: center;
-            margin-bottom: 8mm;
+            margin-bottom: 3mm;
         }}
         .info-section {{
             margin-bottom: {s['info_margin']};
