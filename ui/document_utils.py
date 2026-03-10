@@ -466,14 +466,16 @@ class DocumentUtils:
             f'fo:padding="{pad}"/></style:style>'
             f'<style:style style:name="RH" style:family="table-row">'
             f'<style:table-row-properties style:row-height="{rect_h}" style:use-optimal-row-height="false"/></style:style>'
-            f'<style:style style:name="TF" style:family="table">'
-            f'<style:table-properties style:width="3.5cm" table:align="left"/></style:style>'
             f'<style:style style:name="TCFI" style:family="table-column">'
             f'<style:table-column-properties style:column-width="3.5cm"/></style:style>'
+            f'<style:style style:name="TCHL_L" style:family="table-column">'
+            f'<style:table-column-properties style:column-width="12.5cm"/></style:style>'
             f'<style:style style:name="RFI" style:family="table-row">'
             f'<style:table-row-properties style:row-height="0.5cm" style:use-optimal-row-height="false"/></style:style>'
             f'<style:style style:name="CFI" style:family="table-cell">'
             f'<style:table-cell-properties fo:border="1pt solid #000000" fo:padding="0.05cm"/></style:style>'
+            f'<style:style style:name="THL" style:family="table">'
+            f'<style:table-properties style:width="16cm" table:align="center" fo:margin-top="{margin_mat}" fo:margin-bottom="0cm"/></style:style>'
             f'<style:style style:name="TO" style:family="table">'
             f'<style:table-properties style:width="17.7cm" table:align="margins"/></style:style>'
             f'{ops_col_styles}'
@@ -569,18 +571,21 @@ class DocumentUtils:
                         f'</table:table-cell>'
                     )
 
-                field_table = (
-                    f'<table:table table:name="F{i}" table:style-name="TF">'
+                header_line = (
+                    f'<table:table table:name="HL{i}" table:style-name="THL">'
                     f'<table:table-column table:style-name="TCFI"/>'
+                    f'<table:table-column table:style-name="TCHL_L"/>'
                     f'<table:table-row table:style-name="RFI">'
                     f'<table:table-cell table:style-name="CFI">'
                     f'<text:p text:style-name="PN"></text:p>'
                     f'</table:table-cell>'
+                    f'<table:table-cell table:style-name="CNB">'
+                    f'<text:p text:style-name="PC">{int(lunghezza)} mm</text:p>'
+                    f'</table:table-cell>'
                     f'</table:table-row></table:table>'
                 )
                 mat_parts.append(
-                    field_table +
-                    f'<text:p text:style-name="PL">{int(lunghezza)} mm</text:p>'
+                    header_line +
                     f'<table:table table:name="M{i}" table:style-name="TM">'
                     f'<table:table-column table:style-name="TCN"/>'
                     f'<table:table-column table:style-name="TCW"/>'
