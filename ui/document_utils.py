@@ -410,6 +410,8 @@ class DocumentUtils:
             'xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" '
             'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" '
             'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '
+            'xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" '
+            'xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" '
             'xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"'
         )
 
@@ -454,6 +456,11 @@ class DocumentUtils:
             f'<style:table-cell-properties fo:border="1.5pt solid #000000" fo:padding="{pad}"/></style:style>'
             f'<style:style style:name="CNB" style:family="table-cell">'
             f'<style:table-cell-properties fo:border="none" fo:padding="{npad}"/></style:style>'
+            f'<style:style style:name="DP" style:family="graphic">'
+            f'<style:graphic-properties draw:fill="none" draw:stroke="solid" '
+            f'svg:stroke-width="0.053cm" svg:stroke-color="#000000" '
+            f'draw:auto-grow-height="false" draw:auto-grow-width="false" '
+            f'draw:textarea-horizontal-align="center" draw:textarea-vertical-align="middle"/></style:style>'
             f'<style:style style:name="RH" style:family="table-row">'
             f'<style:table-row-properties style:row-height="{rect_h}" style:use-optimal-row-height="false"/></style:style>'
             f'<style:style style:name="TO" style:family="table">'
@@ -516,15 +523,43 @@ class DocumentUtils:
                     is_conica=False; sezioni=[]; orient={}
 
                 if is_conica and sezioni:
-                    d_s = sezioni[0].get('d_inizio', 0)
-                    d_e = sezioni[-1].get('d_fine', 0)
+                    PI = 3.14159
+                    sv_s = sezioni[0].get('d_inizio', 0) * PI
+                    sv_e = sezioni[-1].get('d_fine', 0) * PI
+                    sv_max = max(sv_s, sv_e, 1.0)
                     rot = orient.get('rotation', 0) if orient else 0
                     flh = orient.get('flip_h', False) if orient else False
+                    sv_l, sv_r = sv_s, sv_e
                     if flh ^ (rot == 180):
-                        d_s, d_e = d_e, d_s
-                    cell_text = f'\u00d8{d_s:.0f}\u2192\u00d8{d_e:.0f}  {nome}'
+                        sv_l, sv_r = sv_r, sv_l
+                    hl = int(21600 * sv_l / sv_max)
+                    hr = int(21600 * sv_r / sv_max)
+                    y_tl = (21600 - hl) // 2
+                    y_tr = (21600 - hr) // 2
+                    y_bl = (21600 + hl) // 2
+                    y_br = (21600 + hr) // 2
+                    epath = f'M 0 {y_tl} L 21600 {y_tr} L 21600 {y_br} L 0 {y_bl} Z N'
+                    center_cell = (
+                        f'<table:table-cell table:style-name="CNB">'
+                        f'<text:p text:style-name="PC">'
+                        f'<draw:custom-shape draw:style-name="DP" '
+                        f'svg:width="11.9cm" svg:height="{rect_h}" '
+                        f'text:anchor-type="as-char" draw:z-index="0">'
+                        f'<text:p text:style-name="PC">{nome}</text:p>'
+                        f'<draw:enhanced-geometry '
+                        f'svg:viewBox="0 0 21600 21600" '
+                        f'draw:enhanced-path="{epath}" '
+                        f'draw:text-areas="0 0 21600 21600"/>'
+                        f'</draw:custom-shape>'
+                        f'</text:p>'
+                        f'</table:table-cell>'
+                    )
                 else:
-                    cell_text = f'==          {nome}'
+                    center_cell = (
+                        f'<table:table-cell table:style-name="CMB">'
+                        f'<text:p text:style-name="PC">==          {nome}</text:p>'
+                        f'</table:table-cell>'
+                    )
 
                 mat_parts.append(
                     f'<text:p text:style-name="PL">{int(lunghezza)} mm</text:p>'
@@ -535,8 +570,7 @@ class DocumentUtils:
                     f'<table:table-row table:style-name="RH">'
                     f'<table:table-cell table:style-name="CNB">'
                     f'<text:p text:style-name="PR">G{giri}</text:p></table:table-cell>'
-                    f'<table:table-cell table:style-name="CMB">'
-                    f'<text:p text:style-name="PC">{cell_text}</text:p></table:table-cell>'
+                    + center_cell +
                     f'<table:table-cell table:style-name="CNB">'
                     f'<text:p text:style-name="PN">H {int(sviluppo)} mm</text:p></table:table-cell>'
                     f'</table:table-row></table:table>'
