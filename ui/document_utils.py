@@ -806,23 +806,37 @@ class DocumentUtils:
                     figura_html = DocumentUtils._genera_figura_conica(
                         sezioni_coniche, orientamento, s, nome)
                 else:
-                    figura_html = f"""<div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative;">
+                    figura_html = f"""<div style="width: 80mm; height: {s['rect_height']}; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative; flex-shrink: 0;">
                         <input type="text" placeholder="Orient." style="width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; position: relative; z-index: 1;">
                         <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; transform: translateX(-50%); z-index: 1;">{nome}</strong>
                     </div>"""
 
+                # Larghezze colonne layout: [campo] [G] [tela 80mm] [H]
+                w_campo = '28mm'
+                w_g     = '8mm'
+                w_h     = '18mm'
+
                 materiali_html += f"""
-                <div style="display: flex; align-items: center; justify-content: center; margin: {s['margin_mat']} auto; page-break-inside: avoid;">
-                    <input type="text" placeholder="" style="width: 28mm; height: 5mm; border: 1.5px solid #000; background: #fff; color: #000; font-size: {s['font_info']}; padding: 0 1mm; box-sizing: border-box; flex-shrink: 0; margin-right: 4mm;">
-                    <div style="width: 120mm; position: relative; flex-shrink: 0;">
-                        <div style="position: absolute; left: 50%; top: {s['top_offset']}; transform: translateX(-50%); font-size: {s['font_info']};">
+                <div style="margin: {s['margin_mat']} auto; page-break-inside: avoid; width: fit-content;">
+                    <!-- Riga 1: campo compilabile a sinistra + lunghezza centrata sulla tela -->
+                    <div style="display: flex; align-items: center; margin-bottom: 1mm;">
+                        <div style="width: {w_campo}; flex-shrink: 0;">
+                            <input type="text" placeholder="" style="width: 100%; height: 5mm; border: 1.5px solid #000; background: #fff; color: #000; font-size: {s['font_info']}; padding: 0 1mm; box-sizing: border-box;">
+                        </div>
+                        <div style="width: {w_g}; flex-shrink: 0;"></div>
+                        <div style="width: 80mm; text-align: center; font-size: {s['font_info']}; flex-shrink: 0;">
                             <strong>{lunghezza}mm</strong>
                         </div>
-                        {figura_html}
-                        <div style="position: absolute; left: -2mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
+                        <div style="width: {w_h}; flex-shrink: 0;"></div>
+                    </div>
+                    <!-- Riga 2: spazio campo + G + tela + H -->
+                    <div style="display: flex; align-items: center;">
+                        <div style="width: {w_campo}; flex-shrink: 0;"></div>
+                        <div style="width: {w_g}; text-align: right; font-size: {s['font_giri']}; flex-shrink: 0; padding-right: 1mm;">
                             <strong>G{giri}</strong>
                         </div>
-                        <div style="position: absolute; right: -6mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
+                        {figura_html}
+                        <div style="width: {w_h}; font-size: {s['font_giri']}; flex-shrink: 0; padding-left: 2mm;">
                             <strong>H {int(sviluppo)} mm</strong>
                         </div>
                     </div>
