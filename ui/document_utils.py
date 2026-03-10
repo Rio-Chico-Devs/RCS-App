@@ -694,39 +694,37 @@ class DocumentUtils:
 
     @staticmethod
     def _genera_figura_conica(sezioni_coniche, orientamento, s, nome):
-        """Genera un div con SVG trapezio per materiale conico.
-        Il lato sinistro/destro del trapezio rispecchia l'orientamento scelto."""
-        PI = 3.14159
-        sv_start = sezioni_coniche[0].get('d_inizio', 0) * PI
-        sv_end   = sezioni_coniche[-1].get('d_fine', 0) * PI
-        sv_max   = max(sv_start, sv_end, 1.0)  # evita divisione per zero
-
+        """Genera un div con SVG rettangolo + linea diagonale per ogni sezione conica.
+        1 sezione conica = 1 diagonale, 2 sezioni coniche = 2 diagonali, ecc."""
         rotation = orientamento.get('rotation', 0) if orientamento else 0
         flip_h   = orientamento.get('flip_h', False) if orientamento else False
 
-        # Determina quale sviluppo va a sinistra/destra
-        sv_left, sv_right = sv_start, sv_end
-        if flip_h:
-            sv_left, sv_right = sv_right, sv_left
-        if rotation == 180:
-            sv_left, sv_right = sv_right, sv_left
+        total_len = sum(sez.get('lunghezza', 0) for sez in sezioni_coniche) or 1
 
-        # Altezze normalizzate in coordinate SVG (viewBox 0 0 80 20, fondo fisso a y=20)
-        h_l = round(20 * sv_left  / sv_max, 2)
-        h_r = round(20 * sv_right / sv_max, 2)
+        # Eventuale inversione per orientamento
+        sezioni_draw = list(sezioni_coniche)
+        if flip_h ^ (rotation == 180):
+            sezioni_draw = list(reversed(sezioni_draw))
 
-        # Vertici trapezio: fondo piatto (come nel widget), bordo superiore diagonale
-        tl = f"0,{round(20 - h_l, 2)}"
-        tr = f"80,{round(20 - h_r, 2)}"
-        br = "80,20"
-        bl = "0,20"
-        points = f"{tl} {tr} {br} {bl}"
+        # Una linea diagonale per ogni sezione conica (d_inizio != d_fine)
+        lines_svg = ""
+        x_pos = 0
+        for sez in sezioni_draw:
+            d_ini = sez.get('d_inizio', 0)
+            d_fin = sez.get('d_fine', 0)
+            l_sez = sez.get('lunghezza', 0)
+            x_s = round(x_pos / total_len * 80, 2)
+            x_e = round((x_pos + l_sez) / total_len * 80, 2)
+            if abs(d_ini - d_fin) > 0.01:
+                lines_svg += f'<line x1="{x_s}" y1="0" x2="{x_e}" y2="20" stroke="#000" stroke-width="1.5"/>'
+            x_pos += l_sez
 
         return f"""<div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; position: relative;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 20"
                  preserveAspectRatio="none"
                  style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-                <polygon points="{points}" style="fill:#fff; stroke:#000; stroke-width:1.2;"/>
+                <rect x="0" y="0" width="80" height="20" fill="#fff" stroke="#000" stroke-width="1.5"/>
+                {lines_svg}
             </svg>
             <input type="text" placeholder="Orient." style="position: relative; z-index: 1; width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; margin-top: auto; margin-bottom: auto;">
             <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 1;">{nome}</strong>
