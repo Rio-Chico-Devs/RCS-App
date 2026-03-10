@@ -790,7 +790,7 @@ class DocumentUtils:
                     </div>
                 </div>
                 <div style="width: 120mm; margin: 1mm auto 0; display: flex; justify-content: flex-start;">
-                    <input type="text" placeholder="" style="width: 35mm; border: 1.5px solid #000; background: #fff; color: #000; font-size: {s['font_info']}; padding: 1mm 2mm; height: {s['rect_height']}; box-sizing: border-box;">
+                    <input type="text" placeholder="" style="width: 35mm; border: 1.5px solid #000; background: #fff; color: #000; font-size: {s['font_info']}; padding: 1mm 2mm; height: 6mm; box-sizing: border-box;">
                 </div>
                 """
 
@@ -920,6 +920,7 @@ class DocumentUtils:
     {materiali_html}
 
     <!-- TABELLA OPERAZIONI -->
+    <div style="page-break-inside: avoid;">
     <table class="operations-table">
         <thead>
             <tr>
@@ -936,6 +937,7 @@ class DocumentUtils:
             {ops_rows_html}
         </tbody>
     </table>
+    </div>
 </body>
 </html>
         """
