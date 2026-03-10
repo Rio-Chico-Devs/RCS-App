@@ -711,15 +711,15 @@ class DocumentUtils:
         if rotation == 180:
             sv_left, sv_right = sv_right, sv_left
 
-        # Altezze normalizzate in coordinate SVG (viewBox 0 0 80 20, centro a y=10)
+        # Altezze normalizzate in coordinate SVG (viewBox 0 0 80 20, fondo fisso a y=20)
         h_l = round(20 * sv_left  / sv_max, 2)
         h_r = round(20 * sv_right / sv_max, 2)
 
-        # Vertici trapezio (centrato verticalmente)
-        tl = f"0,{round(10 - h_l/2, 2)}"
-        tr = f"80,{round(10 - h_r/2, 2)}"
-        br = f"80,{round(10 + h_r/2, 2)}"
-        bl = f"0,{round(10 + h_l/2, 2)}"
+        # Vertici trapezio: fondo piatto (come nel widget), bordo superiore diagonale
+        tl = f"0,{round(20 - h_l, 2)}"
+        tr = f"80,{round(20 - h_r, 2)}"
+        br = "80,20"
+        bl = "0,20"
         points = f"{tl} {tr} {br} {bl}"
 
         return f"""<div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; position: relative;">
