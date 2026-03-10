@@ -398,7 +398,7 @@ class DocumentUtils:
         ft_giri = fmap.get(sc['font_giri'], '10pt')
         rmap = {'8mm': '0.8cm', '6mm': '0.6cm', '5mm': '0.5cm', '4mm': '0.4cm'}
         rect_h = rmap.get(sc['rect_height'], '0.8cm')
-        mmap = {'12mm': '1.2cm', '6mm': '0.6cm', '3mm': '0.3cm', '2mm': '0.2cm'}
+        mmap = {'12mm': '1.2cm', '6mm': '0.6cm', '3mm': '0.3cm', '2mm': '0.2cm', '1mm': '0.1cm', '0mm': '0cm'}
         margin_mat = mmap.get(sc['margin_mat'], '1.2cm')
         num_mat = len(preventivo.materiali) if hasattr(preventivo, 'materiali') and preventivo.materiali else 0
         pad  = '0.15cm' if num_mat <= 10 else ('0.08cm' if num_mat <= 17 else '0.04cm')
@@ -540,17 +540,23 @@ class DocumentUtils:
                     flh = orient.get('flip_h', False) if orient else False
                     sv_l = d_s * 3.14159
                     sv_r = d_e * 3.14159
-                    disp_s, disp_e = d_s, d_e
+                    # Raccoglie tutti i diametri lungo il profilo e rimuove duplicati consecutivi
+                    all_diams = [sezioni[0].get('d_inizio', 0)] + [s.get('d_fine', 0) for s in sezioni]
                     if flh ^ (rot == 180):
                         sv_l, sv_r = sv_r, sv_l
-                        disp_s, disp_e = disp_e, disp_s
+                        all_diams = list(reversed(all_diams))
+                    deduped = [all_diams[0]]
+                    for d in all_diams[1:]:
+                        if d != deduped[-1]:
+                            deduped.append(d)
                     if sv_l > sv_r * 1.05:
                         cstyle = 'CMB_WL'
                     elif sv_r > sv_l * 1.05:
                         cstyle = 'CMB_WR'
                     else:
                         cstyle = 'CMB'
-                    cell_text = f'\u00d8{disp_s:.0f}\u2192\u00d8{disp_e:.0f}  {nome}'
+                    diam_str = '\u2192'.join(f'\u00d8{d:.0f}' for d in deduped)
+                    cell_text = f'{diam_str}  {nome}'
                     center_cell = (
                         f'<table:table-cell table:style-name="{cstyle}">'
                         f'<text:p text:style-name="PC">{cell_text}</text:p>'
@@ -679,7 +685,7 @@ class DocumentUtils:
         Ritorna dict con tutte le misure adattive. Tabella operazioni sempre 5 righe."""
         if num_materiali <= 10:
             return {
-                'margin_mat': '3mm', 'rect_height': '8mm', 'font_nome': '11px',
+                'margin_mat': '1mm', 'rect_height': '8mm', 'font_nome': '11px',
                 'font_info': '10px', 'font_giri': '10px', 'top_offset': '-6mm',
                 'orient_font': '8px', 'orient_width': '18mm',
                 'show_title': True, 'ops_rows': 5, 'ops_height': '8mm',
