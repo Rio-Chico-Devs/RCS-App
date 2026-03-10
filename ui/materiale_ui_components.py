@@ -249,7 +249,6 @@ class MaterialeUIComponents:
         window_instance.sezioni_widgets = []
 
         window_instance.conica_widget.hide()
-        layout.addWidget(window_instance.conica_widget)
 
         # Campo Metri sotto Lunghezza
         MaterialeUIComponents.create_metri_field(window_instance, form_layout)
@@ -279,6 +278,8 @@ class MaterialeUIComponents:
         """)
         window_instance.btn_conica.clicked.connect(window_instance.toggle_conica)
         layout.addWidget(window_instance.btn_conica)
+
+        layout.addWidget(window_instance.conica_widget)
 
         # Nota per i campi non editabili
         note_label = QLabel("* I valori in grassetto non sono editabili")
