@@ -349,13 +349,18 @@ class DocumentUtils:
             return None
     
     @staticmethod
-    def _odt_manifest():
+    def _odt_manifest(svg_paths=None):
+        extra = ''
+        if svg_paths:
+            for path in svg_paths:
+                extra += f'  <manifest:file-entry manifest:media-type="image/svg+xml" manifest:full-path="{path}"/>\n'
         return (
             '<?xml version="1.0" encoding="UTF-8"?>\n'
             '<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">\n'
             '  <manifest:file-entry manifest:media-type="application/vnd.oasis.opendocument.text" manifest:full-path="/"/>\n'
             '  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="content.xml"/>\n'
             '  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="styles.xml"/>\n'
+            + extra +
             '</manifest:manifest>'
         )
 
@@ -385,8 +390,10 @@ class DocumentUtils:
         )
 
     @staticmethod
-    def _odt_content(preventivo, dati_cliente, sc):
-        """Costruisce content.xml ODT senza dipendenze esterne."""
+    def _odt_content(preventivo, dati_cliente, sc, svg_files=None):
+        """Costruisce content.xml ODT senza dipendenze esterne.
+        svg_files: lista opzionale a cui vengono aggiunti (path, svg_content) per le coniche.
+        """
         def x(v):
             if v is None:
                 return ''
@@ -410,7 +417,10 @@ class DocumentUtils:
             'xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" '
             'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" '
             'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '
-            'xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"'
+            'xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" '
+            'xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" '
+            'xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" '
+            'xmlns:xlink="http://www.w3.org/1999/xlink"'
         )
 
         ops_w = ['2.5cm', '1.8cm', '1.8cm', '1.8cm', '1.8cm', '1.8cm', '6cm']
@@ -536,32 +546,20 @@ class DocumentUtils:
                     is_conica=False; sezioni=[]; orient={}
 
                 if is_conica and sezioni:
-                    d_s = sezioni[0].get('d_inizio', 0)
-                    d_e = sezioni[-1].get('d_fine', 0)
-                    rot = orient.get('rotation', 0) if orient else 0
-                    flh = orient.get('flip_h', False) if orient else False
-                    sv_l = d_s * 3.14159
-                    sv_r = d_e * 3.14159
-                    # Raccoglie tutti i diametri lungo il profilo e rimuove duplicati consecutivi
-                    all_diams = [sezioni[0].get('d_inizio', 0)] + [s.get('d_fine', 0) for s in sezioni]
-                    if flh ^ (rot == 180):
-                        sv_l, sv_r = sv_r, sv_l
-                        all_diams = list(reversed(all_diams))
-                    deduped = [all_diams[0]]
-                    for d in all_diams[1:]:
-                        if d != deduped[-1]:
-                            deduped.append(d)
-                    if sv_l > sv_r * 1.05:
-                        cstyle = 'CMB_WL'
-                    elif sv_r > sv_l * 1.05:
-                        cstyle = 'CMB_WR'
-                    else:
-                        cstyle = 'CMB'
-                    diam_str = '\u2192'.join(f'\u00d8{d:.0f}' for d in deduped)
-                    cell_text = f'{diam_str}  {nome}'
+                    # Genera SVG con rettangolo di taglio, profilo conico e scarto
+                    svg_path = f'Pictures/conica_{i}.svg'
+                    svg_content = DocumentUtils._svg_conica_str(sezioni, orient, nome)
+                    if svg_files is not None:
+                        svg_files.append((svg_path, svg_content))
                     center_cell = (
-                        f'<table:table-cell table:style-name="{cstyle}">'
-                        f'<text:p text:style-name="PC">{cell_text}</text:p>'
+                        f'<table:table-cell table:style-name="CMB">'
+                        f'<text:p text:style-name="PC">'
+                        f'<draw:frame text:anchor-type="as-char"'
+                        f' svg:width="11.5cm" svg:height="{rect_h}" draw:z-index="{i}">'
+                        f'<draw:image xlink:href="{svg_path}"'
+                        f' xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>'
+                        f'</draw:frame>'
+                        f'</text:p>'
                         f'</table:table-cell>'
                     )
                 else:
@@ -635,6 +633,68 @@ class DocumentUtils:
         )
 
     @staticmethod
+    def _svg_conica_str(sezioni_coniche, orientamento, nome_xml):
+        """Genera SVG per la conica nell'ODT.
+        Mostra il rettangolo di taglio (bianco), il profilo conico (azzurro)
+        e lo scarto evidenziato in rosso chiaro. nome_xml già XML-escaped.
+        """
+        rotation = orientamento.get('rotation', 0) if orientamento else 0
+        flip_h   = orientamento.get('flip_h', False) if orientamento else False
+
+        sezioni_draw = list(sezioni_coniche)
+        if flip_h ^ (rotation == 180):
+            sezioni_draw = list(reversed(sezioni_draw))
+
+        total_len = sum(sez.get('lunghezza', 0) for sez in sezioni_draw) or 1
+
+        punti = []  # (frac_pos, sviluppo)
+        pos = 0
+        for i, sez in enumerate(sezioni_draw):
+            d_ini = sez.get('d_inizio', 0)
+            d_fin = sez.get('d_fine', 0)
+            l_sez = sez.get('lunghezza', 0)
+            if i == 0:
+                punti.append((pos / total_len, d_ini * 3.14159))
+            pos += l_sez
+            punti.append((pos / total_len, d_fin * 3.14159))
+
+        sviluppo_max = max(p[1] for p in punti) if punti else 1
+        if sviluppo_max <= 0:
+            sviluppo_max = 1
+
+        W, H = 120, 20
+
+        # Profilo conico: bottom-aligned, il bordo superiore varia col diametro
+        top_pts = []
+        for frac, sv in punti:
+            x = round(frac * W, 2)
+            y_top = round(H - sv / sviluppo_max * H, 2)
+            top_pts.append((x, y_top))
+
+        # Trapezio (tela usabile) - riempimento azzurro
+        trap_pts = top_pts + [(W, H), (0, H)]
+        trap_str = ' '.join(f'{x},{y}' for x, y in trap_pts)
+
+        # Area scarto (tra bordo superiore rettangolo e profilo conico) - rosso chiaro
+        scarto_pts = [(0, 0), (W, 0)] + list(reversed(top_pts))
+        scarto_str = ' '.join(f'{x},{y}' for x, y in scarto_pts)
+
+        # Linea profilo conico (tratteggiata)
+        profile_str = ' '.join(f'{x},{y}' for x, y in top_pts)
+
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}">'
+            f'<rect width="{W}" height="{H}" fill="white" stroke="black" stroke-width="1.5"/>'
+            f'<polygon points="{trap_str}" fill="#c8ddf0" fill-opacity="0.5" stroke="none"/>'
+            f'<polygon points="{scarto_str}" fill="#ff9696" fill-opacity="0.4" stroke="none"/>'
+            f'<polyline points="{profile_str}" fill="none" stroke="#2c3e50" stroke-width="1" stroke-dasharray="3,2"/>'
+            f'<text x="{W/2}" y="14" text-anchor="middle" font-size="7" font-weight="bold"'
+            f' font-family="Arial,sans-serif">{nome_xml}</text>'
+            f'</svg>'
+        )
+
+    @staticmethod
     def genera_documento_odt(preventivo, dati_cliente, parent=None):
         """Genera documento ODT per OpenOffice/LibreOffice (senza dipendenze esterne)"""
         try:
@@ -657,11 +717,16 @@ class DocumentUtils:
             sc = DocumentUtils._calcola_scala(num_mat)
             mi = zipfile.ZipInfo('mimetype')
             mi.compress_type = zipfile.ZIP_STORED
+            svg_files = []
+            content_xml = DocumentUtils._odt_content(preventivo, dati_cliente, sc, svg_files)
+            svg_paths = [path for path, _ in svg_files]
             with zipfile.ZipFile(file_path, 'w', zipfile.ZIP_DEFLATED) as zf:
                 zf.writestr(mi, 'application/vnd.oasis.opendocument.text')
-                zf.writestr('META-INF/manifest.xml', DocumentUtils._odt_manifest())
+                zf.writestr('META-INF/manifest.xml', DocumentUtils._odt_manifest(svg_paths))
                 zf.writestr('styles.xml', DocumentUtils._odt_styles())
-                zf.writestr('content.xml', DocumentUtils._odt_content(preventivo, dati_cliente, sc))
+                zf.writestr('content.xml', content_xml)
+                for svg_path, svg_content in svg_files:
+                    zf.writestr(svg_path, svg_content)
 
             print(f"DEBUG: Documento ODT generato: {file_path}")
             try:
