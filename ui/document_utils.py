@@ -406,6 +406,7 @@ class DocumentUtils:
         ft_giri = fmap.get(sc['font_giri'], '10pt')
         rmap = {'8mm': '0.8cm', '6mm': '0.6cm', '5mm': '0.5cm', '4mm': '0.4cm'}
         rect_h = rmap.get(sc['rect_height'], '0.8cm')
+        rect_h_cm = float(rect_h.replace('cm', ''))
         mmap = {'12mm': '1.2cm', '6mm': '0.6cm', '3mm': '0.3cm', '2mm': '0.2cm', '1mm': '0.1cm', '0mm': '0cm'}
         margin_mat = mmap.get(sc['margin_mat'], '1.2cm')
         num_mat = len(preventivo.materiali) if hasattr(preventivo, 'materiali') and preventivo.materiali else 0
@@ -561,7 +562,7 @@ class DocumentUtils:
                     nome_full = f'{diam_str}  {nome}'
                     # Genera SVG con profilo trapezoidale identico all'HTML
                     svg_path = f'Pictures/conica_{i}.svg'
-                    svg_content = DocumentUtils._svg_conica_str(sezioni, orient, nome_full)
+                    svg_content = DocumentUtils._svg_conica_str(sezioni, orient, nome_full, rect_h_cm)
                     if svg_files is not None:
                         svg_files.append((svg_path, svg_content))
                     center_cell = (
@@ -646,10 +647,12 @@ class DocumentUtils:
         )
 
     @staticmethod
-    def _svg_conica_str(sezioni_coniche, orientamento, nome_xml):
+    def _svg_conica_str(sezioni_coniche, orientamento, nome_xml, rect_h_cm=0.8):
         """Genera SVG per la conica nell'ODT.
         SVG per la conica nell'ODT: profilo trapezoidale identico all'HTML.
         nome_xml: testo già XML-escaped (es. 'Ø10→Ø14→Ø10  NomeMateriale').
+        rect_h_cm: altezza del frame ODT in cm (default 0.8), usata per calcolare il viewBox
+                   in modo che corrisponda al ratio del frame e non venga stirato.
         """
         rotation = orientamento.get('rotation', 0) if orientamento else 0
         flip_h   = orientamento.get('flip_h', False) if orientamento else False
@@ -665,8 +668,12 @@ class DocumentUtils:
             1
         )
 
-        W, H = 80, 20
+        # Adatta W/H al ratio reale del frame (11.5cm x rect_h_cm) per evitare stretching
+        W = 115
+        H = max(4, round(W * rect_h_cm / 11.5))
         cy = H / 2
+        margin = max(0.5, H * 0.1)  # margine verticale proporzionale
+        font_sz = max(2, round(H * 0.55))
 
         top_pts = []
         bot_pts = []
@@ -677,8 +684,8 @@ class DocumentUtils:
             l_sez = sez.get('lunghezza', 0)
             x_s = round(x_pos / total_len * W, 2)
             x_e = round((x_pos + l_sez) / total_len * W, 2)
-            h_ini = round(d_ini / max_d * 18, 2)
-            h_fin = round(d_fin / max_d * 18, 2)
+            h_ini = round(d_ini / max_d * (H - 2 * margin), 2)
+            h_fin = round(d_fin / max_d * (H - 2 * margin), 2)
             if j == 0:
                 top_pts.append(f'{x_s},{round(cy - h_ini/2, 2)}')
                 bot_pts.append(f'{x_s},{round(cy + h_ini/2, 2)}')
@@ -690,10 +697,11 @@ class DocumentUtils:
 
         return (
             '<?xml version="1.0" encoding="UTF-8"?>'
-            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}">'
+            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}"'
+            f' preserveAspectRatio="xMidYMid meet">'
             f'<polygon points="{points_str}" fill="white" stroke="black" stroke-width="1.5"/>'
-            f'<text x="{W/2}" y="{cy + 2.5}" text-anchor="middle" dominant-baseline="middle"'
-            f' font-size="5" font-weight="bold" font-family="Arial,sans-serif">{nome_xml}</text>'
+            f'<text x="{W/2}" y="{cy + font_sz * 0.35}" text-anchor="middle" dominant-baseline="middle"'
+            f' font-size="{font_sz}" font-weight="bold" font-family="Arial,sans-serif">{nome_xml}</text>'
             f'</svg>'
         )
 
