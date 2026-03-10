@@ -667,6 +667,46 @@ class DocumentUtils:
             }
 
     @staticmethod
+    def _genera_figura_conica(sezioni_coniche, orientamento, s, nome):
+        """Genera un div con SVG trapezio per materiale conico.
+        Il lato sinistro/destro del trapezio rispecchia l'orientamento scelto."""
+        PI = 3.14159
+        sv_start = sezioni_coniche[0].get('d_inizio', 0) * PI
+        sv_end   = sezioni_coniche[-1].get('d_fine', 0) * PI
+        sv_max   = max(sv_start, sv_end, 1.0)  # evita divisione per zero
+
+        rotation = orientamento.get('rotation', 0) if orientamento else 0
+        flip_h   = orientamento.get('flip_h', False) if orientamento else False
+
+        # Determina quale sviluppo va a sinistra/destra
+        sv_left, sv_right = sv_start, sv_end
+        if flip_h:
+            sv_left, sv_right = sv_right, sv_left
+        if rotation == 180:
+            sv_left, sv_right = sv_right, sv_left
+
+        # Altezze normalizzate in coordinate SVG (viewBox 0 0 80 20, centro a y=10)
+        h_l = round(20 * sv_left  / sv_max, 2)
+        h_r = round(20 * sv_right / sv_max, 2)
+
+        # Vertici trapezio (centrato verticalmente)
+        tl = f"0,{round(10 - h_l/2, 2)}"
+        tr = f"80,{round(10 - h_r/2, 2)}"
+        br = f"80,{round(10 + h_r/2, 2)}"
+        bl = f"0,{round(10 + h_l/2, 2)}"
+        points = f"{tl} {tr} {br} {bl}"
+
+        return f"""<div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; position: relative;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 20"
+                 preserveAspectRatio="none"
+                 style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+                <polygon points="{points}" style="fill:#fff; stroke:#000; stroke-width:1.2;"/>
+            </svg>
+            <input type="text" placeholder="Orient." style="position: relative; z-index: 1; width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; margin-top: auto; margin-bottom: auto;">
+            <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 1;">{nome}</strong>
+        </div>"""
+
+    @staticmethod
     def _genera_html_template_specifico(preventivo, dati_cliente):
         """Template HTML scalabile - adatta il layout al numero di materiali (1-25)"""
 
@@ -682,26 +722,42 @@ class DocumentUtils:
                     lunghezza = getattr(materiale, 'lunghezza', 0)
                     sviluppo = getattr(materiale, 'sviluppo', 0)
                     nome = getattr(materiale, 'nome', f'Materiale {i+1}')
+                    is_conica = getattr(materiale, 'is_conica', False)
+                    sezioni_coniche = getattr(materiale, 'sezioni_coniche', [])
+                    orientamento = getattr(materiale, 'orientamento', {})
                 elif isinstance(materiale, dict):
                     giri = materiale.get('giri', 0)
                     lunghezza = materiale.get('lunghezza', 0)
                     sviluppo = materiale.get('sviluppo', 0)
                     nome = materiale.get('nome', materiale.get('materiale_nome', f'Materiale {i+1}'))
+                    is_conica = materiale.get('is_conica', False)
+                    sezioni_coniche = materiale.get('sezioni_coniche', [])
+                    orientamento = materiale.get('orientamento', {})
                 else:
                     giri = 1
                     lunghezza = 1000
                     sviluppo = 100
                     nome = f'Materiale {i+1}'
+                    is_conica = False
+                    sezioni_coniche = []
+                    orientamento = {}
+
+                # Genera la figura: trapezio SVG per conica, rettangolo normale altrimenti
+                if is_conica and sezioni_coniche:
+                    figura_html = DocumentUtils._genera_figura_conica(
+                        sezioni_coniche, orientamento, s, nome)
+                else:
+                    figura_html = f"""<div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative;">
+                        <input type="text" placeholder="Orient." style="width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; position: relative; z-index: 1;">
+                        <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; transform: translateX(-50%); z-index: 1;">{nome}</strong>
+                    </div>"""
 
                 materiali_html += f"""
                 <div style="width: 120mm; margin: {s['margin_mat']} auto; position: relative; page-break-inside: avoid;">
                     <div style="position: absolute; left: 50%; top: {s['top_offset']}; transform: translateX(-50%); font-size: {s['font_info']};">
                         <strong>{lunghezza}mm</strong>
                     </div>
-                    <div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative;">
-                        <input type="text" placeholder="Orient." style="width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent;">
-                        <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; transform: translateX(-50%);">{nome}</strong>
-                    </div>
+                    {figura_html}
                     <div style="position: absolute; left: -2mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
                         <strong>G{giri}</strong>
                     </div>

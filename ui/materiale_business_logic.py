@@ -218,6 +218,9 @@ class MaterialeBusinessLogic:
             nuovo_materiale.sezioni_coniche = copy.deepcopy(materiale_originale.sezioni_coniche)
         if hasattr(materiale_originale, 'scarto_mm2'):
             nuovo_materiale.scarto_mm2 = materiale_originale.scarto_mm2
+        if hasattr(materiale_originale, 'orientamento'):
+            import copy as _copy
+            nuovo_materiale.orientamento = _copy.deepcopy(materiale_originale.orientamento)
         nuovo_materiale.ricalcola_tutto()
         return nuovo_materiale
     
@@ -283,6 +286,10 @@ class MaterialeBusinessLogic:
                 # Sincronizza sezioni nel modello
                 MaterialeBusinessLogic.on_sezione_changed(window_instance)
 
+        # Ripristina orientamento nella preview
+        if hasattr(window_instance, 'tela_preview') and hasattr(window_instance.materiale_esistente, 'orientamento'):
+            window_instance.tela_preview.set_orientamento(window_instance.materiale_esistente.orientamento)
+
         # Aggiorna display
         MaterialeBusinessLogic.aggiorna_display(window_instance)
     
@@ -330,7 +337,11 @@ class MaterialeBusinessLogic:
         if window_instance.arrotondamento_modificato_manualmente and window_instance.edit_arrotondamento.value() != 0:
             window_instance.materiale_calcolato.arrotondamento_manuale = window_instance.edit_arrotondamento.value()
             window_instance.materiale_calcolato.sviluppo = window_instance.edit_arrotondamento.value()
-        
+
+        # Salva orientamento dalla preview
+        if hasattr(window_instance, 'tela_preview'):
+            window_instance.materiale_calcolato.orientamento = window_instance.tela_preview.get_orientamento()
+
         window_instance.materiale_confermato.emit(window_instance.materiale_calcolato, window_instance.indice_modifica)
         window_instance.close()
     

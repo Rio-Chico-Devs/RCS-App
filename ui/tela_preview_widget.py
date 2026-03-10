@@ -88,6 +88,19 @@ class TelaPreviewWidget(QWidget):
         self._flip_v = not self._flip_v
         self.update()
 
+    def get_orientamento(self):
+        """Restituisce il dizionario orientamento corrente."""
+        return {'rotation': self._rotation, 'flip_h': self._flip_h, 'flip_v': self._flip_v}
+
+    def set_orientamento(self, orientamento):
+        """Imposta orientamento da dizionario (rotation, flip_h, flip_v)."""
+        if not orientamento:
+            return
+        self._rotation = orientamento.get('rotation', 0)
+        self._flip_h = orientamento.get('flip_h', False)
+        self._flip_v = orientamento.get('flip_v', False)
+        self.update()
+
     # ── Calcolo scarto ────────────────────────────────────────────
 
     def _calcola_scarto(self):

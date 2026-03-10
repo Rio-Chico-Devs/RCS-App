@@ -112,6 +112,7 @@ class PreventivoWindow(QMainWindow):
                 # Dati conici
                 materiale.is_conica = mat_data.get('is_conica', False)
                 materiale.sezioni_coniche = mat_data.get('sezioni_coniche', [])
+                materiale.orientamento = mat_data.get('orientamento', {'rotation': 0, 'flip_h': False, 'flip_v': False})
 
                 self.preventivo.materiali_calcolati.append(materiale)
         except (json.JSONDecodeError, TypeError):

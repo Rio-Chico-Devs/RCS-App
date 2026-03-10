@@ -37,6 +37,9 @@ class MaterialeCalcolato:
         # Scarto materiale (mm²) - solo per conica
         self.scarto_mm2 = 0.0
 
+        # Orientamento (da toolbar rotate/flip della TelaPreviewWidget)
+        self.orientamento = {'rotation': 0, 'flip_h': False, 'flip_v': False}
+
     @property
     def stratifica(self):
         """Alias per sviluppo - per compatibilità con codice esistente"""
@@ -109,6 +112,7 @@ class MaterialeCalcolato:
             'maggiorazione': self.maggiorazione,
             'is_conica': self.is_conica,
             'sezioni_coniche': self.sezioni_coniche,
-            'scarto_mm2': self.scarto_mm2
+            'scarto_mm2': self.scarto_mm2,
+            'orientamento': self.orientamento
         }
         return d
