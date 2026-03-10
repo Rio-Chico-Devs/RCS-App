@@ -546,9 +546,21 @@ class DocumentUtils:
                     is_conica=False; sezioni=[]; orient={}
 
                 if is_conica and sezioni:
-                    # Genera SVG con rettangolo di taglio, profilo conico e scarto
+                    # Costruisce diam_str per il testo dentro la forma (es. Ø10→Ø14→Ø10)
+                    rot = orient.get('rotation', 0) if orient else 0
+                    flh = orient.get('flip_h', False) if orient else False
+                    all_diams = [sezioni[0].get('d_inizio', 0)] + [s.get('d_fine', 0) for s in sezioni]
+                    if flh ^ (rot == 180):
+                        all_diams = list(reversed(all_diams))
+                    deduped = [all_diams[0]]
+                    for d in all_diams[1:]:
+                        if d != deduped[-1]:
+                            deduped.append(d)
+                    diam_str = '\u2192'.join(f'\u00d8{d:.0f}' for d in deduped)
+                    nome_full = f'{diam_str}  {nome}'
+                    # Genera SVG con profilo trapezoidale identico all'HTML
                     svg_path = f'Pictures/conica_{i}.svg'
-                    svg_content = DocumentUtils._svg_conica_str(sezioni, orient, nome)
+                    svg_content = DocumentUtils._svg_conica_str(sezioni, orient, nome_full)
                     if svg_files is not None:
                         svg_files.append((svg_path, svg_content))
                     center_cell = (
@@ -635,8 +647,8 @@ class DocumentUtils:
     @staticmethod
     def _svg_conica_str(sezioni_coniche, orientamento, nome_xml):
         """Genera SVG per la conica nell'ODT.
-        Mostra il rettangolo di taglio (bianco), il profilo conico (azzurro)
-        e lo scarto evidenziato in rosso chiaro. nome_xml già XML-escaped.
+        SVG per la conica nell'ODT: profilo trapezoidale identico all'HTML.
+        nome_xml: testo già XML-escaped (es. 'Ø10→Ø14→Ø10  NomeMateriale').
         """
         rotation = orientamento.get('rotation', 0) if orientamento else 0
         flip_h   = orientamento.get('flip_h', False) if orientamento else False
@@ -646,51 +658,41 @@ class DocumentUtils:
             sezioni_draw = list(reversed(sezioni_draw))
 
         total_len = sum(sez.get('lunghezza', 0) for sez in sezioni_draw) or 1
+        max_d = max(
+            max((sez.get('d_inizio', 0) for sez in sezioni_draw), default=1),
+            max((sez.get('d_fine', 0) for sez in sezioni_draw), default=1),
+            1
+        )
 
-        punti = []  # (frac_pos, sviluppo)
-        pos = 0
-        for i, sez in enumerate(sezioni_draw):
+        W, H = 80, 20
+        cy = H / 2
+
+        top_pts = []
+        bot_pts = []
+        x_pos = 0
+        for j, sez in enumerate(sezioni_draw):
             d_ini = sez.get('d_inizio', 0)
             d_fin = sez.get('d_fine', 0)
             l_sez = sez.get('lunghezza', 0)
-            if i == 0:
-                punti.append((pos / total_len, d_ini * 3.14159))
-            pos += l_sez
-            punti.append((pos / total_len, d_fin * 3.14159))
+            x_s = round(x_pos / total_len * W, 2)
+            x_e = round((x_pos + l_sez) / total_len * W, 2)
+            h_ini = round(d_ini / max_d * 18, 2)
+            h_fin = round(d_fin / max_d * 18, 2)
+            if j == 0:
+                top_pts.append(f'{x_s},{round(cy - h_ini/2, 2)}')
+                bot_pts.append(f'{x_s},{round(cy + h_ini/2, 2)}')
+            top_pts.append(f'{x_e},{round(cy - h_fin/2, 2)}')
+            bot_pts.append(f'{x_e},{round(cy + h_fin/2, 2)}')
+            x_pos += l_sez
 
-        sviluppo_max = max(p[1] for p in punti) if punti else 1
-        if sviluppo_max <= 0:
-            sviluppo_max = 1
-
-        W, H = 120, 20
-
-        # Profilo conico: bottom-aligned, il bordo superiore varia col diametro
-        top_pts = []
-        for frac, sv in punti:
-            x = round(frac * W, 2)
-            y_top = round(H - sv / sviluppo_max * H, 2)
-            top_pts.append((x, y_top))
-
-        # Trapezio (tela usabile) - riempimento azzurro
-        trap_pts = top_pts + [(W, H), (0, H)]
-        trap_str = ' '.join(f'{x},{y}' for x, y in trap_pts)
-
-        # Area scarto (tra bordo superiore rettangolo e profilo conico) - rosso chiaro
-        scarto_pts = [(0, 0), (W, 0)] + list(reversed(top_pts))
-        scarto_str = ' '.join(f'{x},{y}' for x, y in scarto_pts)
-
-        # Linea profilo conico (tratteggiata)
-        profile_str = ' '.join(f'{x},{y}' for x, y in top_pts)
+        points_str = ' '.join(top_pts + list(reversed(bot_pts)))
 
         return (
             '<?xml version="1.0" encoding="UTF-8"?>'
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}">'
-            f'<rect width="{W}" height="{H}" fill="white" stroke="black" stroke-width="1.5"/>'
-            f'<polygon points="{trap_str}" fill="#c8ddf0" fill-opacity="0.5" stroke="none"/>'
-            f'<polygon points="{scarto_str}" fill="#ff9696" fill-opacity="0.4" stroke="none"/>'
-            f'<polyline points="{profile_str}" fill="none" stroke="#2c3e50" stroke-width="1" stroke-dasharray="3,2"/>'
-            f'<text x="{W/2}" y="14" text-anchor="middle" font-size="7" font-weight="bold"'
-            f' font-family="Arial,sans-serif">{nome_xml}</text>'
+            f'<polygon points="{points_str}" fill="white" stroke="black" stroke-width="1.5"/>'
+            f'<text x="{W/2}" y="{cy + 2.5}" text-anchor="middle" dominant-baseline="middle"'
+            f' font-size="5" font-weight="bold" font-family="Arial,sans-serif">{nome_xml}</text>'
             f'</svg>'
         )
 
