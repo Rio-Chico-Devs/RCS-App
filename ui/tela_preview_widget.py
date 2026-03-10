@@ -201,13 +201,20 @@ class TelaPreviewWidget(QWidget):
         quota_spazio = 40  # Spazio per le quote
 
         # Area disponibile per il disegno
-        draw_x = margine
-        draw_y = margine + quota_spazio
-        draw_w = w - 2 * margine
-        draw_h = h - 2 * margine - 2 * quota_spazio
+        avail_w = w - 2 * margine
+        avail_h = h - 2 * margine - 2 * quota_spazio
 
-        if draw_w <= 0 or draw_h <= 0:
+        if avail_w <= 0 or avail_h <= 0:
             return
+
+        # Scala uniforme per preservare l'aspect ratio reale (sviluppo x lunghezza)
+        scala = min(avail_w / self._sviluppo, avail_h / self._lunghezza)
+        draw_w = self._sviluppo * scala
+        draw_h = self._lunghezza * scala
+
+        # Centra il rettangolo nell'area disponibile
+        draw_x = margine + (avail_w - draw_w) / 2
+        draw_y = margine + quota_spazio + (avail_h - draw_h) / 2
 
         # Disegna il rettangolo della tela
         pen = QPen(self._tela_border, 2)
@@ -293,14 +300,19 @@ class TelaPreviewWidget(QWidget):
             self._disegna_placeholder(painter)
             return
 
-        # Fattori di scala
-        scala_x = draw_w / lunghezza_totale
-        scala_y = draw_h / sviluppo_max
+        # Scala uniforme per preservare l'aspect ratio reale
+        scala = min(draw_w / lunghezza_totale, draw_h / sviluppo_max)
+        scala_x = scala
+        scala_y = scala
+
+        # Centra il rettangolo nell'area disponibile
+        rect_w_px = lunghezza_totale * scala
+        rect_h_px = sviluppo_max * scala
+        rect_left = margine_sx + (draw_w - rect_w_px) / 2
+        rect_right = rect_left + rect_w_px
 
         # Il rettangolo di taglio è allineato in basso (bordo inferiore comune)
-        rect_left = margine_sx
-        rect_right = margine_sx + lunghezza_totale * scala_x
-        rect_h = sviluppo_max * scala_y
+        rect_h = rect_h_px
         rect_top = margine_top + (draw_h - rect_h)
         rect_bot = rect_top + rect_h
 
