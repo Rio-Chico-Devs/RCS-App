@@ -466,6 +466,14 @@ class DocumentUtils:
             f'fo:padding="{pad}"/></style:style>'
             f'<style:style style:name="RH" style:family="table-row">'
             f'<style:table-row-properties style:row-height="{rect_h}" style:use-optimal-row-height="false"/></style:style>'
+            f'<style:style style:name="TF" style:family="table">'
+            f'<style:table-properties style:width="3.5cm" table:align="left"/></style:style>'
+            f'<style:style style:name="TCFI" style:family="table-column">'
+            f'<style:table-column-properties style:column-width="3.5cm"/></style:style>'
+            f'<style:style style:name="RFI" style:family="table-row">'
+            f'<style:table-row-properties style:row-height="0.5cm" style:use-optimal-row-height="false"/></style:style>'
+            f'<style:style style:name="CFI" style:family="table-cell">'
+            f'<style:table-cell-properties fo:border="1pt solid #000000" fo:padding="0.05cm"/></style:style>'
             f'<style:style style:name="TO" style:family="table">'
             f'<style:table-properties style:width="17.7cm" table:align="margins"/></style:style>'
             f'{ops_col_styles}'
@@ -555,7 +563,17 @@ class DocumentUtils:
                         f'</table:table-cell>'
                     )
 
+                field_table = (
+                    f'<table:table table:name="F{i}" table:style-name="TF">'
+                    f'<table:table-column table:style-name="TCFI"/>'
+                    f'<table:table-row table:style-name="RFI">'
+                    f'<table:table-cell table:style-name="CFI">'
+                    f'<text:p text:style-name="PN"></text:p>'
+                    f'</table:table-cell>'
+                    f'</table:table-row></table:table>'
+                )
                 mat_parts.append(
+                    field_table +
                     f'<text:p text:style-name="PL">{int(lunghezza)} mm</text:p>'
                     f'<table:table table:name="M{i}" table:style-name="TM">'
                     f'<table:table-column table:style-name="TCN"/>'
@@ -694,37 +712,54 @@ class DocumentUtils:
 
     @staticmethod
     def _genera_figura_conica(sezioni_coniche, orientamento, s, nome):
-        """Genera un div con SVG rettangolo + linea diagonale per ogni sezione conica.
-        1 sezione conica = 1 diagonale, 2 sezioni coniche = 2 diagonali, ecc."""
+        """Genera un div con SVG trapezio (polygon) per ogni sezione conica.
+        La forma rispecchia il profilo reale: ogni sezione è un trapezio proporzionale ai diametri."""
         rotation = orientamento.get('rotation', 0) if orientamento else 0
         flip_h   = orientamento.get('flip_h', False) if orientamento else False
 
         total_len = sum(sez.get('lunghezza', 0) for sez in sezioni_coniche) or 1
 
-        # Eventuale inversione per orientamento
         sezioni_draw = list(sezioni_coniche)
         if flip_h ^ (rotation == 180):
             sezioni_draw = list(reversed(sezioni_draw))
 
-        # Una linea diagonale per ogni sezione conica (d_inizio != d_fine)
-        lines_svg = ""
+        # Diametro massimo per normalizzare le altezze
+        max_d = max(
+            max((sez.get('d_inizio', 0) for sez in sezioni_draw), default=1),
+            max((sez.get('d_fine', 0) for sez in sezioni_draw), default=1),
+            1
+        )
+
+        # Costruisce il profilo del trapezio come polygon SVG
+        # viewBox: 0 0 80 20, centro y=10
+        cy = 10.0
+        top_pts = []
+        bot_pts = []
+
         x_pos = 0
-        for sez in sezioni_draw:
+        for j, sez in enumerate(sezioni_draw):
             d_ini = sez.get('d_inizio', 0)
             d_fin = sez.get('d_fine', 0)
             l_sez = sez.get('lunghezza', 0)
             x_s = round(x_pos / total_len * 80, 2)
             x_e = round((x_pos + l_sez) / total_len * 80, 2)
-            if abs(d_ini - d_fin) > 0.01:
-                lines_svg += f'<line x1="{x_s}" y1="0" x2="{x_e}" y2="20" stroke="#000" stroke-width="1.5"/>'
+            h_ini = round(d_ini / max_d * 18, 2)  # altezza proporzionale, max 18 (lascia 1px bordo)
+            h_fin = round(d_fin / max_d * 18, 2)
+            if j == 0:
+                top_pts.append(f'{x_s},{round(cy - h_ini/2, 2)}')
+                bot_pts.append(f'{x_s},{round(cy + h_ini/2, 2)}')
+            top_pts.append(f'{x_e},{round(cy - h_fin/2, 2)}')
+            bot_pts.append(f'{x_e},{round(cy + h_fin/2, 2)}')
             x_pos += l_sez
+
+        points_str = ' '.join(top_pts + list(reversed(bot_pts)))
+        polygon_svg = f'<polygon points="{points_str}" fill="#fff" stroke="#000" stroke-width="1.5"/>'
 
         return f"""<div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; position: relative;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 20"
                  preserveAspectRatio="none"
                  style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-                <rect x="0" y="0" width="80" height="20" fill="#fff" stroke="#000" stroke-width="1.5"/>
-                {lines_svg}
+                {polygon_svg}
             </svg>
             <input type="text" placeholder="Orient." style="position: relative; z-index: 1; width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; margin-top: auto; margin-bottom: auto;">
             <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 1;">{nome}</strong>
@@ -777,20 +812,20 @@ class DocumentUtils:
                     </div>"""
 
                 materiali_html += f"""
-                <div style="width: 120mm; margin: {s['margin_mat']} auto; position: relative; page-break-inside: avoid;">
-                    <div style="position: absolute; left: 50%; top: {s['top_offset']}; transform: translateX(-50%); font-size: {s['font_info']};">
-                        <strong>{lunghezza}mm</strong>
+                <div style="display: flex; align-items: center; justify-content: center; margin: {s['margin_mat']} auto; page-break-inside: avoid;">
+                    <input type="text" placeholder="" style="width: 28mm; height: 5mm; border: 1.5px solid #000; background: #fff; color: #000; font-size: {s['font_info']}; padding: 0 1mm; box-sizing: border-box; flex-shrink: 0; margin-right: 4mm;">
+                    <div style="width: 120mm; position: relative; flex-shrink: 0;">
+                        <div style="position: absolute; left: 50%; top: {s['top_offset']}; transform: translateX(-50%); font-size: {s['font_info']};">
+                            <strong>{lunghezza}mm</strong>
+                        </div>
+                        {figura_html}
+                        <div style="position: absolute; left: -2mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
+                            <strong>G{giri}</strong>
+                        </div>
+                        <div style="position: absolute; right: -6mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
+                            <strong>H {int(sviluppo)} mm</strong>
+                        </div>
                     </div>
-                    {figura_html}
-                    <div style="position: absolute; left: -2mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
-                        <strong>G{giri}</strong>
-                    </div>
-                    <div style="position: absolute; right: -6mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
-                        <strong>H {int(sviluppo)} mm</strong>
-                    </div>
-                </div>
-                <div style="width: 120mm; margin: 1mm auto 0; display: flex; justify-content: flex-start;">
-                    <input type="text" placeholder="" style="width: 35mm; border: 1.5px solid #000; background: #fff; color: #000; font-size: {s['font_info']}; padding: 1mm 2mm; height: 6mm; box-sizing: border-box;">
                 </div>
                 """
 
