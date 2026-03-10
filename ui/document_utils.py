@@ -410,8 +410,6 @@ class DocumentUtils:
             'xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" '
             'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" '
             'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '
-            'xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" '
-            'xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" '
             'xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"'
         )
 
@@ -456,11 +454,16 @@ class DocumentUtils:
             f'<style:table-cell-properties fo:border="1.5pt solid #000000" fo:padding="{pad}"/></style:style>'
             f'<style:style style:name="CNB" style:family="table-cell">'
             f'<style:table-cell-properties fo:border="none" fo:padding="{npad}"/></style:style>'
-            f'<style:style style:name="DP" style:family="graphic">'
-            f'<style:graphic-properties draw:fill="none" draw:stroke="solid" '
-            f'svg:stroke-width="0.053cm" svg:stroke-color="#000000" '
-            f'draw:auto-grow-height="false" draw:auto-grow-width="false" '
-            f'draw:textarea-horizontal-align="center" draw:textarea-vertical-align="middle"/></style:style>'
+            f'<style:style style:name="CMB_WL" style:family="table-cell">'
+            f'<style:table-cell-properties '
+            f'fo:border-left="3.5pt solid #000000" fo:border-right="0.75pt solid #000000" '
+            f'fo:border-top="1.5pt solid #000000" fo:border-bottom="1.5pt solid #000000" '
+            f'fo:padding="{pad}"/></style:style>'
+            f'<style:style style:name="CMB_WR" style:family="table-cell">'
+            f'<style:table-cell-properties '
+            f'fo:border-left="0.75pt solid #000000" fo:border-right="3.5pt solid #000000" '
+            f'fo:border-top="1.5pt solid #000000" fo:border-bottom="1.5pt solid #000000" '
+            f'fo:padding="{pad}"/></style:style>'
             f'<style:style style:name="RH" style:family="table-row">'
             f'<style:table-row-properties style:row-height="{rect_h}" style:use-optimal-row-height="false"/></style:style>'
             f'<style:style style:name="TO" style:family="table">'
@@ -523,35 +526,26 @@ class DocumentUtils:
                     is_conica=False; sezioni=[]; orient={}
 
                 if is_conica and sezioni:
-                    PI = 3.14159
-                    sv_s = sezioni[0].get('d_inizio', 0) * PI
-                    sv_e = sezioni[-1].get('d_fine', 0) * PI
-                    sv_max = max(sv_s, sv_e, 1.0)
+                    d_s = sezioni[0].get('d_inizio', 0)
+                    d_e = sezioni[-1].get('d_fine', 0)
                     rot = orient.get('rotation', 0) if orient else 0
                     flh = orient.get('flip_h', False) if orient else False
-                    sv_l, sv_r = sv_s, sv_e
+                    sv_l = d_s * 3.14159
+                    sv_r = d_e * 3.14159
+                    disp_s, disp_e = d_s, d_e
                     if flh ^ (rot == 180):
                         sv_l, sv_r = sv_r, sv_l
-                    hl = int(21600 * sv_l / sv_max)
-                    hr = int(21600 * sv_r / sv_max)
-                    y_tl = (21600 - hl) // 2
-                    y_tr = (21600 - hr) // 2
-                    y_bl = (21600 + hl) // 2
-                    y_br = (21600 + hr) // 2
-                    epath = f'M 0 {y_tl} L 21600 {y_tr} L 21600 {y_br} L 0 {y_bl} Z N'
+                        disp_s, disp_e = disp_e, disp_s
+                    if sv_l > sv_r * 1.05:
+                        cstyle = 'CMB_WL'
+                    elif sv_r > sv_l * 1.05:
+                        cstyle = 'CMB_WR'
+                    else:
+                        cstyle = 'CMB'
+                    cell_text = f'\u00d8{disp_s:.0f}\u2192\u00d8{disp_e:.0f}  {nome}'
                     center_cell = (
-                        f'<table:table-cell table:style-name="CNB">'
-                        f'<text:p text:style-name="PC">'
-                        f'<draw:custom-shape draw:style-name="DP" '
-                        f'svg:width="11.9cm" svg:height="{rect_h}" '
-                        f'text:anchor-type="as-char" draw:z-index="0">'
-                        f'<text:p text:style-name="PC">{nome}</text:p>'
-                        f'<draw:enhanced-geometry '
-                        f'svg:viewBox="0 0 21600 21600" '
-                        f'draw:enhanced-path="{epath}" '
-                        f'draw:text-areas="0 0 21600 21600"/>'
-                        f'</draw:custom-shape>'
-                        f'</text:p>'
+                        f'<table:table-cell table:style-name="{cstyle}">'
+                        f'<text:p text:style-name="PC">{cell_text}</text:p>'
                         f'</table:table-cell>'
                     )
                 else:
