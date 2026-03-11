@@ -29,13 +29,14 @@ v2.3.0 (22/09/2025):
 # type: ignore
 # pyright: reportUnknownLambdaType=false
 
-from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
                              QWidget, QLabel, QLineEdit, QFormLayout, QMessageBox,
                              QScrollArea, QGroupBox, QSpinBox, QDoubleSpinBox,
                              QDialog, QListWidget, QListWidgetItem, QGridLayout, QFrame,
                              QSizePolicy, QApplication, QGraphicsDropShadowEffect, QTextEdit)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QDoubleValidator, QColor
+from ui.materiale_ui_components import NoScrollSpinBox, NoScrollDoubleSpinBox
 from models.preventivo import Preventivo
 from models.materiale import MaterialeCalcolato
 from ui.materiale_window import MaterialeWindow
@@ -111,6 +112,7 @@ class PreventivoWindow(QMainWindow):
                 # Dati conici
                 materiale.is_conica = mat_data.get('is_conica', False)
                 materiale.sezioni_coniche = mat_data.get('sezioni_coniche', [])
+                materiale.orientamento = mat_data.get('orientamento', {'rotation': 0, 'flip_h': False, 'flip_v': False})
 
                 self.preventivo.materiali_calcolati.append(materiale)
         except (json.JSONDecodeError, TypeError):
@@ -728,7 +730,7 @@ class PreventivoWindow(QMainWindow):
     
     def create_standard_spinbox(self, suffix="€"):
         """SpinBox standardizzato"""
-        spinbox = QDoubleSpinBox()
+        spinbox = NoScrollDoubleSpinBox()
         spinbox.setMaximum(999999.99)
         spinbox.setDecimals(2)
         if suffix:

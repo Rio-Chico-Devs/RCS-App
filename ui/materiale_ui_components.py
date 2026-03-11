@@ -13,10 +13,23 @@ Author: Antonio VB + Claude
 from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QWidget, QLabel,
                              QLineEdit, QFormLayout, QGroupBox, QDoubleSpinBox, QFrame,
                              QGridLayout, QGraphicsDropShadowEffect, QComboBox, QSpinBox,
-                             QSizePolicy, QScrollArea, QApplication, QDesktopWidget)
+                             QSizePolicy, QScrollArea, QApplication, QDesktopWidget,
+                             QButtonGroup, QRadioButton)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QFont
 from ui.tela_preview_widget import TelaPreviewWidget
+
+
+class NoScrollSpinBox(QSpinBox):
+    """QSpinBox che ignora la rotella del mouse"""
+    def wheelEvent(self, event):
+        event.ignore()
+
+
+class NoScrollDoubleSpinBox(QDoubleSpinBox):
+    """QDoubleSpinBox che ignora la rotella del mouse"""
+    def wheelEvent(self, event):
+        event.ignore()
 
 class MaterialeUIComponents:
     """Classe per creare componenti UI standardizzati per MaterialeWindow"""
@@ -173,71 +186,77 @@ class MaterialeUIComponents:
 
         layout.addWidget(window_instance.cilindrico_widget)
 
-        # === SEZIONI CONICHE - visibile solo in modalità conica ===
+        # === CONICITÀ - visibile solo in modalità conica ===
         window_instance.conica_widget = QWidget()
         conica_layout = QVBoxLayout(window_instance.conica_widget)
         conica_layout.setContentsMargins(0, 0, 0, 0)
-        conica_layout.setSpacing(6)
+        conica_layout.setSpacing(10)
 
-        # Header sezioni + pulsanti
-        sezioni_header = QHBoxLayout()
-        lbl_sezioni = QLabel("Sezioni coniche:")
-        lbl_sezioni.setStyleSheet("font-size: 13px; font-weight: 600; color: #4a5568;")
-        sezioni_header.addWidget(lbl_sezioni)
-        sezioni_header.addStretch()
+        # Label titolo
+        lbl_conica_title = QLabel("Parametri Conicità:")
+        lbl_conica_title.setStyleSheet("font-size: 13px; font-weight: 600; color: #4a5568;")
+        conica_layout.addWidget(lbl_conica_title)
 
-        window_instance.btn_aggiungi_sezione = QPushButton("+")
-        window_instance.btn_aggiungi_sezione.setFixedSize(30, 30)
-        window_instance.btn_aggiungi_sezione.setStyleSheet("""
-            QPushButton { background-color: #48bb78; color: white; font-size: 16px; font-weight: 700; border-radius: 4px; padding: 0; }
-            QPushButton:hover { background-color: #38a169; }
-        """)
-        window_instance.btn_aggiungi_sezione.clicked.connect(window_instance.aggiungi_sezione_conica)
+        # Lato: radio buttons Sinistra / Destra / Entrambi
+        lato_row = QHBoxLayout()
+        lato_label = QLabel("Lato:")
+        lato_label.setStyleSheet("font-size: 13px; color: #4a5568; min-width: 60px;")
+        lato_row.addWidget(lato_label)
 
-        window_instance.btn_rimuovi_sezione = QPushButton("-")
-        window_instance.btn_rimuovi_sezione.setFixedSize(30, 30)
-        window_instance.btn_rimuovi_sezione.setStyleSheet("""
-            QPushButton { background-color: #e53e3e; color: white; font-size: 16px; font-weight: 700; border-radius: 4px; padding: 0; }
-            QPushButton:hover { background-color: #c53030; }
-        """)
-        window_instance.btn_rimuovi_sezione.clicked.connect(window_instance.rimuovi_sezione_conica)
+        radio_style = "QRadioButton { font-size: 13px; color: #2d3748; spacing: 4px; }"
+        window_instance.radio_sinistra = QRadioButton("Sinistra")
+        window_instance.radio_sinistra.setStyleSheet(radio_style)
+        window_instance.radio_sinistra.setChecked(True)
+        window_instance.radio_destra = QRadioButton("Destra")
+        window_instance.radio_destra.setStyleSheet(radio_style)
+        window_instance.radio_entrambi = QRadioButton("Entrambi")
+        window_instance.radio_entrambi.setStyleSheet(radio_style)
 
-        sezioni_header.addWidget(window_instance.btn_aggiungi_sezione)
-        sezioni_header.addWidget(window_instance.btn_rimuovi_sezione)
-        conica_layout.addLayout(sezioni_header)
+        window_instance.lato_group = QButtonGroup(window_instance.conica_widget)
+        window_instance.lato_group.addButton(window_instance.radio_sinistra, 0)
+        window_instance.lato_group.addButton(window_instance.radio_destra, 1)
+        window_instance.lato_group.addButton(window_instance.radio_entrambi, 2)
+        window_instance.lato_group.buttonClicked.connect(window_instance.on_conicita_changed)
 
-        # Header colonne
-        col_header = QHBoxLayout()
-        col_header.setSpacing(4)
-        for txt in ["#", "Lungh. (mm)", "Ø Inizio", "Ø Fine"]:
-            lbl = QLabel(txt)
-            lbl.setStyleSheet("font-size: 11px; font-weight: 600; color: #718096;")
-            lbl.setAlignment(Qt.AlignCenter)
-            if txt == "#":
-                lbl.setFixedWidth(20)
-            col_header.addWidget(lbl)
-        conica_layout.addLayout(col_header)
+        lato_row.addWidget(window_instance.radio_sinistra)
+        lato_row.addWidget(window_instance.radio_destra)
+        lato_row.addWidget(window_instance.radio_entrambi)
+        lato_row.addStretch()
+        conica_layout.addLayout(lato_row)
 
-        # Scroll area per le righe sezioni
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
-        scroll.setMaximumHeight(200)
+        # Form con Altezza inizio e Lunghezza taglio
+        conica_form = QFormLayout()
+        conica_form.setVerticalSpacing(10)
+        conica_form.setHorizontalSpacing(10)
+        conica_form.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
-        window_instance.sezioni_container = QWidget()
-        window_instance.sezioni_layout = QVBoxLayout(window_instance.sezioni_container)
-        window_instance.sezioni_layout.setContentsMargins(0, 0, 0, 0)
-        window_instance.sezioni_layout.setSpacing(4)
-        window_instance.sezioni_layout.addStretch()
-        scroll.setWidget(window_instance.sezioni_container)
+        window_instance.spin_conicita_altezza = NoScrollDoubleSpinBox()
+        window_instance.spin_conicita_altezza.setMaximum(99999.0)
+        window_instance.spin_conicita_altezza.setDecimals(1)
+        window_instance.spin_conicita_altezza.setValue(0.0)
+        window_instance.spin_conicita_altezza.setSuffix(" mm")
+        window_instance.spin_conicita_altezza.setMinimumHeight(32)
+        window_instance.spin_conicita_altezza.valueChanged.connect(window_instance.on_conicita_changed)
+        conica_form.addRow(
+            MaterialeUIComponents.create_standard_label("Altezza inizio"),
+            window_instance.spin_conicita_altezza
+        )
 
-        conica_layout.addWidget(scroll)
+        window_instance.spin_conicita_lunghezza = NoScrollDoubleSpinBox()
+        window_instance.spin_conicita_lunghezza.setMaximum(99999.0)
+        window_instance.spin_conicita_lunghezza.setDecimals(1)
+        window_instance.spin_conicita_lunghezza.setValue(0.0)
+        window_instance.spin_conicita_lunghezza.setSuffix(" mm")
+        window_instance.spin_conicita_lunghezza.setMinimumHeight(32)
+        window_instance.spin_conicita_lunghezza.valueChanged.connect(window_instance.on_conicita_changed)
+        conica_form.addRow(
+            MaterialeUIComponents.create_standard_label("Lunghezza taglio"),
+            window_instance.spin_conicita_lunghezza
+        )
 
-        # Lista per tenere traccia dei widget delle sezioni
-        window_instance.sezioni_widgets = []
+        conica_layout.addLayout(conica_form)
 
         window_instance.conica_widget.hide()
-        layout.addWidget(window_instance.conica_widget)
 
         # Campo Metri sotto Lunghezza
         MaterialeUIComponents.create_metri_field(window_instance, form_layout)
@@ -248,7 +267,7 @@ class MaterialeUIComponents:
         form_layout.addRow(MaterialeUIComponents.create_standard_label("Materiale"), window_instance.combo_materiale)
 
         # Giri
-        window_instance.edit_giri = QSpinBox()
+        window_instance.edit_giri = NoScrollSpinBox()
         window_instance.edit_giri.setMaximum(9999)
         window_instance.edit_giri.setValue(1)
         window_instance.edit_giri.valueChanged.connect(window_instance.on_parametro_changed)
@@ -267,6 +286,8 @@ class MaterialeUIComponents:
         """)
         window_instance.btn_conica.clicked.connect(window_instance.toggle_conica)
         layout.addWidget(window_instance.btn_conica)
+
+        layout.addWidget(window_instance.conica_widget)
 
         # Nota per i campi non editabili
         note_label = QLabel("* I valori in grassetto non sono editabili")
@@ -287,7 +308,7 @@ class MaterialeUIComponents:
     @staticmethod
     def create_standard_input(suffix="", callback=None, decimals=2, default_value=0):
         """Input standardizzato per tutto il form"""
-        field = QDoubleSpinBox()
+        field = NoScrollDoubleSpinBox()
         field.setMaximum(999999.99)
         field.setDecimals(decimals)
         if suffix:
@@ -475,7 +496,7 @@ class MaterialeUIComponents:
         input_container.setFixedHeight(36)
         
         # FIX: Input con callback specifico per sviluppo manuale
-        window_instance.edit_arrotondamento = QDoubleSpinBox()
+        window_instance.edit_arrotondamento = NoScrollDoubleSpinBox()
         window_instance.edit_arrotondamento.setMaximum(999999.99)
         window_instance.edit_arrotondamento.setDecimals(2)
         window_instance.edit_arrotondamento.setFixedHeight(36)
@@ -583,8 +604,57 @@ class MaterialeUIComponents:
         layout.setContentsMargins(15, 28, 15, 15)
         layout.setSpacing(8)
 
+        # Barra pulsanti trasformazione
+        btn_style = """
+            QPushButton {
+                background-color: #edf2f7;
+                color: #4a5568;
+                border: 1px solid #e2e8f0;
+                border-radius: 4px;
+                font-size: 16px;
+                padding: 0;
+            }
+            QPushButton:hover { background-color: #e2e8f0; }
+            QPushButton:pressed { background-color: #cbd5e0; }
+        """
+        transform_layout = QHBoxLayout()
+        transform_layout.setSpacing(6)
+        transform_layout.addStretch()
+
+        btn_rotate_left = QPushButton("↺")
+        btn_rotate_left.setToolTip("Ruota a sinistra (90°)")
+        btn_rotate_left.setFixedSize(32, 32)
+        btn_rotate_left.setStyleSheet(btn_style)
+        transform_layout.addWidget(btn_rotate_left)
+
+        btn_rotate_right = QPushButton("↻")
+        btn_rotate_right.setToolTip("Ruota a destra (90°)")
+        btn_rotate_right.setFixedSize(32, 32)
+        btn_rotate_right.setStyleSheet(btn_style)
+        transform_layout.addWidget(btn_rotate_right)
+
+        btn_flip_h = QPushButton("↔")
+        btn_flip_h.setToolTip("Capovolgi orizzontalmente")
+        btn_flip_h.setFixedSize(32, 32)
+        btn_flip_h.setStyleSheet(btn_style)
+        transform_layout.addWidget(btn_flip_h)
+
+        btn_flip_v = QPushButton("↕")
+        btn_flip_v.setToolTip("Capovolgi verticalmente")
+        btn_flip_v.setFixedSize(32, 32)
+        btn_flip_v.setStyleSheet(btn_style)
+        transform_layout.addWidget(btn_flip_v)
+
+        layout.addLayout(transform_layout)
+
         # Widget di anteprima CAD
         window_instance.tela_preview = TelaPreviewWidget()
+
+        btn_rotate_left.clicked.connect(window_instance.tela_preview.rotate_left)
+        btn_rotate_right.clicked.connect(window_instance.tela_preview.rotate_right)
+        btn_flip_h.clicked.connect(window_instance.tela_preview.flip_horizontal)
+        btn_flip_v.clicked.connect(window_instance.tela_preview.flip_vertical)
+
         layout.addWidget(window_instance.tela_preview, 1)
 
         parent_layout.addWidget(preview_group, 1)  # stretch=1 per prendere spazio rimanente

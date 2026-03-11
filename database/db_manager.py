@@ -168,6 +168,23 @@ class DatabaseManager:
             )
         """)
 
+        # Tabella fornitori
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS fornitori (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT NOT NULL UNIQUE
+            )
+        """)
+
+        # Pre-popola fornitori di default se vuota
+        cursor.execute("SELECT COUNT(*) FROM fornitori")
+        if cursor.fetchone()[0] == 0:
+            for nome_f in ['CIT', 'FIBERTECH', 'ANGELONI']:
+                try:
+                    cursor.execute("INSERT INTO fornitori (nome) VALUES (?)", (nome_f,))
+                except sqlite3.IntegrityError:
+                    pass
+
     # =================== METODI MATERIALI (IDENTICI ALL'ORIGINALE) ===================
 
     def get_all_materiali(self):
@@ -698,6 +715,58 @@ class DatabaseManager:
                 ORDER BY numero_revisione DESC
             """, (preventivo_originale_id, preventivo_originale_id))
             return cursor.fetchall()
+
+    # =================== METODI FORNITORI ===================
+
+    def get_all_fornitori(self):
+        """Restituisce tutti i fornitori"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, nome FROM fornitori ORDER BY nome")
+            return cursor.fetchall()
+
+    def add_fornitore(self, nome):
+        """Aggiunge un nuovo fornitore"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute("INSERT INTO fornitori (nome) VALUES (?)", (nome,))
+                conn.commit()
+                return cursor.lastrowid
+            except sqlite3.IntegrityError:
+                return False
+
+    def get_scorte_per_fornitore(self, nome_fornitore):
+        """Restituisce le scorte dei materiali di un fornitore specifico"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, nome, giacenza, capacita_magazzino, fornitore, prezzo_fornitore
+                FROM materiali
+                WHERE fornitore = ?
+                ORDER BY nome
+            """, (nome_fornitore,))
+            return cursor.fetchall()
+
+    def rename_fornitore(self, old_nome, new_nome):
+        """Rinomina un fornitore aggiornando anche tutti i materiali collegati"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute("UPDATE fornitori SET nome = ? WHERE nome = ?", (new_nome, old_nome))
+                cursor.execute("UPDATE materiali SET fornitore = ? WHERE fornitore = ?", (new_nome, old_nome))
+                conn.commit()
+                return True
+            except sqlite3.IntegrityError:
+                return False
+
+    def assegna_materiali_a_fornitore(self, nome_fornitore, materiale_ids):
+        """Assegna i materiali selezionati al fornitore (aggiorna campo fornitore)"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            for mat_id in materiale_ids:
+                cursor.execute("UPDATE materiali SET fornitore = ? WHERE id = ?", (nome_fornitore, mat_id))
+            conn.commit()
 
     def delete_preventivo_e_revisioni(self, preventivo_id):
         """NUOVO: Elimina un preventivo e tutte le sue revisioni"""

@@ -403,6 +403,22 @@ class VisualizzaPreventiviWindow(QMainWindow):
         """)
         self.btn_confronta.clicked.connect(self.confronta_preventivi)
 
+        # Anteprima Documento
+        self.btn_anteprima = QPushButton("Anteprima Documento")
+        self.btn_anteprima.setStyleSheet("""
+            QPushButton {
+                background-color: #ebf8ff;
+                color: #2b6cb0;
+                border: 1px solid #bee3f8;
+                min-height: 32px;
+                padding: 8px 16px;
+            }
+            QPushButton:hover {
+                background-color: #bee3f8;
+            }
+        """)
+        self.btn_anteprima.clicked.connect(self.anteprima_documento)
+
         # Genera Documento
         self.btn_genera = QPushButton("Genera Documento")
         self.btn_genera.setStyleSheet("""
@@ -435,6 +451,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         self.btn_elimina.clicked.connect(self.elimina_preventivo)
 
         row2.addWidget(self.btn_confronta)
+        row2.addWidget(self.btn_anteprima)
         row2.addWidget(self.btn_genera)
         row2.addWidget(self.btn_elimina)
 
@@ -664,6 +681,16 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
         confronto_window = ConfrontoPreventiviWindow(self.db_manager, self)
         confronto_window.show()
+
+    def anteprima_documento(self) -> None:
+        """Mostra anteprima del documento nel browser senza salvarlo"""
+        current_item = self.lista_preventivi.currentItem()
+        if not current_item:
+            QMessageBox.warning(self, "Attenzione", "Seleziona un preventivo dalla lista per visualizzare l'anteprima.")
+            return
+
+        from ui.main_window_business_logic import MainWindowBusinessLogic
+        MainWindowBusinessLogic.anteprima_documento_preventivo(self)
 
     def genera_documento(self) -> None:
         """Genera documento dal preventivo selezionato"""

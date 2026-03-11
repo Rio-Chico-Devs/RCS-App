@@ -15,12 +15,13 @@ v1.0.0 (2024-12-19):
 - ADDED: Form di modifica con validazione dati
 """
 
-from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, 
+from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
                              QWidget, QLabel, QListWidget, QMessageBox, QListWidgetItem,
                              QGroupBox, QFrame, QSizePolicy, QGraphicsDropShadowEffect,
                              QLineEdit, QDoubleSpinBox, QFormLayout, QDialog, QGridLayout)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QColor
+from ui.materiale_ui_components import NoScrollDoubleSpinBox
 
 class GestioneMaterialiWindow(QMainWindow):
     materiali_modificati = pyqtSignal()  # Signal per notificare modifiche
@@ -362,14 +363,14 @@ class GestioneMaterialiWindow(QMainWindow):
         self.edit_nome.setPlaceholderText("es. HS300")
 
         # Spessore
-        self.edit_spessore = QDoubleSpinBox()
+        self.edit_spessore = NoScrollDoubleSpinBox()
         self.edit_spessore.setDecimals(2)
         self.edit_spessore.setMaximum(999.99)
         self.edit_spessore.setSuffix(" mm")
         self.edit_spessore.setMinimumHeight(36)
 
         # Prezzo (preventivo)
-        self.edit_prezzo = QDoubleSpinBox()
+        self.edit_prezzo = NoScrollDoubleSpinBox()
         self.edit_prezzo.setDecimals(2)
         self.edit_prezzo.setMaximum(9999.99)
         self.edit_prezzo.setSuffix(" €")
@@ -380,21 +381,21 @@ class GestioneMaterialiWindow(QMainWindow):
         self.edit_fornitore.setPlaceholderText("es. Toray, Hexcel...")
 
         # Prezzo Fornitore
-        self.edit_prezzo_fornitore = QDoubleSpinBox()
+        self.edit_prezzo_fornitore = NoScrollDoubleSpinBox()
         self.edit_prezzo_fornitore.setDecimals(2)
         self.edit_prezzo_fornitore.setMaximum(9999.99)
         self.edit_prezzo_fornitore.setSuffix(" €/m²")
         self.edit_prezzo_fornitore.setMinimumHeight(36)
 
         # Capacità Magazzino (m²)
-        self.edit_capacita_magazzino = QDoubleSpinBox()
+        self.edit_capacita_magazzino = NoScrollDoubleSpinBox()
         self.edit_capacita_magazzino.setDecimals(2)
         self.edit_capacita_magazzino.setMaximum(99999.99)
         self.edit_capacita_magazzino.setSuffix(" m²")
         self.edit_capacita_magazzino.setMinimumHeight(36)
 
         # Giacenza (m²)
-        self.edit_giacenza = QDoubleSpinBox()
+        self.edit_giacenza = NoScrollDoubleSpinBox()
         self.edit_giacenza.setDecimals(2)
         self.edit_giacenza.setMaximum(99999.99)
         self.edit_giacenza.setSuffix(" m²")
@@ -773,12 +774,12 @@ class NuovoMaterialeDialog(QDialog):
         self.edit_nome = QLineEdit()
         self.edit_nome.setPlaceholderText("es. HS400")
 
-        self.edit_spessore = QDoubleSpinBox()
+        self.edit_spessore = NoScrollDoubleSpinBox()
         self.edit_spessore.setDecimals(2)
         self.edit_spessore.setMaximum(999.99)
         self.edit_spessore.setSuffix(" mm")
 
-        self.edit_prezzo = QDoubleSpinBox()
+        self.edit_prezzo = NoScrollDoubleSpinBox()
         self.edit_prezzo.setDecimals(2)
         self.edit_prezzo.setMaximum(9999.99)
         self.edit_prezzo.setSuffix(" €")
@@ -786,17 +787,17 @@ class NuovoMaterialeDialog(QDialog):
         self.edit_fornitore = QLineEdit()
         self.edit_fornitore.setPlaceholderText("es. Toray, Hexcel...")
 
-        self.edit_prezzo_fornitore = QDoubleSpinBox()
+        self.edit_prezzo_fornitore = NoScrollDoubleSpinBox()
         self.edit_prezzo_fornitore.setDecimals(2)
         self.edit_prezzo_fornitore.setMaximum(9999.99)
         self.edit_prezzo_fornitore.setSuffix(" €/m²")
 
-        self.edit_capacita_magazzino = QDoubleSpinBox()
+        self.edit_capacita_magazzino = NoScrollDoubleSpinBox()
         self.edit_capacita_magazzino.setDecimals(2)
         self.edit_capacita_magazzino.setMaximum(99999.99)
         self.edit_capacita_magazzino.setSuffix(" m²")
 
-        self.edit_giacenza = QDoubleSpinBox()
+        self.edit_giacenza = NoScrollDoubleSpinBox()
         self.edit_giacenza.setDecimals(2)
         self.edit_giacenza.setMaximum(99999.99)
         self.edit_giacenza.setSuffix(" m²")

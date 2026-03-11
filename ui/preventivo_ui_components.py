@@ -10,12 +10,13 @@ Last Updated: 23/09/2025
 Author: Antonio VB + Claude
 """
 
-from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QWidget, QLabel, 
+from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QWidget, QLabel,
                              QLineEdit, QFormLayout, QGroupBox, QDoubleSpinBox, QFrame,
                              QGridLayout, QGraphicsDropShadowEffect, QScrollArea, QListWidget,
                              QListWidgetItem, QSizePolicy, QTextEdit)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QFont
+from ui.materiale_ui_components import NoScrollDoubleSpinBox
 
 class PreventivoUIComponents:
     """Classe per creare componenti UI standardizzati"""
@@ -45,7 +46,7 @@ class PreventivoUIComponents:
     @staticmethod
     def create_standard_spinbox(suffix="€", callback=None):
         """SpinBox standardizzato"""
-        spinbox = QDoubleSpinBox()
+        spinbox = NoScrollDoubleSpinBox()
         spinbox.setMaximum(999999.99)
         spinbox.setDecimals(2)
         if suffix:

@@ -459,6 +459,78 @@ class MainWindowBusinessLogic:
                                f"Errore durante la generazione del documento:\n{str(e)}")
     
     @staticmethod
+    def anteprima_documento_preventivo(window_instance):
+        """Mostra anteprima del documento preventivo nel browser senza salvarlo"""
+        current_item = window_instance.lista_preventivi.currentItem()
+        if not current_item:
+            QMessageBox.warning(window_instance, "Attenzione",
+                                "Seleziona un preventivo dalla lista per visualizzare l'anteprima.")
+            return
+
+        try:
+            preventivo_id = current_item.data(Qt.UserRole)
+
+            # Carica dati preventivo
+            preventivo_data = None
+            for metodo_name in ['get_preventivo_by_id', 'load_preventivo', 'fetch_preventivo']:
+                if hasattr(window_instance.db_manager, metodo_name):
+                    try:
+                        preventivo_data = getattr(window_instance.db_manager, metodo_name)(preventivo_id)
+                        break
+                    except Exception:
+                        continue
+
+            # Prepara dati cliente e materiali
+            if isinstance(preventivo_data, dict):
+                dati_cliente = {
+                    'nome_cliente': preventivo_data.get('nome_cliente', ''),
+                    'numero_ordine': preventivo_data.get('numero_ordine', ''),
+                    'oggetto_preventivo': preventivo_data.get('descrizione', ''),
+                    'codice': preventivo_data.get('codice', f"PREV_{preventivo_id:03d}"),
+                    'misura': preventivo_data.get('misura', ''),
+                    'finitura': preventivo_data.get('finitura', '')
+                }
+                materiali = (preventivo_data.get('materiali_utilizzati')
+                             or preventivo_data.get('materiali')
+                             or preventivo_data.get('materiali_calcolati')
+                             or [])
+            elif isinstance(preventivo_data, (list, tuple)) and len(preventivo_data) >= 8:
+                dati_cliente = {
+                    'nome_cliente': preventivo_data[4] if len(preventivo_data) > 4 else '',
+                    'numero_ordine': preventivo_data[5] if len(preventivo_data) > 5 else '',
+                    'oggetto_preventivo': preventivo_data[6] if len(preventivo_data) > 6 else '',
+                    'codice': preventivo_data[7] if len(preventivo_data) > 7 else f"PREV_{preventivo_id:03d}",
+                    'misura': '',
+                    'finitura': ''
+                }
+                materiali = []
+            else:
+                dati_cliente = {
+                    'nome_cliente': '',
+                    'numero_ordine': '',
+                    'oggetto_preventivo': '',
+                    'codice': f"PREV_{preventivo_id:03d}",
+                    'misura': '',
+                    'finitura': ''
+                }
+                materiali = []
+
+            class PreventivoData:
+                def __init__(self, codice, materiali_list):
+                    self.codice_preventivo = codice
+                    self.materiali = materiali_list or []
+
+            preventivo_obj = PreventivoData(dati_cliente['codice'], materiali)
+
+            DocumentUtils.anteprima_html(preventivo_obj, dati_cliente, window_instance)
+
+        except Exception as e:
+            import traceback
+            print(f"DEBUG: Errore anteprima: {traceback.format_exc()}")
+            QMessageBox.critical(window_instance, "Errore",
+                                 f"Errore durante la generazione dell'anteprima:\n{e}")
+
+    @staticmethod
     def apri_gestione_materiali(window_instance):
         """Apre la finestra per gestire i materiali"""
         window_instance.gestione_materiali_window = GestioneMaterialiWindow(window_instance.db_manager)

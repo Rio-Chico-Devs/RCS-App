@@ -115,6 +115,29 @@ class DocumentUtils:
             return None
     
     @staticmethod
+    def anteprima_html(preventivo, dati_cliente, parent=None):
+        """Mostra anteprima del documento HTML nel browser senza salvarlo"""
+        import tempfile
+        import webbrowser
+
+        try:
+            html_content = DocumentUtils._genera_html_template_specifico(preventivo, dati_cliente)
+
+            # Scrivi in un file temporaneo (delete=False perché il browser deve poterlo aprire)
+            with tempfile.NamedTemporaryFile(
+                mode='w', suffix='.html', encoding='utf-8', delete=False
+            ) as f:
+                f.write(html_content)
+                temp_path = f.name
+
+            webbrowser.open(f'file://{temp_path}')
+
+        except Exception as e:
+            print(f"DEBUG: Errore anteprima HTML: {e}")
+            if parent:
+                QMessageBox.warning(parent, "Errore", f"Errore nella generazione anteprima:\n{e}")
+
+    @staticmethod
     def genera_documento_docx(preventivo, dati_cliente, parent=None):
         """Genera documento DOCX editabile per la produzione"""
         try:
@@ -326,22 +349,357 @@ class DocumentUtils:
             return None
     
     @staticmethod
-    def genera_documento_odt(preventivo, dati_cliente, parent=None):
-        """Genera documento ODT scalabile (1-25 materiali) per OpenOffice/LibreOffice"""
-        try:
-            try:
-                from odf.opendocument import OpenDocumentText
-                from odf.style import Style, TextProperties, ParagraphProperties, TableColumnProperties, TableCellProperties, TableRowProperties
-                from odf.text import P, Span
-                from odf.table import Table, TableColumn, TableRow, TableCell, CoveredTableCell
-            except ImportError:
-                if parent:
-                    QMessageBox.information(
-                        parent,
-                        "Libreria Mancante",
-                        "Per generare ODT è necessario installare odfpy:\n\npip install odfpy"
+    def _odt_manifest(svg_paths=None):
+        extra = ''
+        if svg_paths:
+            extra += '  <manifest:file-entry manifest:media-type="" manifest:full-path="Pictures/"/>\n'
+            for path in svg_paths:
+                extra += f'  <manifest:file-entry manifest:media-type="image/svg+xml" manifest:full-path="{path}"/>\n'
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">\n'
+            '  <manifest:file-entry manifest:media-type="application/vnd.oasis.opendocument.text" manifest:full-path="/"/>\n'
+            '  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="content.xml"/>\n'
+            '  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="styles.xml"/>\n'
+            + extra +
+            '</manifest:manifest>'
+        )
+
+    @staticmethod
+    def _odt_styles():
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<office:document-styles\n'
+            '    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"\n'
+            '    xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"\n'
+            '    xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0">\n'
+            '  <office:styles>\n'
+            '    <style:style style:name="Standard" style:family="paragraph" style:class="text"/>\n'
+            '  </office:styles>\n'
+            '  <office:automatic-styles>\n'
+            '    <style:page-layout style:name="pm1">\n'
+            '      <style:page-layout-properties fo:page-width="21.001cm" fo:page-height="29.7cm"\n'
+            '          style:print-orientation="portrait"\n'
+            '          fo:margin-top="1cm" fo:margin-bottom="1cm"\n'
+            '          fo:margin-left="1.5cm" fo:margin-right="1.5cm"/>\n'
+            '    </style:page-layout>\n'
+            '  </office:automatic-styles>\n'
+            '  <office:master-styles>\n'
+            '    <style:master-page style:name="Standard" style:page-layout-name="pm1"/>\n'
+            '  </office:master-styles>\n'
+            '</office:document-styles>'
+        )
+
+    @staticmethod
+    def _odt_content(preventivo, dati_cliente, sc, svg_files=None):
+        """Costruisce content.xml ODT senza dipendenze esterne.
+        svg_files: lista opzionale a cui vengono aggiunti (path, svg_content) per le coniche.
+        """
+        def x(v):
+            if v is None:
+                return ''
+            return str(v).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+
+        fmap = {'11px': '11pt', '10px': '10pt', '9px': '9pt', '8px': '8pt', '7px': '7pt', '6px': '6pt'}
+        ft_info = fmap.get(sc['font_info'], '10pt')
+        ft_nome = fmap.get(sc['font_nome'], '11pt')
+        ft_giri = fmap.get(sc['font_giri'], '10pt')
+        rmap = {'8mm': '0.8cm', '6mm': '0.6cm', '5mm': '0.5cm', '4mm': '0.4cm'}
+        rect_h = rmap.get(sc['rect_height'], '0.8cm')
+        rect_h_cm = float(rect_h.replace('cm', ''))
+        mmap = {'12mm': '1.2cm', '6mm': '0.6cm', '3mm': '0.3cm', '2mm': '0.2cm', '1mm': '0.1cm', '0mm': '0cm'}
+        margin_mat = mmap.get(sc['margin_mat'], '1.2cm')
+        num_mat = len(preventivo.materiali) if hasattr(preventivo, 'materiali') and preventivo.materiali else 0
+        pad  = '0.15cm' if num_mat <= 10 else ('0.08cm' if num_mat <= 17 else '0.04cm')
+        cpad = '0.2cm'  if num_mat <= 10 else ('0.12cm' if num_mat <= 17 else '0.08cm')
+        npad = '0.1cm'  if num_mat <= 10 else ('0.05cm' if num_mat <= 17 else '0.02cm')
+
+        NS = (
+            'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+            'xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" '
+            'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" '
+            'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '
+            'xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0" '
+            'xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" '
+            'xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" '
+            'xmlns:xlink="http://www.w3.org/1999/xlink"'
+        )
+
+        ops_w = ['2.5cm', '1.8cm', '1.8cm', '1.8cm', '1.8cm', '1.8cm', '6cm']
+        ops_col_styles = ''.join(
+            f'<style:style style:name="TCO{j}" style:family="table-column">'
+            f'<style:table-column-properties style:column-width="{w}"/></style:style>'
+            for j, w in enumerate(ops_w)
+        )
+
+        auto = (
+            f'<office:automatic-styles>'
+            f'<style:style style:name="PN" style:family="paragraph">'
+            f'<style:text-properties fo:font-size="{ft_info}"/></style:style>'
+            f'<style:style style:name="PT" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="center" fo:margin-bottom="0.3cm"/>'
+            f'<style:text-properties fo:font-size="14pt" fo:font-weight="bold"/></style:style>'
+            f'<style:style style:name="PC" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="center" fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
+            f'<style:text-properties fo:font-size="{ft_nome}" fo:font-weight="bold"/></style:style>'
+            f'<style:style style:name="PR" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="end" fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
+            f'<style:text-properties fo:font-size="{ft_giri}" fo:font-weight="bold"/></style:style>'
+            f'<style:style style:name="PL" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="center" fo:margin-top="{margin_mat}" fo:margin-bottom="0cm"/>'
+            f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
+            f'<style:style style:name="TI" style:family="table">'
+            f'<style:table-properties style:width="17.7cm" table:align="margins"/></style:style>'
+            f'<style:style style:name="TCI" style:family="table-column">'
+            f'<style:table-column-properties style:column-width="5.9cm"/></style:style>'
+            f'<style:style style:name="CB" style:family="table-cell">'
+            f'<style:table-cell-properties fo:border="0.05pt solid #000000" fo:padding="{cpad}"/></style:style>'
+            f'<style:style style:name="CH" style:family="table-cell">'
+            f'<style:table-cell-properties fo:border="0.05pt solid #000000" fo:padding="{cpad}" fo:background-color="#f0f0f0"/></style:style>'
+            f'<style:style style:name="TM" style:family="table">'
+            f'<style:table-properties style:width="16cm" table:align="center"/></style:style>'
+            f'<style:style style:name="TCN" style:family="table-column">'
+            f'<style:table-column-properties style:column-width="2cm"/></style:style>'
+            f'<style:style style:name="TCW" style:family="table-column">'
+            f'<style:table-column-properties style:column-width="12cm"/></style:style>'
+            f'<style:style style:name="CMB" style:family="table-cell">'
+            f'<style:table-cell-properties fo:border="1.5pt solid #000000" fo:padding="{pad}"/></style:style>'
+            f'<style:style style:name="CNB" style:family="table-cell">'
+            f'<style:table-cell-properties fo:border="none" fo:padding="{npad}"/></style:style>'
+            f'<style:style style:name="CMB_WL" style:family="table-cell">'
+            f'<style:table-cell-properties '
+            f'fo:border-left="3.5pt solid #000000" fo:border-right="0.75pt solid #000000" '
+            f'fo:border-top="1.5pt solid #000000" fo:border-bottom="1.5pt solid #000000" '
+            f'fo:padding="{pad}"/></style:style>'
+            f'<style:style style:name="CMB_WR" style:family="table-cell">'
+            f'<style:table-cell-properties '
+            f'fo:border-left="0.75pt solid #000000" fo:border-right="3.5pt solid #000000" '
+            f'fo:border-top="1.5pt solid #000000" fo:border-bottom="1.5pt solid #000000" '
+            f'fo:padding="{pad}"/></style:style>'
+            f'<style:style style:name="RH" style:family="table-row">'
+            f'<style:table-row-properties style:row-height="{rect_h}" style:use-optimal-row-height="false"/></style:style>'
+            f'<style:style style:name="TCFI" style:family="table-column">'
+            f'<style:table-column-properties style:column-width="3.5cm"/></style:style>'
+            f'<style:style style:name="TCHL_L" style:family="table-column">'
+            f'<style:table-column-properties style:column-width="12.5cm"/></style:style>'
+            f'<style:style style:name="RFI" style:family="table-row">'
+            f'<style:table-row-properties style:row-height="0.5cm" style:use-optimal-row-height="false"/></style:style>'
+            f'<style:style style:name="CFI" style:family="table-cell">'
+            f'<style:table-cell-properties fo:border="1pt solid #000000" fo:padding="0.05cm"/></style:style>'
+            f'<style:style style:name="THL" style:family="table">'
+            f'<style:table-properties style:width="16cm" table:align="center" fo:margin-top="{margin_mat}" fo:margin-bottom="0cm"/></style:style>'
+            f'<style:style style:name="TO" style:family="table">'
+            f'<style:table-properties style:width="17.7cm" table:align="margins"/></style:style>'
+            f'{ops_col_styles}'
+            f'</office:automatic-styles>'
+        )
+
+        nom  = x(dati_cliente.get('nome_cliente', ''))
+        ord_ = x(dati_cliente.get('numero_ordine', ''))
+        dat  = datetime.now().strftime('%d/%m/%Y')
+        cod  = x(dati_cliente.get('codice', ''))
+        mis  = x(dati_cliente.get('misura', ''))
+        fin  = x(dati_cliente.get('finitura', ''))
+        desc = x(dati_cliente.get('oggetto_preventivo', dati_cliente.get('descrizione', '')))
+
+        def cell(st, txt, span=None):
+            sp = f' table:number-columns-spanned="{span}"' if span else ''
+            return f'<table:table-cell table:style-name="{st}"{sp}><text:p text:style-name="PN">{txt}</text:p></table:table-cell>'
+
+        info_table = (
+            '<table:table table:name="Info" table:style-name="TI">'
+            '<table:table-column table:style-name="TCI"/>'
+            '<table:table-column table:style-name="TCI"/>'
+            '<table:table-column table:style-name="TCI"/>'
+            '<table:table-row>'
+            + cell('CB', f'Cliente: {nom}') + cell('CB', f'Ordine n.: {ord_}') + cell('CB', f'Data: {dat}') +
+            '</table:table-row>'
+            '<table:table-row>'
+            + cell('CB', f'Codice: {cod}') + cell('CB', f'Misura: {mis}') + cell('CB', f'Finitura: {fin}') +
+            '</table:table-row>'
+            '<table:table-row>'
+            + cell('CB', f'Descrizione: {desc}', span=3) +
+            '<table:covered-table-cell/><table:covered-table-cell/>'
+            '</table:table-row>'
+            '</table:table>'
+        )
+
+        mat_parts = []
+        if hasattr(preventivo, 'materiali') and preventivo.materiali:
+            for i, materiale in enumerate(preventivo.materiali):
+                if hasattr(materiale, 'giri'):
+                    giri       = materiale.giri
+                    lunghezza  = getattr(materiale, 'lunghezza', 0)
+                    sviluppo   = getattr(materiale, 'sviluppo', 0)
+                    nome       = x(getattr(materiale, 'nome', f'Materiale {i+1}'))
+                    is_conica  = getattr(materiale, 'is_conica', False)
+                    con_lato   = getattr(materiale, 'conicita_lato', 'sinistra')
+                    con_alt    = getattr(materiale, 'conicita_altezza_mm', 0.0)
+                    con_lung   = getattr(materiale, 'conicita_lunghezza_mm', 0.0)
+                elif isinstance(materiale, dict):
+                    giri       = materiale.get('giri', 0)
+                    lunghezza  = materiale.get('lunghezza', 0)
+                    sviluppo   = materiale.get('sviluppo', 0)
+                    nome       = x(materiale.get('nome', materiale.get('materiale_nome', f'Materiale {i+1}')))
+                    is_conica  = materiale.get('is_conica', False)
+                    con_lato   = materiale.get('conicita_lato', 'sinistra')
+                    con_alt    = materiale.get('conicita_altezza_mm', 0.0)
+                    con_lung   = materiale.get('conicita_lunghezza_mm', 0.0)
+                else:
+                    giri=1; lunghezza=1000; sviluppo=100; nome=f'Materiale {i+1}'
+                    is_conica=False; con_lato='sinistra'; con_alt=0.0; con_lung=0.0
+
+                if is_conica and con_lung > 0:
+                    svg_path = f'Pictures/conica_{i}.svg'
+                    svg_content = DocumentUtils._svg_conica_str(
+                        con_lato, con_alt, con_lung, lunghezza, nome, rect_h_cm)
+                    if svg_files is not None:
+                        svg_files.append((svg_path, svg_content))
+                    center_cell = (
+                        f'<table:table-cell table:style-name="CMB">'
+                        f'<text:p text:style-name="PC">'
+                        f'<draw:frame text:anchor-type="as-char"'
+                        f' svg:width="11.5cm" svg:height="{rect_h}" draw:z-index="{i}">'
+                        f'<draw:image xlink:href="{svg_path}"'
+                        f' xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>'
+                        f'</draw:frame>'
+                        f'</text:p>'
+                        f'</table:table-cell>'
                     )
-                return None
+                else:
+                    center_cell = (
+                        f'<table:table-cell table:style-name="CMB">'
+                        f'<text:p text:style-name="PC">==          {nome}</text:p>'
+                        f'</table:table-cell>'
+                    )
+
+                header_line = (
+                    f'<table:table table:name="HL{i}" table:style-name="THL">'
+                    f'<table:table-column table:style-name="TCFI"/>'
+                    f'<table:table-column table:style-name="TCHL_L"/>'
+                    f'<table:table-row table:style-name="RFI">'
+                    f'<table:table-cell table:style-name="CFI">'
+                    f'<text:p text:style-name="PN"></text:p>'
+                    f'</table:table-cell>'
+                    f'<table:table-cell table:style-name="CNB">'
+                    f'<text:p text:style-name="PC">{int(lunghezza)} mm</text:p>'
+                    f'</table:table-cell>'
+                    f'</table:table-row></table:table>'
+                )
+                mat_parts.append(
+                    header_line +
+                    f'<table:table table:name="M{i}" table:style-name="TM">'
+                    f'<table:table-column table:style-name="TCN"/>'
+                    f'<table:table-column table:style-name="TCW"/>'
+                    f'<table:table-column table:style-name="TCN"/>'
+                    f'<table:table-row table:style-name="RH">'
+                    f'<table:table-cell table:style-name="CNB">'
+                    f'<text:p text:style-name="PR">G{giri}</text:p></table:table-cell>'
+                    + center_cell +
+                    f'<table:table-cell table:style-name="CNB">'
+                    f'<text:p text:style-name="PN">H {int(sviluppo)} mm</text:p></table:table-cell>'
+                    f'</table:table-row></table:table>'
+                )
+
+        hdrs_xml = ''.join(
+            f'<table:table-cell table:style-name="CH">'
+            f'<text:p text:style-name="PC">{h}</text:p></table:table-cell>'
+            for h in ['Operazione', 'Inizio', 'Fine', 'Tempo', 'Pezzi', 'Data', 'Note']
+        )
+        empty_cells = ''.join(
+            '<table:table-cell table:style-name="CB">'
+            '<text:p text:style-name="PN"></text:p></table:table-cell>'
+            for _ in range(7)
+        )
+        empty_row   = f'<table:table-row>{empty_cells}</table:table-row>'
+        ops_cols    = ''.join(f'<table:table-column table:style-name="TCO{j}"/>' for j in range(7))
+        ops_table   = (
+            f'<table:table table:name="Ops" table:style-name="TO">{ops_cols}'
+            f'<table:table-row>{hdrs_xml}</table:table-row>'
+            + empty_row * sc['ops_rows']
+            + '</table:table>'
+        )
+
+        title_xml = '<text:p text:style-name="PT">RCS - Scheda di Taglio</text:p>' if sc['show_title'] else ''
+
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            f'<office:document-content {NS}>'
+            f'{auto}'
+            f'<office:body><office:text>'
+            f'{title_xml}'
+            f'{info_table}'
+            + ''.join(mat_parts) +
+            '<text:p text:style-name="PN"></text:p>'
+            f'{ops_table}'
+            '</office:text></office:body>'
+            '</office:document-content>'
+        )
+
+    @staticmethod
+    def _svg_conica_str(lato, altezza_mm, lunghezza_mm, lunghezza_tela, nome_xml, rect_h_cm=0.8):
+        """Genera SVG per la conica nell'ODT.
+        Disegna un rettangolo con triangolo(i) di scarto e indicazione della sbiegatura.
+        """
+        W = 115
+        H = max(4, round(W * rect_h_cm / 11.5))
+        font_sz = max(2, round(H * 0.50))
+
+        L = max(lunghezza_tela, 1)
+        lt = lunghezza_mm
+        alt = altezza_mm
+
+        # Calcola proporzioni in pixel
+        lt_px = round(lt / L * W, 2)
+        alt_px = round(alt / H * H, 2) if H > 0 else 0
+
+        elements = []
+        # Rettangolo principale
+        elements.append(f'<rect x="0" y="0" width="{W}" height="{H}" fill="white" stroke="black" stroke-width="1.5"/>')
+
+        # Triangolo(i) scarto in rosa
+        tri_fill = 'rgba(255,150,150,0.6)'
+        tri_stroke = 'red'
+        sw = '0.8'
+
+        def triangolo_sx():
+            # (0, alt_px), (lt_px, H), (0, H)
+            pts = f'0,{alt_px} {lt_px},{H} 0,{H}'
+            return (f'<polygon points="{pts}" fill="{tri_fill}" stroke="{tri_stroke}" stroke-width="{sw}"/>')
+
+        def triangolo_dx():
+            # (W, alt_px), (W-lt_px, H), (W, H)
+            pts = f'{W},{alt_px} {W-lt_px},{H} {W},{H}'
+            return (f'<polygon points="{pts}" fill="{tri_fill}" stroke="{tri_stroke}" stroke-width="{sw}"/>')
+
+        if lato == 'sinistra':
+            elements.append(triangolo_sx())
+        elif lato == 'destra':
+            elements.append(triangolo_dx())
+        else:
+            elements.append(triangolo_sx())
+            elements.append(triangolo_dx())
+
+        # Testo materiale centrato
+        cy = H / 2
+        elements.append(
+            f'<text x="{W/2}" y="{cy + font_sz * 0.35}" text-anchor="middle"'
+            f' font-size="{font_sz}" font-weight="bold" font-family="Arial,sans-serif">{nome_xml}</text>'
+        )
+
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}"'
+            f' preserveAspectRatio="xMidYMid meet">'
+            + ''.join(elements) +
+            f'</svg>'
+        )
+
+    @staticmethod
+    def genera_documento_odt(preventivo, dati_cliente, parent=None):
+        """Genera documento ODT per OpenOffice/LibreOffice (senza dipendenze esterne)"""
+        try:
+            import zipfile
 
             # Dialog per salvare file
             nome_file = f"SchediaTaglio_{preventivo.codice_preventivo}_{datetime.now().strftime('%Y%m%d')}"
@@ -355,246 +713,32 @@ class DocumentUtils:
             if not file_path:
                 return None
 
-            # Calcola scala
+            # Genera contenuto ODT con metodi nativi (no dipendenze esterne)
             num_mat = len(preventivo.materiali) if hasattr(preventivo, 'materiali') and preventivo.materiali else 0
             sc = DocumentUtils._calcola_scala(num_mat)
+            mi = zipfile.ZipInfo('mimetype')
+            mi.compress_type = zipfile.ZIP_STORED
+            svg_files = []
+            content_xml = DocumentUtils._odt_content(preventivo, dati_cliente, sc, svg_files)
+            svg_paths = [path for path, _ in svg_files]
+            with zipfile.ZipFile(file_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr(mi, 'application/vnd.oasis.opendocument.text')
+                zf.writestr('META-INF/manifest.xml', DocumentUtils._odt_manifest(svg_paths))
+                zf.writestr('styles.xml', DocumentUtils._odt_styles())
+                zf.writestr('content.xml', content_xml)
+                for svg_path, svg_content in svg_files:
+                    zf.writestr(svg_path, svg_content)
 
-            # Mappa font size
-            font_map = {'10px': '10pt', '9px': '9pt', '8px': '8pt', '11px': '11pt', '7px': '7pt', '6px': '6pt'}
-            ft_info = font_map.get(sc['font_info'], '10pt')
-            ft_nome = font_map.get(sc['font_nome'], '10pt')
-            ft_giri = font_map.get(sc['font_giri'], '10pt')
-
-            # Mappa margini
-            margin_map = {'12mm': '1.2cm', '6mm': '0.6cm', '3mm': '0.3cm'}
-            margin_mat = margin_map.get(sc['margin_mat'], '1.2cm')
-
-            # Mappa altezza rettangolo
-            rect_map = {'8mm': '0.8cm', '6mm': '0.6cm', '5mm': '0.5cm'}
-            rect_h = rect_map.get(sc['rect_height'], '0.8cm')
-
-            # Padding cella materiale basato su scala
-            mat_padding = '0.15cm' if num_mat <= 10 else ('0.08cm' if num_mat <= 17 else '0.04cm')
-            cell_padding = '0.2cm' if num_mat <= 10 else ('0.12cm' if num_mat <= 17 else '0.08cm')
-            no_border_padding = '0.1cm' if num_mat <= 10 else ('0.05cm' if num_mat <= 17 else '0.02cm')
-
-            doc = OpenDocumentText()
-
-            # === STILI (adattivi) ===
-            style_title = Style(name="TitoloScheda", family="paragraph")
-            style_title.addElement(ParagraphProperties(textalign="center", marginbottom="0.3cm"))
-            style_title.addElement(TextProperties(fontsize="14pt", fontweight="bold"))
-            doc.styles.addElement(style_title)
-
-            style_normal = Style(name="Normale", family="paragraph")
-            style_normal.addElement(TextProperties(fontsize=ft_info))
-            doc.styles.addElement(style_normal)
-
-            style_bold = Style(name="Bold", family="text")
-            style_bold.addElement(TextProperties(fontweight="bold", fontsize=ft_info))
-            doc.styles.addElement(style_bold)
-
-            style_bold_nome = Style(name="BoldNome", family="text")
-            style_bold_nome.addElement(TextProperties(fontweight="bold", fontsize=ft_nome))
-            doc.styles.addElement(style_bold_nome)
-
-            style_centered = Style(name="Centrato", family="paragraph")
-            style_centered.addElement(ParagraphProperties(textalign="center", marginbottom="0cm", margintop="0cm"))
-            style_centered.addElement(TextProperties(fontsize=ft_info, fontweight="bold"))
-            doc.styles.addElement(style_centered)
-
-            # Stile paragrafo con margine ridotto per materiali
-            style_mat_label = Style(name="MatLabel", family="paragraph")
-            style_mat_label.addElement(ParagraphProperties(textalign="center", marginbottom="0cm", margintop=margin_mat))
-            style_mat_label.addElement(TextProperties(fontsize=ft_info, fontweight="bold"))
-            doc.styles.addElement(style_mat_label)
-
-            style_cell = Style(name="CellaBordo", family="table-cell")
-            style_cell.addElement(TableCellProperties(border="0.05pt solid #000000", padding=cell_padding))
-            doc.automaticstyles.addElement(style_cell)
-
-            style_cell_header = Style(name="CellaHeader", family="table-cell")
-            style_cell_header.addElement(TableCellProperties(border="0.05pt solid #000000", padding=cell_padding, backgroundcolor="#f0f0f0"))
-            doc.automaticstyles.addElement(style_cell_header)
-
-            style_table_info = Style(name="TabellaInfo", family="table")
-            doc.automaticstyles.addElement(style_table_info)
-
-            style_col_info = Style(name="ColInfo", family="table-column")
-            style_col_info.addElement(TableColumnProperties(columnwidth="6cm"))
-            doc.automaticstyles.addElement(style_col_info)
-
-            style_col_info_wide = Style(name="ColInfoWide", family="table-column")
-            style_col_info_wide.addElement(TableColumnProperties(columnwidth="18cm"))
-            doc.automaticstyles.addElement(style_col_info_wide)
-
-            style_table_ops = Style(name="TabellaOps", family="table")
-            doc.automaticstyles.addElement(style_table_ops)
-
-            col_widths_ops = ["2.5cm", "1.8cm", "1.8cm", "1.8cm", "1.8cm", "1.8cm", "6cm"]
-            style_cols_ops = []
-            for i, w in enumerate(col_widths_ops):
-                st = Style(name=f"ColOps{i}", family="table-column")
-                st.addElement(TableColumnProperties(columnwidth=w))
-                doc.automaticstyles.addElement(st)
-                style_cols_ops.append(st)
-
-            style_mat_box = Style(name="MatBox", family="table-cell")
-            style_mat_box.addElement(TableCellProperties(border="1.5pt solid #000000", padding=mat_padding))
-            doc.automaticstyles.addElement(style_mat_box)
-
-            style_cell_no_border = Style(name="CellaNoBordo", family="table-cell")
-            style_cell_no_border.addElement(TableCellProperties(border="none", padding=no_border_padding))
-            doc.automaticstyles.addElement(style_cell_no_border)
-
-            style_col_mat_narrow = Style(name="ColMatNarrow", family="table-column")
-            style_col_mat_narrow.addElement(TableColumnProperties(columnwidth="2cm"))
-            doc.automaticstyles.addElement(style_col_mat_narrow)
-
-            style_col_mat_wide = Style(name="ColMatWide", family="table-column")
-            style_col_mat_wide.addElement(TableColumnProperties(columnwidth="12cm"))
-            doc.automaticstyles.addElement(style_col_mat_wide)
-
-            style_right = Style(name="AllineatoDestra", family="paragraph")
-            style_right.addElement(ParagraphProperties(textalign="end"))
-            style_right.addElement(TextProperties(fontsize=ft_giri, fontweight="bold"))
-            doc.styles.addElement(style_right)
-
-            style_giri_text = Style(name="GiriText", family="text")
-            style_giri_text.addElement(TextProperties(fontweight="bold", fontsize=ft_giri))
-            doc.styles.addElement(style_giri_text)
-
-            # Stile riga materiale con altezza fissa
-            style_mat_row = Style(name="MatRow", family="table-row")
-            style_mat_row.addElement(TableRowProperties(rowheight=rect_h))
-            doc.automaticstyles.addElement(style_mat_row)
-
-            # === CONTENUTO ===
-
-            # Titolo (solo se <= 10 materiali)
-            if sc['show_title']:
-                p_title = P(stylename=style_title)
-                p_title.addElement(Span(stylename=style_bold, text="RCS - Scheda di Taglio"))
-                doc.text.addElement(p_title)
-
-            # Tabella info cliente (3 colonne)
-            info_table = Table(name="InfoCliente", stylename=style_table_info)
-            info_table.addElement(TableColumn(stylename=style_col_info))
-            info_table.addElement(TableColumn(stylename=style_col_info))
-            info_table.addElement(TableColumn(stylename=style_col_info))
-
-            # Riga 1: Cliente | Ordine n. | Data
-            tr1 = TableRow()
-            for text in [f"Cliente: {dati_cliente.get('nome_cliente', '')}", f"Ordine n.: {dati_cliente.get('numero_ordine', '')}", f"Data: {datetime.now().strftime('%d/%m/%Y')}"]:
-                tc = TableCell(stylename=style_cell)
-                tc.addElement(P(stylename=style_normal, text=text))
-                tr1.addElement(tc)
-            info_table.addElement(tr1)
-
-            # Riga 2: Codice | Misura | Finitura
-            tr2 = TableRow()
-            for text in [f"Codice: {dati_cliente.get('codice', '')}", f"Misura: {dati_cliente.get('misura', '')}", f"Finitura: {dati_cliente.get('finitura', '')}"]:
-                tc = TableCell(stylename=style_cell)
-                tc.addElement(P(stylename=style_normal, text=text))
-                tr2.addElement(tc)
-            info_table.addElement(tr2)
-
-            # Riga 3: Descrizione (occupa tutte e 3 le colonne)
-            tr3 = TableRow()
-            descrizione = dati_cliente.get('oggetto_preventivo', dati_cliente.get('descrizione', ''))
-            tc_desc = TableCell(stylename=style_cell, numbercolumnsspanned="3")
-            tc_desc.addElement(P(stylename=style_normal, text=f"Descrizione: {descrizione}"))
-            tr3.addElement(tc_desc)
-            # Celle coperte dal colspan
-            tr3.addElement(CoveredTableCell())
-            tr3.addElement(CoveredTableCell())
-            info_table.addElement(tr3)
-
-            doc.text.addElement(info_table)
-
-            # Sezione materiali
-            if hasattr(preventivo, 'materiali') and preventivo.materiali:
-                for i, materiale in enumerate(preventivo.materiali):
-                    if hasattr(materiale, 'giri'):
-                        giri = materiale.giri
-                        lunghezza = getattr(materiale, 'lunghezza', 0)
-                        sviluppo = getattr(materiale, 'sviluppo', 0)
-                        nome = getattr(materiale, 'nome', f'Materiale {i+1}')
-                    elif isinstance(materiale, dict):
-                        giri = materiale.get('giri', 0)
-                        lunghezza = materiale.get('lunghezza', 0)
-                        sviluppo = materiale.get('sviluppo', 0)
-                        nome = materiale.get('nome', materiale.get('materiale_nome', f'Materiale {i+1}'))
-                    else:
-                        giri = 1
-                        lunghezza = 1000
-                        sviluppo = 100
-                        nome = f'Materiale {i+1}'
-
-                    # Lunghezza centrata sopra (con margine top adattivo)
-                    doc.text.addElement(P(stylename=style_mat_label, text=f"{int(lunghezza)} mm"))
-
-                    # Tabella 1x3: Giri | Rettangolo | Sviluppo
-                    mat_table = Table(name=f"Materiale{i}")
-                    mat_table.addElement(TableColumn(stylename=style_col_mat_narrow))
-                    mat_table.addElement(TableColumn(stylename=style_col_mat_wide))
-                    mat_table.addElement(TableColumn(stylename=style_col_mat_narrow))
-
-                    mat_row = TableRow(stylename=style_mat_row)
-
-                    cell_giri = TableCell(stylename=style_cell_no_border)
-                    cell_giri.addElement(P(stylename=style_right, text=f"G{giri}"))
-                    mat_row.addElement(cell_giri)
-
-                    cell_rect = TableCell(stylename=style_mat_box)
-                    p_rect = P(stylename=style_centered)
-                    p_rect.addElement(Span(stylename=style_bold_nome, text=f"==          {nome}"))
-                    cell_rect.addElement(p_rect)
-                    mat_row.addElement(cell_rect)
-
-                    cell_svil = TableCell(stylename=style_cell_no_border)
-                    p_svil = P(stylename=style_normal)
-                    p_svil.addElement(Span(stylename=style_giri_text, text=f"H {int(sviluppo)} mm"))
-                    cell_svil.addElement(p_svil)
-                    mat_row.addElement(cell_svil)
-
-                    mat_table.addElement(mat_row)
-                    doc.text.addElement(mat_table)
-
-            # Spazio prima tabella operazioni
-            doc.text.addElement(P(stylename=style_normal, text=""))
-
-            # Tabella operazioni
-            ops_table = Table(name="Operazioni", stylename=style_table_ops)
-            for st in style_cols_ops:
-                ops_table.addElement(TableColumn(stylename=st))
-
-            headers = ['Operazione', 'Inizio', 'Fine', 'Tempo', 'Pezzi', 'Data', 'Note']
-            header_row = TableRow()
-            for h in headers:
-                tc = TableCell(stylename=style_cell_header)
-                p = P(stylename=style_centered)
-                p.addElement(Span(stylename=style_bold, text=h))
-                tc.addElement(p)
-                header_row.addElement(tc)
-            ops_table.addElement(header_row)
-
-            for _ in range(sc['ops_rows']):
-                tr = TableRow()
-                for _ in range(7):
-                    tc = TableCell(stylename=style_cell)
-                    tc.addElement(P(stylename=style_normal, text=""))
-                    tr.addElement(tc)
-                ops_table.addElement(tr)
-
-            doc.text.addElement(ops_table)
-
-            # Salva documento
-            doc.save(file_path)
             print(f"DEBUG: Documento ODT generato: {file_path}")
-
-            # Apri automaticamente
-            os.startfile(file_path)
+            try:
+                import sys
+                import subprocess
+                if sys.platform == 'win32':
+                    os.startfile(file_path)
+                else:
+                    subprocess.Popen(['xdg-open', file_path])
+            except Exception:
+                pass
 
             return file_path
 
@@ -612,36 +756,74 @@ class DocumentUtils:
         Ritorna dict con tutte le misure adattive. Tabella operazioni sempre 5 righe."""
         if num_materiali <= 10:
             return {
-                'margin_mat': '12mm', 'rect_height': '8mm', 'font_nome': '11px',
+                'margin_mat': '1mm', 'rect_height': '8mm', 'font_nome': '11px',
                 'font_info': '10px', 'font_giri': '10px', 'top_offset': '-6mm',
                 'orient_font': '8px', 'orient_width': '18mm',
                 'show_title': True, 'ops_rows': 5, 'ops_height': '8mm',
-                'info_margin': '3mm', 'ops_margin_top': '15mm',
+                'info_margin': '2mm', 'ops_margin_top': '4mm',
             }
         elif num_materiali <= 17:
             return {
-                'margin_mat': '6mm', 'rect_height': '6mm', 'font_nome': '10px',
+                'margin_mat': '2mm', 'rect_height': '6mm', 'font_nome': '10px',
                 'font_info': '9px', 'font_giri': '9px', 'top_offset': '-4mm',
                 'orient_font': '7px', 'orient_width': '15mm',
                 'show_title': False, 'ops_rows': 5, 'ops_height': '6mm',
-                'info_margin': '2mm', 'ops_margin_top': '8mm',
+                'info_margin': '1mm', 'ops_margin_top': '3mm',
             }
         elif num_materiali <= 25:
             return {
-                'margin_mat': '3mm', 'rect_height': '5mm', 'font_nome': '9px',
+                'margin_mat': '1mm', 'rect_height': '5mm', 'font_nome': '9px',
                 'font_info': '8px', 'font_giri': '8px', 'top_offset': '-3mm',
                 'orient_font': '6px', 'orient_width': '12mm',
                 'show_title': False, 'ops_rows': 5, 'ops_height': '5mm',
-                'info_margin': '1mm', 'ops_margin_top': '5mm',
+                'info_margin': '1mm', 'ops_margin_top': '2mm',
             }
         else:  # 26-30
             return {
-                'margin_mat': '2mm', 'rect_height': '4mm', 'font_nome': '8px',
+                'margin_mat': '1mm', 'rect_height': '4mm', 'font_nome': '8px',
                 'font_info': '7px', 'font_giri': '7px', 'top_offset': '-2mm',
                 'orient_font': '6px', 'orient_width': '10mm',
                 'show_title': False, 'ops_rows': 5, 'ops_height': '4mm',
-                'info_margin': '1mm', 'ops_margin_top': '3mm',
+                'info_margin': '1mm', 'ops_margin_top': '2mm',
             }
+
+    @staticmethod
+    def _genera_figura_conica(lato, altezza_mm, lunghezza_mm, lunghezza_tela, s, nome):
+        """Genera un div con SVG rettangolo + triangolo(i) di sbiegatura per la scheda HTML.
+        Mostra chiaramente da quale lato e a quale distanza viene eseguita la sbiegatura."""
+        L = max(lunghezza_tela, 1)
+        lt = lunghezza_mm
+        alt = altezza_mm
+
+        # ViewBox: 80 x 20
+        W, H = 80, 20
+        lt_px = round(lt / L * W, 2)
+        alt_px = round(alt / H * H, 2)
+
+        tri_fill = 'rgba(255,150,150,0.7)'
+
+        triangles = []
+        if lato in ('sinistra', 'entrambi'):
+            pts = f'0,{alt_px} {lt_px},{H} 0,{H}'
+            triangles.append(f'<polygon points="{pts}" fill="{tri_fill}" stroke="red" stroke-width="0.8"/>')
+        if lato in ('destra', 'entrambi'):
+            pts = f'{W},{alt_px} {W-lt_px},{H} {W},{H}'
+            triangles.append(f'<polygon points="{pts}" fill="{tri_fill}" stroke="red" stroke-width="0.8"/>')
+
+        lato_txt = {'sinistra': 'SX', 'destra': 'DX', 'entrambi': 'SX+DX'}.get(lato, lato)
+        sbieg_label = f'Sbieg. {lato_txt}: {lt:.0f}mm'
+
+        return f"""<div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; position: relative;">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}"
+                 preserveAspectRatio="none"
+                 style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+                <rect x="0" y="0" width="{W}" height="{H}" fill="#fff" stroke="#000" stroke-width="1.5"/>
+                {''.join(triangles)}
+            </svg>
+            <input type="text" placeholder="Orient." style="position: relative; z-index: 1; width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; margin-top: auto; margin-bottom: auto;">
+            <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 1;">{nome}</strong>
+            <span style="font-size: {s['orient_font']}; position: absolute; bottom: 1px; right: 2px; color: red; z-index: 1;">{sbieg_label}</span>
+        </div>"""
 
     @staticmethod
     def _genera_html_template_specifico(preventivo, dati_cliente):
@@ -659,31 +841,62 @@ class DocumentUtils:
                     lunghezza = getattr(materiale, 'lunghezza', 0)
                     sviluppo = getattr(materiale, 'sviluppo', 0)
                     nome = getattr(materiale, 'nome', f'Materiale {i+1}')
+                    is_conica = getattr(materiale, 'is_conica', False)
+                    con_lato = getattr(materiale, 'conicita_lato', 'sinistra')
+                    con_alt = getattr(materiale, 'conicita_altezza_mm', 0.0)
+                    con_lung = getattr(materiale, 'conicita_lunghezza_mm', 0.0)
                 elif isinstance(materiale, dict):
                     giri = materiale.get('giri', 0)
                     lunghezza = materiale.get('lunghezza', 0)
                     sviluppo = materiale.get('sviluppo', 0)
                     nome = materiale.get('nome', materiale.get('materiale_nome', f'Materiale {i+1}'))
+                    is_conica = materiale.get('is_conica', False)
+                    con_lato = materiale.get('conicita_lato', 'sinistra')
+                    con_alt = materiale.get('conicita_altezza_mm', 0.0)
+                    con_lung = materiale.get('conicita_lunghezza_mm', 0.0)
                 else:
-                    giri = 1
-                    lunghezza = 1000
-                    sviluppo = 100
+                    giri = 1; lunghezza = 1000; sviluppo = 100
                     nome = f'Materiale {i+1}'
+                    is_conica = False; con_lato = 'sinistra'; con_alt = 0.0; con_lung = 0.0
+
+                # Genera la figura: rettangolo con triangolo sbiegatura o rettangolo normale
+                if is_conica and con_lung > 0:
+                    figura_html = DocumentUtils._genera_figura_conica(
+                        con_lato, con_alt, con_lung, lunghezza, s, nome)
+                else:
+                    figura_html = f"""<div style="width: 80mm; height: {s['rect_height']}; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative; flex-shrink: 0;">
+                        <input type="text" placeholder="Orient." style="width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; position: relative; z-index: 1;">
+                        <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; transform: translateX(-50%); z-index: 1;">{nome}</strong>
+                    </div>"""
+
+                # Larghezze colonne layout: [campo] [G] [tela 80mm] [H]
+                w_campo = '28mm'
+                w_g     = '8mm'
+                w_h     = '18mm'
 
                 materiali_html += f"""
-                <div style="width: 120mm; margin: {s['margin_mat']} auto; position: relative; page-break-inside: avoid;">
-                    <div style="position: absolute; left: 50%; top: {s['top_offset']}; transform: translateX(-50%); font-size: {s['font_info']};">
-                        <strong>{lunghezza}mm</strong>
+                <div style="margin: {s['margin_mat']} auto 0; page-break-inside: avoid; width: fit-content;">
+                    <!-- Riga 1: campo compilabile a sinistra + lunghezza centrata sulla tela -->
+                    <div style="display: flex; align-items: center; margin-bottom: 0;">
+                        <div style="width: {w_campo}; flex-shrink: 0;">
+                            <input type="text" placeholder="" style="width: 100%; height: 5mm; border: 1.5px solid #000; background: #fff; color: #000; font-size: {s['font_info']}; padding: 0 1mm; box-sizing: border-box;">
+                        </div>
+                        <div style="width: {w_g}; flex-shrink: 0;"></div>
+                        <div style="width: 80mm; text-align: center; font-size: {s['font_info']}; flex-shrink: 0;">
+                            <strong>{lunghezza}mm</strong>
+                        </div>
+                        <div style="width: {w_h}; flex-shrink: 0;"></div>
                     </div>
-                    <div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative;">
-                        <input type="text" placeholder="Orient." style="width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent;">
-                        <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; transform: translateX(-50%);">{nome}</strong>
-                    </div>
-                    <div style="position: absolute; left: -2mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
-                        <strong>G{giri}</strong>
-                    </div>
-                    <div style="position: absolute; right: -6mm; top: 50%; transform: translateY(-50%); font-size: {s['font_giri']};">
-                        <strong>H {int(sviluppo)} mm</strong>
+                    <!-- Riga 2: spazio campo + G + tela + H -->
+                    <div style="display: flex; align-items: center;">
+                        <div style="width: {w_campo}; flex-shrink: 0;"></div>
+                        <div style="width: {w_g}; text-align: right; font-size: {s['font_giri']}; flex-shrink: 0; padding-right: 1mm;">
+                            <strong>G{giri}</strong>
+                        </div>
+                        {figura_html}
+                        <div style="width: {w_h}; font-size: {s['font_giri']}; flex-shrink: 0; padding-left: 2mm;">
+                            <strong>H {int(sviluppo)} mm</strong>
+                        </div>
                     </div>
                 </div>
                 """
@@ -719,7 +932,7 @@ class DocumentUtils:
         }}
         .header {{
             text-align: center;
-            margin-bottom: 8mm;
+            margin-bottom: 3mm;
         }}
         .info-section {{
             margin-bottom: {s['info_margin']};
@@ -814,6 +1027,7 @@ class DocumentUtils:
     {materiali_html}
 
     <!-- TABELLA OPERAZIONI -->
+    <div style="page-break-inside: avoid;">
     <table class="operations-table">
         <thead>
             <tr>
@@ -830,6 +1044,7 @@ class DocumentUtils:
             {ops_rows_html}
         </tbody>
     </table>
+    </div>
 </body>
 </html>
         """
