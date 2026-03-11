@@ -13,7 +13,7 @@ Author: Antonio VB + Claude
 from PyQt5.QtWidgets import QMessageBox, QHBoxLayout, QLabel, QWidget
 from PyQt5.QtCore import Qt
 from models.materiale import MaterialeCalcolato
-from ui.materiale_ui_components import NoScrollSpinBox, NoScrollDoubleSpinBox
+from ui.materiale_ui_components import NoScrollDoubleSpinBox
 
 class MaterialeBusinessLogic:
     """Classe per gestire la logica di business per MaterialeWindow"""
@@ -139,16 +139,9 @@ class MaterialeBusinessLogic:
         window_instance.materiale_calcolato.diametro = window_instance.edit_diametro.value()
         window_instance.materiale_calcolato.lunghezza = window_instance.edit_lunghezza.value()
 
-        # Aggiorna sezioni coniche solo per l'anteprima visiva (non influenzano i calcoli)
+        # Aggiorna parametri conicità dall'UI
         if window_instance.materiale_calcolato.is_conica:
-            sezioni = []
-            for sw in window_instance.sezioni_widgets:
-                sezioni.append({
-                    'lunghezza': sw['lunghezza'].value(),
-                    'd_inizio': sw['d_inizio'].value(),
-                    'd_fine': sw['d_fine'].value()
-                })
-            window_instance.materiale_calcolato.sezioni_coniche = sezioni
+            MaterialeBusinessLogic._leggi_conicita_da_ui(window_instance)
         
         # FIX: Logica sviluppo manuale corretta
         if window_instance.arrotondamento_modificato_manualmente and window_instance.edit_arrotondamento.value() > 0:
@@ -188,9 +181,20 @@ class MaterialeBusinessLogic:
             # Aggiorna anteprima tela
             if hasattr(window_instance, 'tela_preview'):
                 mc = window_instance.materiale_calcolato
-                if mc.is_conica and mc.sezioni_coniche:
-                    scarto = window_instance.tela_preview.aggiorna_conica(mc.sezioni_coniche)
+                if mc.is_conica and mc.conicita_lunghezza_mm > 0:
+                    scarto = window_instance.tela_preview.aggiorna_conica(
+                        mc.conicita_lato,
+                        mc.conicita_altezza_mm,
+                        mc.conicita_lunghezza_mm,
+                        mc.lunghezza,
+                        mc.sviluppo
+                    )
                     mc.scarto_mm2 = scarto
+                elif mc.is_conica:
+                    # Conica attiva ma lunghezza taglio = 0: mostra solo rettangolo
+                    window_instance.tela_preview.aggiorna_cilindrica(
+                        mc.diametro, mc.lunghezza, mc.sviluppo)
+                    mc.scarto_mm2 = 0.0
                 else:
                     window_instance.tela_preview.aggiorna_cilindrica(
                         mc.diametro, mc.lunghezza, mc.sviluppo)
@@ -216,6 +220,12 @@ class MaterialeBusinessLogic:
         if hasattr(materiale_originale, 'sezioni_coniche'):
             import copy
             nuovo_materiale.sezioni_coniche = copy.deepcopy(materiale_originale.sezioni_coniche)
+        if hasattr(materiale_originale, 'conicita_lato'):
+            nuovo_materiale.conicita_lato = materiale_originale.conicita_lato
+        if hasattr(materiale_originale, 'conicita_altezza_mm'):
+            nuovo_materiale.conicita_altezza_mm = materiale_originale.conicita_altezza_mm
+        if hasattr(materiale_originale, 'conicita_lunghezza_mm'):
+            nuovo_materiale.conicita_lunghezza_mm = materiale_originale.conicita_lunghezza_mm
         if hasattr(materiale_originale, 'scarto_mm2'):
             nuovo_materiale.scarto_mm2 = materiale_originale.scarto_mm2
         if hasattr(materiale_originale, 'orientamento'):
@@ -265,26 +275,29 @@ class MaterialeBusinessLogic:
         if hasattr(window_instance.materiale_esistente, 'is_conica') and window_instance.materiale_esistente.is_conica:
             window_instance.btn_conica.setChecked(True)
             window_instance.materiale_calcolato.is_conica = True
-            # I campi cilindrici rimangono visibili perché usati per i calcoli
             window_instance.conica_widget.show()
 
-            # Ricrea le sezioni dal materiale esistente
-            if hasattr(window_instance.materiale_esistente, 'sezioni_coniche') and window_instance.materiale_esistente.sezioni_coniche:
-                for sez in window_instance.materiale_esistente.sezioni_coniche:
-                    MaterialeBusinessLogic.aggiungi_sezione_conica(window_instance)
-                    last = window_instance.sezioni_widgets[-1]
-                    last['lunghezza'].blockSignals(True)
-                    last['d_inizio'].blockSignals(True)
-                    last['d_fine'].blockSignals(True)
-                    last['lunghezza'].setValue(int(sez.get('lunghezza', 0)))
-                    last['d_inizio'].setValue(float(sez.get('d_inizio', 0.0)))
-                    last['d_fine'].setValue(float(sez.get('d_fine', sez.get('d_inizio', 0.0))))
-                    last['lunghezza'].blockSignals(False)
-                    last['d_inizio'].blockSignals(False)
-                    last['d_fine'].blockSignals(False)
+            # Carica parametri conicità semplificati
+            mc = window_instance.materiale_esistente
+            lato = getattr(mc, 'conicita_lato', 'sinistra')
+            altezza = getattr(mc, 'conicita_altezza_mm', 0.0)
+            lunghezza = getattr(mc, 'conicita_lunghezza_mm', 0.0)
 
-                # Sincronizza sezioni nel modello
-                MaterialeBusinessLogic.on_sezione_changed(window_instance)
+            # Imposta radio button lato
+            if lato == 'destra':
+                window_instance.radio_destra.setChecked(True)
+            elif lato == 'entrambi':
+                window_instance.radio_entrambi.setChecked(True)
+            else:
+                window_instance.radio_sinistra.setChecked(True)
+
+            # Imposta valori spinbox
+            window_instance.spin_conicita_altezza.blockSignals(True)
+            window_instance.spin_conicita_lunghezza.blockSignals(True)
+            window_instance.spin_conicita_altezza.setValue(altezza)
+            window_instance.spin_conicita_lunghezza.setValue(lunghezza)
+            window_instance.spin_conicita_altezza.blockSignals(False)
+            window_instance.spin_conicita_lunghezza.blockSignals(False)
 
         # Ripristina orientamento nella preview
         if hasattr(window_instance, 'tela_preview') and hasattr(window_instance.materiale_esistente, 'orientamento'):
@@ -354,16 +367,11 @@ class MaterialeBusinessLogic:
         window_instance.materiale_calcolato.is_conica = is_conica
 
         if is_conica:
-            # Mostra sezione conica mantenendo visibili i campi cilindrici (usati per i calcoli)
             window_instance.conica_widget.show()
-            # Aggiungi una sezione iniziale se vuota
-            if len(window_instance.sezioni_widgets) == 0:
-                MaterialeBusinessLogic.aggiungi_sezione_conica(window_instance)
         else:
             window_instance.conica_widget.hide()
-            # Ripristina modalità cilindrica
             window_instance.materiale_calcolato.is_conica = False
-            window_instance.materiale_calcolato.sezioni_coniche = []
+            window_instance.materiale_calcolato.conicita_lunghezza_mm = 0.0
 
         # Reset sviluppo manuale e ricalcola
         window_instance.materiale_calcolato.arrotondamento_manuale = 0.0
@@ -375,101 +383,25 @@ class MaterialeBusinessLogic:
         MaterialeBusinessLogic.ricalcola_tutto(window_instance)
 
     @staticmethod
-    def aggiungi_sezione_conica(window_instance):
-        """Aggiunge una riga sezione conica con i relativi widget"""
-        idx = len(window_instance.sezioni_widgets) + 1
-
-        row_widget = QWidget()
-        row_layout = QHBoxLayout(row_widget)
-        row_layout.setContentsMargins(0, 0, 0, 0)
-        row_layout.setSpacing(4)
-
-        # Numero sezione
-        lbl_num = QLabel(str(idx))
-        lbl_num.setFixedWidth(20)
-        lbl_num.setAlignment(Qt.AlignCenter)
-        lbl_num.setStyleSheet("font-size: 12px; font-weight: 600; color: #718096;")
-        row_layout.addWidget(lbl_num)
-
-        # Lunghezza sezione (mm) - intero
-        spin_lunghezza = NoScrollSpinBox()
-        spin_lunghezza.setMaximum(99999)
-        spin_lunghezza.setValue(0)
-        spin_lunghezza.setSuffix(" mm")
-        spin_lunghezza.setMinimumHeight(32)
-        spin_lunghezza.valueChanged.connect(window_instance.on_sezione_changed)
-        row_layout.addWidget(spin_lunghezza)
-
-        # Diametro inizio (mm) - decimale
-        spin_d_inizio = NoScrollDoubleSpinBox()
-        spin_d_inizio.setMaximum(99999.99)
-        spin_d_inizio.setDecimals(2)
-        spin_d_inizio.setValue(0.0)
-        spin_d_inizio.setSuffix(" mm")
-        spin_d_inizio.setMinimumHeight(32)
-        spin_d_inizio.valueChanged.connect(window_instance.on_sezione_changed)
-        row_layout.addWidget(spin_d_inizio)
-
-        # Diametro fine (mm) - input libero (dimensione finale desiderata del tubo)
-        spin_d_fine = NoScrollDoubleSpinBox()
-        spin_d_fine.setMaximum(99999.99)
-        spin_d_fine.setDecimals(2)
-        spin_d_fine.setValue(0.0)
-        spin_d_fine.setSuffix(" mm")
-        spin_d_fine.setMinimumHeight(32)
-        spin_d_fine.valueChanged.connect(window_instance.on_sezione_changed)
-        row_layout.addWidget(spin_d_fine)
-
-        # Se c'è una sezione precedente, usa il d_fine di quella come d_inizio di questa
-        if window_instance.sezioni_widgets:
-            prev = window_instance.sezioni_widgets[-1]
-            prev_d_fine = prev['d_fine'].value()
-            spin_d_inizio.setValue(prev_d_fine)
-            spin_d_fine.setValue(prev_d_fine)  # default cilindrico: d_fine = d_inizio
-
-        # Inserisci prima dello stretch
-        stretch_index = window_instance.sezioni_layout.count() - 1
-        window_instance.sezioni_layout.insertWidget(stretch_index, row_widget)
-
-        window_instance.sezioni_widgets.append({
-            'widget': row_widget,
-            'lbl_num': lbl_num,
-            'lunghezza': spin_lunghezza,
-            'd_inizio': spin_d_inizio,
-            'd_fine': spin_d_fine
-        })
-
-        # Aggiorna calcoli
-        MaterialeBusinessLogic.on_sezione_changed(window_instance)
+    def _leggi_conicita_da_ui(window_instance):
+        """Legge i parametri conicità dai widget e li salva nel modello."""
+        mc = window_instance.materiale_calcolato
+        if window_instance.radio_destra.isChecked():
+            mc.conicita_lato = 'destra'
+        elif window_instance.radio_entrambi.isChecked():
+            mc.conicita_lato = 'entrambi'
+        else:
+            mc.conicita_lato = 'sinistra'
+        mc.conicita_altezza_mm = window_instance.spin_conicita_altezza.value()
+        mc.conicita_lunghezza_mm = window_instance.spin_conicita_lunghezza.value()
 
     @staticmethod
-    def rimuovi_sezione_conica(window_instance):
-        """Rimuove l'ultima sezione conica"""
-        if not window_instance.sezioni_widgets:
+    def on_conicita_changed(window_instance):
+        """Callback quando un parametro conicità cambia."""
+        if not window_instance.materiale_calcolato.is_conica:
             return
-
-        last = window_instance.sezioni_widgets.pop()
-        last['widget'].setParent(None)
-        last['widget'].deleteLater()
-
-        # Aggiorna calcoli
-        MaterialeBusinessLogic.on_sezione_changed(window_instance)
-
-    @staticmethod
-    def on_sezione_changed(window_instance):
-        """Legge i valori dalle sezioni e aggiorna l'anteprima visiva (senza toccare i calcoli)"""
-        sezioni = []
-        for sw in window_instance.sezioni_widgets:
-            sezioni.append({
-                'lunghezza': sw['lunghezza'].value(),
-                'd_inizio': sw['d_inizio'].value(),
-                'd_fine': sw['d_fine'].value()
-            })
-        window_instance.materiale_calcolato.sezioni_coniche = sezioni
-
-        # Aggiorna solo l'anteprima visiva conica, senza alterare i calcoli
-        if hasattr(window_instance, 'tela_preview') and window_instance.materiale_calcolato.is_conica:
-            window_instance.tela_preview.aggiorna_conica(sezioni)
+        MaterialeBusinessLogic._leggi_conicita_da_ui(window_instance)
+        MaterialeBusinessLogic.aggiorna_display(window_instance)
 
     @staticmethod
     def gestisci_chiusura_finestra(window_instance, event):

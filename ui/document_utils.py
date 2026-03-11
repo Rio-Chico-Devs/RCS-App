@@ -533,36 +533,26 @@ class DocumentUtils:
                     sviluppo   = getattr(materiale, 'sviluppo', 0)
                     nome       = x(getattr(materiale, 'nome', f'Materiale {i+1}'))
                     is_conica  = getattr(materiale, 'is_conica', False)
-                    sezioni    = getattr(materiale, 'sezioni_coniche', [])
-                    orient     = getattr(materiale, 'orientamento', {})
+                    con_lato   = getattr(materiale, 'conicita_lato', 'sinistra')
+                    con_alt    = getattr(materiale, 'conicita_altezza_mm', 0.0)
+                    con_lung   = getattr(materiale, 'conicita_lunghezza_mm', 0.0)
                 elif isinstance(materiale, dict):
                     giri       = materiale.get('giri', 0)
                     lunghezza  = materiale.get('lunghezza', 0)
                     sviluppo   = materiale.get('sviluppo', 0)
                     nome       = x(materiale.get('nome', materiale.get('materiale_nome', f'Materiale {i+1}')))
                     is_conica  = materiale.get('is_conica', False)
-                    sezioni    = materiale.get('sezioni_coniche', [])
-                    orient     = materiale.get('orientamento', {})
+                    con_lato   = materiale.get('conicita_lato', 'sinistra')
+                    con_alt    = materiale.get('conicita_altezza_mm', 0.0)
+                    con_lung   = materiale.get('conicita_lunghezza_mm', 0.0)
                 else:
                     giri=1; lunghezza=1000; sviluppo=100; nome=f'Materiale {i+1}'
-                    is_conica=False; sezioni=[]; orient={}
+                    is_conica=False; con_lato='sinistra'; con_alt=0.0; con_lung=0.0
 
-                if is_conica and sezioni:
-                    # Costruisce diam_str per il testo dentro la forma (es. Ø10→Ø14→Ø10)
-                    rot = orient.get('rotation', 0) if orient else 0
-                    flh = orient.get('flip_h', False) if orient else False
-                    all_diams = [sezioni[0].get('d_inizio', 0)] + [s.get('d_fine', 0) for s in sezioni]
-                    if flh ^ (rot == 180):
-                        all_diams = list(reversed(all_diams))
-                    deduped = [all_diams[0]]
-                    for d in all_diams[1:]:
-                        if d != deduped[-1]:
-                            deduped.append(d)
-                    diam_str = '\u2192'.join(f'\u00d8{d:.0f}' for d in deduped)
-                    nome_full = f'{diam_str}  {nome}'
-                    # Genera SVG con profilo trapezoidale identico all'HTML
+                if is_conica and con_lung > 0:
                     svg_path = f'Pictures/conica_{i}.svg'
-                    svg_content = DocumentUtils._svg_conica_str(sezioni, orient, nome_full, rect_h_cm)
+                    svg_content = DocumentUtils._svg_conica_str(
+                        con_lato, con_alt, con_lung, lunghezza, nome, rect_h_cm)
                     if svg_files is not None:
                         svg_files.append((svg_path, svg_content))
                     center_cell = (
@@ -647,61 +637,61 @@ class DocumentUtils:
         )
 
     @staticmethod
-    def _svg_conica_str(sezioni_coniche, orientamento, nome_xml, rect_h_cm=0.8):
+    def _svg_conica_str(lato, altezza_mm, lunghezza_mm, lunghezza_tela, nome_xml, rect_h_cm=0.8):
         """Genera SVG per la conica nell'ODT.
-        SVG per la conica nell'ODT: profilo trapezoidale identico all'HTML.
-        nome_xml: testo già XML-escaped (es. 'Ø10→Ø14→Ø10  NomeMateriale').
-        rect_h_cm: altezza del frame ODT in cm (default 0.8), usata per calcolare il viewBox
-                   in modo che corrisponda al ratio del frame e non venga stirato.
+        Disegna un rettangolo con triangolo(i) di scarto e indicazione della sbiegatura.
         """
-        rotation = orientamento.get('rotation', 0) if orientamento else 0
-        flip_h   = orientamento.get('flip_h', False) if orientamento else False
-
-        sezioni_draw = list(sezioni_coniche)
-        if flip_h ^ (rotation == 180):
-            sezioni_draw = list(reversed(sezioni_draw))
-
-        total_len = sum(sez.get('lunghezza', 0) for sez in sezioni_draw) or 1
-        max_d = max(
-            max((sez.get('d_inizio', 0) for sez in sezioni_draw), default=1),
-            max((sez.get('d_fine', 0) for sez in sezioni_draw), default=1),
-            1
-        )
-
-        # Adatta W/H al ratio reale del frame (11.5cm x rect_h_cm) per evitare stretching
         W = 115
         H = max(4, round(W * rect_h_cm / 11.5))
+        font_sz = max(2, round(H * 0.50))
+
+        L = max(lunghezza_tela, 1)
+        lt = lunghezza_mm
+        alt = altezza_mm
+
+        # Calcola proporzioni in pixel
+        lt_px = round(lt / L * W, 2)
+        alt_px = round(alt / H * H, 2) if H > 0 else 0
+
+        elements = []
+        # Rettangolo principale
+        elements.append(f'<rect x="0" y="0" width="{W}" height="{H}" fill="white" stroke="black" stroke-width="1.5"/>')
+
+        # Triangolo(i) scarto in rosa
+        tri_fill = 'rgba(255,150,150,0.6)'
+        tri_stroke = 'red'
+        sw = '0.8'
+
+        def triangolo_sx():
+            # (0, alt_px), (lt_px, H), (0, H)
+            pts = f'0,{alt_px} {lt_px},{H} 0,{H}'
+            return (f'<polygon points="{pts}" fill="{tri_fill}" stroke="{tri_stroke}" stroke-width="{sw}"/>')
+
+        def triangolo_dx():
+            # (W, alt_px), (W-lt_px, H), (W, H)
+            pts = f'{W},{alt_px} {W-lt_px},{H} {W},{H}'
+            return (f'<polygon points="{pts}" fill="{tri_fill}" stroke="{tri_stroke}" stroke-width="{sw}"/>')
+
+        if lato == 'sinistra':
+            elements.append(triangolo_sx())
+        elif lato == 'destra':
+            elements.append(triangolo_dx())
+        else:
+            elements.append(triangolo_sx())
+            elements.append(triangolo_dx())
+
+        # Testo materiale centrato
         cy = H / 2
-        margin = max(0.5, H * 0.1)  # margine verticale proporzionale
-        font_sz = max(2, round(H * 0.55))
-
-        top_pts = []
-        bot_pts = []
-        x_pos = 0
-        for j, sez in enumerate(sezioni_draw):
-            d_ini = sez.get('d_inizio', 0)
-            d_fin = sez.get('d_fine', 0)
-            l_sez = sez.get('lunghezza', 0)
-            x_s = round(x_pos / total_len * W, 2)
-            x_e = round((x_pos + l_sez) / total_len * W, 2)
-            h_ini = round(d_ini / max_d * (H - 2 * margin), 2)
-            h_fin = round(d_fin / max_d * (H - 2 * margin), 2)
-            if j == 0:
-                top_pts.append(f'{x_s},{round(cy - h_ini/2, 2)}')
-                bot_pts.append(f'{x_s},{round(cy + h_ini/2, 2)}')
-            top_pts.append(f'{x_e},{round(cy - h_fin/2, 2)}')
-            bot_pts.append(f'{x_e},{round(cy + h_fin/2, 2)}')
-            x_pos += l_sez
-
-        points_str = ' '.join(top_pts + list(reversed(bot_pts)))
+        elements.append(
+            f'<text x="{W/2}" y="{cy + font_sz * 0.35}" text-anchor="middle"'
+            f' font-size="{font_sz}" font-weight="bold" font-family="Arial,sans-serif">{nome_xml}</text>'
+        )
 
         return (
             '<?xml version="1.0" encoding="UTF-8"?>'
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}"'
             f' preserveAspectRatio="xMidYMid meet">'
-            f'<polygon points="{points_str}" fill="white" stroke="black" stroke-width="1.5"/>'
-            f'<text x="{W/2}" y="{cy + font_sz * 0.35}" text-anchor="middle" dominant-baseline="middle"'
-            f' font-size="{font_sz}" font-weight="bold" font-family="Arial,sans-serif">{nome_xml}</text>'
+            + ''.join(elements) +
             f'</svg>'
         )
 
@@ -798,58 +788,41 @@ class DocumentUtils:
             }
 
     @staticmethod
-    def _genera_figura_conica(sezioni_coniche, orientamento, s, nome):
-        """Genera un div con SVG trapezio (polygon) per ogni sezione conica.
-        La forma rispecchia il profilo reale: ogni sezione è un trapezio proporzionale ai diametri."""
-        rotation = orientamento.get('rotation', 0) if orientamento else 0
-        flip_h   = orientamento.get('flip_h', False) if orientamento else False
+    def _genera_figura_conica(lato, altezza_mm, lunghezza_mm, lunghezza_tela, s, nome):
+        """Genera un div con SVG rettangolo + triangolo(i) di sbiegatura per la scheda HTML.
+        Mostra chiaramente da quale lato e a quale distanza viene eseguita la sbiegatura."""
+        L = max(lunghezza_tela, 1)
+        lt = lunghezza_mm
+        alt = altezza_mm
 
-        total_len = sum(sez.get('lunghezza', 0) for sez in sezioni_coniche) or 1
+        # ViewBox: 80 x 20
+        W, H = 80, 20
+        lt_px = round(lt / L * W, 2)
+        alt_px = round(alt / H * H, 2)
 
-        sezioni_draw = list(sezioni_coniche)
-        if flip_h ^ (rotation == 180):
-            sezioni_draw = list(reversed(sezioni_draw))
+        tri_fill = 'rgba(255,150,150,0.7)'
 
-        # Diametro massimo per normalizzare le altezze
-        max_d = max(
-            max((sez.get('d_inizio', 0) for sez in sezioni_draw), default=1),
-            max((sez.get('d_fine', 0) for sez in sezioni_draw), default=1),
-            1
-        )
+        triangles = []
+        if lato in ('sinistra', 'entrambi'):
+            pts = f'0,{alt_px} {lt_px},{H} 0,{H}'
+            triangles.append(f'<polygon points="{pts}" fill="{tri_fill}" stroke="red" stroke-width="0.8"/>')
+        if lato in ('destra', 'entrambi'):
+            pts = f'{W},{alt_px} {W-lt_px},{H} {W},{H}'
+            triangles.append(f'<polygon points="{pts}" fill="{tri_fill}" stroke="red" stroke-width="0.8"/>')
 
-        # Costruisce il profilo del trapezio come polygon SVG
-        # viewBox: 0 0 80 20, centro y=10
-        cy = 10.0
-        top_pts = []
-        bot_pts = []
-
-        x_pos = 0
-        for j, sez in enumerate(sezioni_draw):
-            d_ini = sez.get('d_inizio', 0)
-            d_fin = sez.get('d_fine', 0)
-            l_sez = sez.get('lunghezza', 0)
-            x_s = round(x_pos / total_len * 80, 2)
-            x_e = round((x_pos + l_sez) / total_len * 80, 2)
-            h_ini = round(d_ini / max_d * 18, 2)  # altezza proporzionale, max 18 (lascia 1px bordo)
-            h_fin = round(d_fin / max_d * 18, 2)
-            if j == 0:
-                top_pts.append(f'{x_s},{round(cy - h_ini/2, 2)}')
-                bot_pts.append(f'{x_s},{round(cy + h_ini/2, 2)}')
-            top_pts.append(f'{x_e},{round(cy - h_fin/2, 2)}')
-            bot_pts.append(f'{x_e},{round(cy + h_fin/2, 2)}')
-            x_pos += l_sez
-
-        points_str = ' '.join(top_pts + list(reversed(bot_pts)))
-        polygon_svg = f'<polygon points="{points_str}" fill="#fff" stroke="#000" stroke-width="1.5"/>'
+        lato_txt = {'sinistra': 'SX', 'destra': 'DX', 'entrambi': 'SX+DX'}.get(lato, lato)
+        sbieg_label = f'Sbieg. {lato_txt}: {lt:.0f}mm'
 
         return f"""<div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; position: relative;">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 20"
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}"
                  preserveAspectRatio="none"
                  style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-                {polygon_svg}
+                <rect x="0" y="0" width="{W}" height="{H}" fill="#fff" stroke="#000" stroke-width="1.5"/>
+                {''.join(triangles)}
             </svg>
             <input type="text" placeholder="Orient." style="position: relative; z-index: 1; width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; margin-top: auto; margin-bottom: auto;">
             <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 1;">{nome}</strong>
+            <span style="font-size: {s['orient_font']}; position: absolute; bottom: 1px; right: 2px; color: red; z-index: 1;">{sbieg_label}</span>
         </div>"""
 
     @staticmethod
@@ -869,29 +842,27 @@ class DocumentUtils:
                     sviluppo = getattr(materiale, 'sviluppo', 0)
                     nome = getattr(materiale, 'nome', f'Materiale {i+1}')
                     is_conica = getattr(materiale, 'is_conica', False)
-                    sezioni_coniche = getattr(materiale, 'sezioni_coniche', [])
-                    orientamento = getattr(materiale, 'orientamento', {})
+                    con_lato = getattr(materiale, 'conicita_lato', 'sinistra')
+                    con_alt = getattr(materiale, 'conicita_altezza_mm', 0.0)
+                    con_lung = getattr(materiale, 'conicita_lunghezza_mm', 0.0)
                 elif isinstance(materiale, dict):
                     giri = materiale.get('giri', 0)
                     lunghezza = materiale.get('lunghezza', 0)
                     sviluppo = materiale.get('sviluppo', 0)
                     nome = materiale.get('nome', materiale.get('materiale_nome', f'Materiale {i+1}'))
                     is_conica = materiale.get('is_conica', False)
-                    sezioni_coniche = materiale.get('sezioni_coniche', [])
-                    orientamento = materiale.get('orientamento', {})
+                    con_lato = materiale.get('conicita_lato', 'sinistra')
+                    con_alt = materiale.get('conicita_altezza_mm', 0.0)
+                    con_lung = materiale.get('conicita_lunghezza_mm', 0.0)
                 else:
-                    giri = 1
-                    lunghezza = 1000
-                    sviluppo = 100
+                    giri = 1; lunghezza = 1000; sviluppo = 100
                     nome = f'Materiale {i+1}'
-                    is_conica = False
-                    sezioni_coniche = []
-                    orientamento = {}
+                    is_conica = False; con_lato = 'sinistra'; con_alt = 0.0; con_lung = 0.0
 
-                # Genera la figura: trapezio SVG per conica, rettangolo normale altrimenti
-                if is_conica and sezioni_coniche:
+                # Genera la figura: rettangolo con triangolo sbiegatura o rettangolo normale
+                if is_conica and con_lung > 0:
                     figura_html = DocumentUtils._genera_figura_conica(
-                        sezioni_coniche, orientamento, s, nome)
+                        con_lato, con_alt, con_lung, lunghezza, s, nome)
                 else:
                     figura_html = f"""<div style="width: 80mm; height: {s['rect_height']}; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative; flex-shrink: 0;">
                         <input type="text" placeholder="Orient." style="width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; position: relative; z-index: 1;">

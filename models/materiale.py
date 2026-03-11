@@ -32,7 +32,12 @@ class MaterialeCalcolato:
 
         # Modalità conica
         self.is_conica = False
-        self.sezioni_coniche = []  # [{lunghezza, d_inizio, d_fine}, ...]
+        self.sezioni_coniche = []  # Mantenuto per retrocompatibilità
+
+        # Conicità semplificata: lato, altezza inizio taglio, lunghezza taglio
+        self.conicita_lato = 'sinistra'       # 'sinistra', 'destra', 'entrambi'
+        self.conicita_altezza_mm = 0.0        # mm dall'alto sul bordo laterale (0 = angolo)
+        self.conicita_lunghezza_mm = 0.0      # mm estensione orizzontale del taglio
 
         # Scarto materiale (mm²) - solo per conica
         self.scarto_mm2 = 0.0
@@ -112,6 +117,9 @@ class MaterialeCalcolato:
             'maggiorazione': self.maggiorazione,
             'is_conica': self.is_conica,
             'sezioni_coniche': self.sezioni_coniche,
+            'conicita_lato': self.conicita_lato,
+            'conicita_altezza_mm': self.conicita_altezza_mm,
+            'conicita_lunghezza_mm': self.conicita_lunghezza_mm,
             'scarto_mm2': self.scarto_mm2,
             'orientamento': self.orientamento
         }
