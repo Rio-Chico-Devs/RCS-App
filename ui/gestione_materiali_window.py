@@ -84,6 +84,7 @@ class GestioneMaterialiWindow(QMainWindow):
         self.init_ui()
         self.carica_categorie_combo()
         self.carica_materiali()
+        self.showMaximized()
 
     # ------------------------------------------------------------------
     # UI setup
@@ -91,7 +92,6 @@ class GestioneMaterialiWindow(QMainWindow):
 
     def init_ui(self):
         self.setWindowTitle("Gestione Materiali - Software Aziendale RCS")
-        self.showMaximized()
         self.setStyleSheet(_BASE_STYLE)
 
         central = QWidget()
