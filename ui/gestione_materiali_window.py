@@ -904,7 +904,7 @@ class NuovoMaterialeDialog(QDialog):
 
         self.combo_categoria = QComboBox()
         self.combo_categoria.addItem("— Nessuna categoria —", None)
-        for cat in db_manager.get_all_categorie():
+        for cat in self.db_manager.get_all_categorie():
             self.combo_categoria.addItem(cat[1], cat[0])
 
         form.addRow("Nome Materiale:", self.edit_nome)
