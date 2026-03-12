@@ -1,5 +1,5 @@
 class Materiale:
-    def __init__(self, nome="", spessore=0.0, prezzo=0.0, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0):
+    def __init__(self, nome="", spessore=0.0, prezzo=0.0, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0, categoria_id=None):
         self.nome = nome
         self.spessore = spessore
         self.prezzo = prezzo
@@ -7,6 +7,7 @@ class Materiale:
         self.prezzo_fornitore = prezzo_fornitore
         self.capacita_magazzino = capacita_magazzino
         self.giacenza = giacenza
+        self.categoria_id = categoria_id
 
 class MaterialeCalcolato:
     def __init__(self):

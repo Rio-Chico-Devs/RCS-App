@@ -239,8 +239,38 @@ class MagazzinoWindow(QMainWindow):
         layout.setContentsMargins(0, 20, 0, 0)
         layout.setSpacing(16)
 
-        # Barra superiore: ordina + carico/scarico
+        # Barra superiore: toggle vista + ordina + carico/scarico
         top_layout = QHBoxLayout()
+
+        # Toggle singoli/categorie
+        _toggle_style_active = """
+            QPushButton { background-color: #4a5568; color: #ffffff;
+                          border-radius: 6px; min-height: 34px; padding: 6px 18px;
+                          font-size: 13px; font-weight: 700; }
+        """
+        _toggle_style_inactive = """
+            QPushButton { background-color: #f7fafc; color: #4a5568;
+                          border: 1px solid #e2e8f0; border-radius: 6px;
+                          min-height: 34px; padding: 6px 18px;
+                          font-size: 13px; font-weight: 600; }
+            QPushButton:hover { background-color: #edf2f7; }
+        """
+        self._toggle_style_active = _toggle_style_active
+        self._toggle_style_inactive = _toggle_style_inactive
+
+        self.btn_vista_singoli = QPushButton("Singoli Materiali")
+        self.btn_vista_singoli.setStyleSheet(_toggle_style_active)
+        self.btn_vista_singoli.clicked.connect(self._vista_singoli)
+
+        self.btn_vista_categorie = QPushButton("Per Categoria")
+        self.btn_vista_categorie.setStyleSheet(_toggle_style_inactive)
+        self.btn_vista_categorie.clicked.connect(self._vista_categorie)
+
+        self._scorte_vista = 'singoli'  # 'singoli' | 'categorie'
+
+        top_layout.addWidget(self.btn_vista_singoli)
+        top_layout.addWidget(self.btn_vista_categorie)
+        top_layout.addSpacing(16)
 
         lbl_ordina = QLabel("Ordina per:")
         lbl_ordina.setStyleSheet("font-weight: 600;")
@@ -284,14 +314,34 @@ class MagazzinoWindow(QMainWindow):
         self.scroll_scorte.setWidget(self.scorte_container)
         layout.addWidget(self.scroll_scorte)
 
+    def _vista_singoli(self):
+        self._scorte_vista = 'singoli'
+        self.btn_vista_singoli.setStyleSheet(self._toggle_style_active)
+        self.btn_vista_categorie.setStyleSheet(self._toggle_style_inactive)
+        self.carica_scorte()
+
+    def _vista_categorie(self):
+        self._scorte_vista = 'categorie'
+        self.btn_vista_categorie.setStyleSheet(self._toggle_style_active)
+        self.btn_vista_singoli.setStyleSheet(self._toggle_style_inactive)
+        self.carica_scorte()
+
     def carica_scorte(self):
-        """Carica e visualizza tutte le scorte"""
+        """Carica e visualizza le scorte nella vista corrente (singoli o categorie)"""
         # Pulisci layout
         while self.scorte_layout.count():
             child = self.scorte_layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
 
+        vista = getattr(self, '_scorte_vista', 'singoli')
+        if vista == 'categorie':
+            self._carica_scorte_categorie()
+        else:
+            self._carica_scorte_singoli()
+
+    def _carica_scorte_singoli(self):
+        """Visualizza le scorte dei singoli materiali"""
         ordina_per = self.combo_ordinamento.currentData() or 'giacenza_asc'
         scorte = self.db_manager.get_scorte(ordina_per)
 
@@ -309,6 +359,176 @@ class MagazzinoWindow(QMainWindow):
             self.scorte_layout.addWidget(card)
 
         self.scorte_layout.addStretch()
+
+    def _carica_scorte_categorie(self):
+        """Visualizza le scorte aggregate per categoria"""
+        ordina_per = self.combo_ordinamento.currentData() or 'giacenza_asc'
+        categorie = self.db_manager.get_scorte_per_categoria(ordina_per)
+
+        if not categorie:
+            lbl_vuoto = QLabel("Nessuna categoria definita. Aggiungile da Gestione Materiali → Categorie.")
+            lbl_vuoto.setAlignment(Qt.AlignCenter)
+            lbl_vuoto.setWordWrap(True)
+            lbl_vuoto.setStyleSheet("color: #718096; font-size: 16px; padding: 40px;")
+            self.scorte_layout.addWidget(lbl_vuoto)
+            self.scorte_layout.addStretch()
+            return
+
+        for cat in categorie:
+            cat_id, nome, giacenza_totale, capacita, giacenza_minima, giacenza_desiderata, num_materiali, note = cat
+            card = self._crea_card_categoria(
+                cat_id, nome, giacenza_totale or 0.0, capacita or 0.0,
+                giacenza_minima or 0.0, giacenza_desiderata or 0.0,
+                num_materiali or 0
+            )
+            self.scorte_layout.addWidget(card)
+
+        self.scorte_layout.addStretch()
+
+    def _crea_card_categoria(self, cat_id, nome, giacenza_totale, capacita,
+                              giacenza_minima, giacenza_desiderata, num_materiali):
+        """Crea una card per una categoria con barra gradiente e informazioni aggregate"""
+        card = QFrame()
+
+        # Determine alert color based on thresholds
+        border_color = "#e2e8f0"
+        if giacenza_minima > 0 and giacenza_totale < giacenza_minima:
+            border_color = "#fc8181"  # red – below minimum
+        elif giacenza_desiderata > 0 and giacenza_totale < giacenza_desiderata:
+            border_color = "#f6ad55"  # orange – below desired
+
+        card.setStyleSheet(f"""
+            QFrame {{
+                background-color: #ffffff;
+                border: 1px solid {border_color};
+                border-radius: 10px;
+            }}
+            QFrame:hover {{
+                border-color: #a0aec0;
+            }}
+        """)
+
+        card_layout = QHBoxLayout(card)
+        card_layout.setContentsMargins(20, 14, 20, 14)
+        card_layout.setSpacing(20)
+
+        # Info categoria
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(2)
+
+        lbl_nome = QLabel(nome)
+        lbl_nome.setStyleSheet("font-size: 16px; font-weight: 700; color: #2d3748;")
+
+        dettagli = f"Giacenza totale: {giacenza_totale:.2f} m²"
+        if capacita > 0:
+            dettagli += f" / {capacita:.2f} m²"
+        dettagli += f"  |  {num_materiali} materiali"
+        if giacenza_minima > 0:
+            dettagli += f"  |  Min: {giacenza_minima:.1f} m²"
+        if giacenza_desiderata > 0:
+            dettagli += f"  |  Desiderata: {giacenza_desiderata:.1f} m²"
+
+        lbl_dettagli = QLabel(dettagli)
+        lbl_dettagli.setStyleSheet("font-size: 12px; color: #718096;")
+
+        # Alert label
+        if giacenza_minima > 0 and giacenza_totale < giacenza_minima:
+            lbl_alert = QLabel("⚠ Scorta sotto il minimo!")
+            lbl_alert.setStyleSheet("font-size: 11px; color: #c53030; font-weight: 700;")
+            info_layout.addWidget(lbl_alert)
+        elif giacenza_desiderata > 0 and giacenza_totale < giacenza_desiderata:
+            lbl_alert = QLabel("Scorta sotto il livello desiderato")
+            lbl_alert.setStyleSheet("font-size: 11px; color: #c05621; font-weight: 600;")
+            info_layout.addWidget(lbl_alert)
+
+        info_layout.addWidget(lbl_nome)
+        info_layout.addWidget(lbl_dettagli)
+
+        card_layout.addLayout(info_layout)
+
+        # Barra scorta (basata su capacità se presente, altrimenti su desiderata)
+        ref_capacity = capacita if capacita > 0 else giacenza_desiderata
+        percentuale = (giacenza_totale / ref_capacity * 100) if ref_capacity > 0 else 0
+        barra = BarraScorta(percentuale)
+        card_layout.addWidget(barra)
+
+        # Bottone mostra materiali
+        btn_dettagli = QPushButton("Materiali")
+        btn_dettagli.setStyleSheet("""
+            QPushButton {
+                background-color: #f7fafc; color: #4a5568;
+                border: 1px solid #e2e8f0; min-height: 30px;
+                padding: 4px 12px; font-size: 12px;
+            }
+            QPushButton:hover { background-color: #edf2f7; }
+        """)
+        btn_dettagli.clicked.connect(
+            lambda checked, cid=cat_id, cn=nome: self._mostra_materiali_categoria(cid, cn)
+        )
+        card_layout.addWidget(btn_dettagli)
+
+        return card
+
+    def _mostra_materiali_categoria(self, categoria_id, nome_categoria):
+        """Mostra i materiali che appartengono a questa categoria"""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QLabel, QTableWidget, QTableWidgetItem, QPushButton, QHeaderView
+        mats = self.db_manager.get_materiali_per_categoria(categoria_id)
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Materiali – {nome_categoria}")
+        dialog.setMinimumSize(600, 350)
+        dialog.setStyleSheet("""
+            QDialog { background-color: #fafbfc; }
+            QLabel { color: #2d3748; font-family: system-ui, -apple-system, sans-serif; }
+            QTableWidget { background-color: #ffffff; border: 1px solid #e2e8f0;
+                           border-radius: 8px; font-size: 13px; }
+            QHeaderView::section { background-color: #f7fafc; color: #4a5568;
+                                   font-weight: 600; padding: 8px; border: none;
+                                   border-bottom: 2px solid #e2e8f0; }
+        """)
+
+        dlg_layout = QVBoxLayout(dialog)
+        dlg_layout.setContentsMargins(25, 25, 25, 25)
+        dlg_layout.setSpacing(12)
+
+        title = QLabel(f"Materiali nella categoria: {nome_categoria}")
+        title.setStyleSheet("font-size: 16px; font-weight: 700;")
+        dlg_layout.addWidget(title)
+
+        if not mats:
+            lbl = QLabel("Nessun materiale assegnato a questa categoria.")
+            lbl.setStyleSheet("color: #718096;")
+            dlg_layout.addWidget(lbl)
+        else:
+            table = QTableWidget(len(mats), 4)
+            table.setHorizontalHeaderLabels(["Nome", "Giacenza (m²)", "Capacità (m²)", "Fornitore"])
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            table.setEditTriggers(QTableWidget.NoEditTriggers)
+            table.setSelectionBehavior(QTableWidget.SelectRows)
+
+            for row, mat in enumerate(mats):
+                mat_id, nome, giacenza, capacita, fornitore, prezzo_fornitore = mat
+                table.setItem(row, 0, QTableWidgetItem(nome))
+                table.setItem(row, 1, QTableWidgetItem(f"{giacenza:.2f}"))
+                table.setItem(row, 2, QTableWidgetItem(f"{capacita:.2f}" if capacita > 0 else "—"))
+                table.setItem(row, 3, QTableWidgetItem(fornitore or "—"))
+
+            dlg_layout.addWidget(table)
+
+            totale = sum(m[2] for m in mats)
+            lbl_tot = QLabel(f"Giacenza totale categoria: {totale:.2f} m²")
+            lbl_tot.setStyleSheet("font-size: 13px; font-weight: 600; color: #4a5568;")
+            dlg_layout.addWidget(lbl_tot)
+
+        btn_close = QPushButton("Chiudi")
+        btn_close.setStyleSheet("""
+            QPushButton { background-color: #4a5568; color: #ffffff; min-height: 36px; padding: 8px 20px; }
+            QPushButton:hover { background-color: #2d3748; }
+        """)
+        btn_close.clicked.connect(dialog.accept)
+        dlg_layout.addWidget(btn_close, alignment=Qt.AlignRight)
+
+        dialog.exec_()
 
     def _crea_card_scorta(self, mat_id, nome, giacenza, capacita, fornitore, prezzo_fornitore):
         """Crea una card per un materiale con barra gradiente"""

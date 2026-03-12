@@ -154,6 +154,27 @@ class DatabaseManager:
                 except sqlite3.OperationalError as e:
                     print(f"Errore durante l'aggiunta della colonna {column_name}: {e}")
 
+        # Tabella categorie materiale
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS categorie_materiale (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT NOT NULL UNIQUE,
+                giacenza_minima REAL NOT NULL DEFAULT 0.0,
+                giacenza_desiderata REAL NOT NULL DEFAULT 0.0,
+                capacita_magazzino REAL NOT NULL DEFAULT 0.0,
+                note TEXT DEFAULT ''
+            )
+        """)
+
+        # Migrazione: aggiungi categoria_id ai materiali se non esiste
+        cursor.execute("PRAGMA table_info(materiali)")
+        mat_cols = [c[1] for c in cursor.fetchall()]
+        if 'categoria_id' not in mat_cols:
+            try:
+                cursor.execute("ALTER TABLE materiali ADD COLUMN categoria_id INTEGER REFERENCES categorie_materiale(id)")
+            except Exception:
+                pass
+
         # Tabella movimenti magazzino
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS movimenti_magazzino (
@@ -191,45 +212,45 @@ class DatabaseManager:
         """Restituisce tutti i materiali disponibili"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza FROM materiali ORDER BY nome")
+            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id FROM materiali ORDER BY nome")
             return cursor.fetchall()
 
     def get_materiale_by_id(self, materiale_id):
         """Restituisce un materiale specifico tramite ID"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza FROM materiali WHERE id = ?", (materiale_id,))
+            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id FROM materiali WHERE id = ?", (materiale_id,))
             return cursor.fetchone()
 
     def get_materiale_by_nome(self, nome):
         """Restituisce un materiale specifico tramite nome"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza FROM materiali WHERE nome = ?", (nome,))
+            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id FROM materiali WHERE nome = ?", (nome,))
             return cursor.fetchone()
 
-    def add_materiale(self, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0):
+    def add_materiale(self, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0, categoria_id=None):
         """Aggiunge un nuovo materiale"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    "INSERT INTO materiali (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza)
+                    "INSERT INTO materiali (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id)
                 )
                 conn.commit()
                 return cursor.lastrowid
             except sqlite3.IntegrityError:
                 return False
 
-    def update_materiale(self, materiale_id, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0):
+    def update_materiale(self, materiale_id, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0, categoria_id=None):
         """Aggiorna un materiale esistente"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    "UPDATE materiali SET nome = ?, spessore = ?, prezzo = ?, fornitore = ?, prezzo_fornitore = ?, capacita_magazzino = ?, giacenza = ? WHERE id = ?",
-                    (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, materiale_id)
+                    "UPDATE materiali SET nome = ?, spessore = ?, prezzo = ?, fornitore = ?, prezzo_fornitore = ?, capacita_magazzino = ?, giacenza = ?, categoria_id = ? WHERE id = ?",
+                    (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id, materiale_id)
                 )
                 conn.commit()
                 return cursor.rowcount > 0
@@ -319,6 +340,28 @@ class DatabaseManager:
             cursor.execute(f"""
                 SELECT id, nome, giacenza, capacita_magazzino, fornitore, prezzo_fornitore
                 FROM materiali
+                ORDER BY {order}
+            """)
+            return cursor.fetchall()
+
+    def get_scorte_per_categoria(self, ordina_per='giacenza_asc'):
+        """Restituisce le scorte aggregate per categoria (somma giacenza dei materiali)"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            if ordina_per == 'giacenza_asc':
+                order = "CASE WHEN c.capacita_magazzino > 0 THEN (SUM(m.giacenza) / c.capacita_magazzino) ELSE 0 END ASC"
+            elif ordina_per == 'giacenza_desc':
+                order = "CASE WHEN c.capacita_magazzino > 0 THEN (SUM(m.giacenza) / c.capacita_magazzino) ELSE 0 END DESC"
+            else:
+                order = "c.nome ASC"
+
+            cursor.execute(f"""
+                SELECT c.id, c.nome, SUM(m.giacenza) as giacenza_totale,
+                       c.capacita_magazzino, c.giacenza_minima, c.giacenza_desiderata,
+                       COUNT(m.id) as num_materiali, c.note
+                FROM categorie_materiale c
+                LEFT JOIN materiali m ON m.categoria_id = c.id
+                GROUP BY c.id, c.nome, c.capacita_magazzino, c.giacenza_minima, c.giacenza_desiderata, c.note
                 ORDER BY {order}
             """)
             return cursor.fetchall()
@@ -767,6 +810,71 @@ class DatabaseManager:
             for mat_id in materiale_ids:
                 cursor.execute("UPDATE materiali SET fornitore = ? WHERE id = ?", (nome_fornitore, mat_id))
             conn.commit()
+
+    # =================== METODI CATEGORIE MATERIALE ===================
+
+    def get_all_categorie(self):
+        """Restituisce tutte le categorie di materiale"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, nome, giacenza_minima, giacenza_desiderata, capacita_magazzino, note FROM categorie_materiale ORDER BY nome")
+            return cursor.fetchall()
+
+    def get_categoria_by_id(self, categoria_id):
+        """Restituisce una categoria specifica"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, nome, giacenza_minima, giacenza_desiderata, capacita_magazzino, note FROM categorie_materiale WHERE id = ?", (categoria_id,))
+            return cursor.fetchone()
+
+    def add_categoria(self, nome, giacenza_minima=0.0, giacenza_desiderata=0.0, capacita_magazzino=0.0, note=""):
+        """Aggiunge una nuova categoria"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "INSERT INTO categorie_materiale (nome, giacenza_minima, giacenza_desiderata, capacita_magazzino, note) VALUES (?, ?, ?, ?, ?)",
+                    (nome, giacenza_minima, giacenza_desiderata, capacita_magazzino, note)
+                )
+                conn.commit()
+                return cursor.lastrowid
+            except sqlite3.IntegrityError:
+                return False
+
+    def update_categoria(self, categoria_id, nome, giacenza_minima=0.0, giacenza_desiderata=0.0, capacita_magazzino=0.0, note=""):
+        """Aggiorna una categoria esistente"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "UPDATE categorie_materiale SET nome = ?, giacenza_minima = ?, giacenza_desiderata = ?, capacita_magazzino = ?, note = ? WHERE id = ?",
+                    (nome, giacenza_minima, giacenza_desiderata, capacita_magazzino, note, categoria_id)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            except sqlite3.IntegrityError:
+                return False
+
+    def delete_categoria(self, categoria_id):
+        """Elimina una categoria e rimuove il riferimento dai materiali collegati"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE materiali SET categoria_id = NULL WHERE categoria_id = ?", (categoria_id,))
+            cursor.execute("DELETE FROM categorie_materiale WHERE id = ?", (categoria_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def get_materiali_per_categoria(self, categoria_id):
+        """Restituisce i materiali di una categoria specifica"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, nome, giacenza, capacita_magazzino, fornitore, prezzo_fornitore
+                FROM materiali
+                WHERE categoria_id = ?
+                ORDER BY nome
+            """, (categoria_id,))
+            return cursor.fetchall()
 
     def delete_preventivo_e_revisioni(self, preventivo_id):
         """NUOVO: Elimina un preventivo e tutte le sue revisioni"""
