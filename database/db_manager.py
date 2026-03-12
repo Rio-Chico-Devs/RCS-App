@@ -18,11 +18,20 @@ Uso riservato esclusivamente a RCS
 
 import sqlite3
 import os
+import sys
 import json
 from datetime import datetime
 
 class DatabaseManager:
-    def __init__(self, db_path="data/materiali.db"):
+    def __init__(self, db_path=None):
+        if db_path is None:
+            if getattr(sys, 'frozen', False):
+                # Eseguibile PyInstaller: usa la directory dell'exe
+                base_dir = os.path.dirname(sys.executable)
+            else:
+                # Script Python: risali dalla cartella database/ alla root del progetto
+                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            db_path = os.path.join(base_dir, "data", "materiali.db")
         self.db_path = db_path
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.init_database()
@@ -131,9 +140,8 @@ class DatabaseManager:
             if column_name not in columns:
                 try:
                     cursor.execute(f"ALTER TABLE preventivi ADD COLUMN {column_name} {column_def}")
-                    print(f"Aggiunta colonna {column_name} alla tabella preventivi")
-                except sqlite3.OperationalError as e:
-                    print(f"Errore durante l'aggiunta della colonna {column_name}: {e}")
+                except sqlite3.OperationalError:
+                    pass
 
         # Migrazione tabella materiali - nuovi campi magazzino
         cursor.execute("PRAGMA table_info(materiali)")
@@ -150,9 +158,8 @@ class DatabaseManager:
             if column_name not in materiali_columns:
                 try:
                     cursor.execute(f"ALTER TABLE materiali ADD COLUMN {column_name} {column_def}")
-                    print(f"Aggiunta colonna {column_name} alla tabella materiali")
-                except sqlite3.OperationalError as e:
-                    print(f"Errore durante l'aggiunta della colonna {column_name}: {e}")
+                except sqlite3.OperationalError:
+                    pass
 
         # Tabella categorie materiale
         cursor.execute("""

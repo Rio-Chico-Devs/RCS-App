@@ -101,15 +101,12 @@ class DocumentUtils:
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
                 
-            print(f"DEBUG: Documento HTML generato: {file_path}")
-            
             # Apri automaticamente
             os.startfile(file_path)
             
             return file_path
             
         except Exception as e:
-            print(f"DEBUG: Errore generazione HTML: {e}")
             if parent:
                 QMessageBox.warning(parent, "Errore", f"Errore nella generazione HTML: {e}")
             return None
@@ -133,7 +130,6 @@ class DocumentUtils:
             webbrowser.open(f'file://{temp_path}')
 
         except Exception as e:
-            print(f"DEBUG: Errore anteprima HTML: {e}")
             if parent:
                 QMessageBox.warning(parent, "Errore", f"Errore nella generazione anteprima:\n{e}")
 
@@ -333,17 +329,13 @@ class DocumentUtils:
             
             # Salva documento
             doc.save(file_path)
-            print(f"DEBUG: Documento DOCX generato: {file_path}")
-            
+
             # Apri automaticamente
             os.startfile(file_path)
             
             return file_path
             
         except Exception as e:
-            print(f"DEBUG: Errore generazione DOCX: {e}")
-            import traceback
-            traceback.print_exc()
             if parent:
                 QMessageBox.warning(parent, "Errore", f"Errore nella generazione DOCX: {e}")
             return None
@@ -729,7 +721,6 @@ class DocumentUtils:
                 for svg_path, svg_content in svg_files:
                     zf.writestr(svg_path, svg_content)
 
-            print(f"DEBUG: Documento ODT generato: {file_path}")
             try:
                 import sys
                 import subprocess
@@ -743,9 +734,6 @@ class DocumentUtils:
             return file_path
 
         except Exception as e:
-            print(f"DEBUG: Errore generazione ODT: {e}")
-            import traceback
-            traceback.print_exc()
             if parent:
                 QMessageBox.warning(parent, "Errore", f"Errore nella generazione ODT: {e}")
             return None

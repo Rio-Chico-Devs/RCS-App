@@ -22,7 +22,7 @@ def main():
     # Imposta le proprietà dell'applicazione
     app.setApplicationName("Gestione Preventivi")
     app.setApplicationVersion("1.0")
-    app.setOrganizationName("La Tua Azienda")
+    app.setOrganizationName("RCS")
     
     try:
         # Crea e mostra la finestra principale

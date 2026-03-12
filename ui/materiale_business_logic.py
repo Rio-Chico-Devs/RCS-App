@@ -36,8 +36,6 @@ class MaterialeBusinessLogic:
     @staticmethod
     def on_materiale_changed(window_instance):
         """FIX: Gestisce cambio materiale e reset sviluppo manuale"""
-        print("DEBUG: Materiale cambiato - resetting sviluppo manuale")
-        
         # RESET sviluppo manuale quando cambia il materiale
         window_instance.materiale_calcolato.arrotondamento_manuale = 0.0
         window_instance.edit_arrotondamento.blockSignals(True)
@@ -51,8 +49,6 @@ class MaterialeBusinessLogic:
     @staticmethod
     def on_parametro_changed(window_instance):
         """FIX: Gestisce cambio parametri e reset sviluppo manuale"""
-        print("DEBUG: Parametro cambiato - resetting sviluppo manuale")
-        
         # RESET sviluppo manuale quando cambia qualsiasi parametro
         window_instance.materiale_calcolato.arrotondamento_manuale = 0.0
         window_instance.edit_arrotondamento.blockSignals(True)
@@ -67,9 +63,7 @@ class MaterialeBusinessLogic:
     def on_sviluppo_manuale_changed(window_instance):
         """FIX: Gestisce SOLO il cambio del campo sviluppo manuale"""
         valore = window_instance.edit_arrotondamento.value()
-        
-        print(f"DEBUG: Sviluppo manuale cambiato a: {valore}")
-        
+
         if valore != 0:
             window_instance.arrotondamento_modificato_manualmente = True
             window_instance.materiale_calcolato.arrotondamento_manuale = valore
@@ -149,12 +143,10 @@ class MaterialeBusinessLogic:
             sviluppo_manuale = window_instance.edit_arrotondamento.value()
             window_instance.materiale_calcolato.arrotondamento_manuale = sviluppo_manuale
             window_instance.materiale_calcolato.sviluppo = sviluppo_manuale
-            print(f"DEBUG: Usando sviluppo manuale: {sviluppo_manuale}")
         else:
             # Calcola sviluppo automaticamente
             window_instance.materiale_calcolato.arrotondamento_manuale = 0.0
             window_instance.materiale_calcolato.ricalcola_tutto()
-            print(f"DEBUG: Sviluppo calcolato automaticamente: {window_instance.materiale_calcolato.sviluppo}")
         
         # Aggiorna interfaccia
         MaterialeBusinessLogic.aggiorna_display(window_instance)
