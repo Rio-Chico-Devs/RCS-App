@@ -182,6 +182,27 @@ class DatabaseManager:
             except Exception:
                 pass
 
+        # Tabella categorie materiale
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS categorie_materiale (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT NOT NULL UNIQUE,
+                giacenza_minima REAL NOT NULL DEFAULT 0.0,
+                giacenza_desiderata REAL NOT NULL DEFAULT 0.0,
+                capacita_magazzino REAL NOT NULL DEFAULT 0.0,
+                note TEXT DEFAULT ''
+            )
+        """)
+
+        # Migrazione: aggiungi categoria_id ai materiali se non esiste
+        cursor.execute("PRAGMA table_info(materiali)")
+        mat_cols = [c[1] for c in cursor.fetchall()]
+        if 'categoria_id' not in mat_cols:
+            try:
+                cursor.execute("ALTER TABLE materiali ADD COLUMN categoria_id INTEGER REFERENCES categorie_materiale(id)")
+            except Exception:
+                pass
+
         # Tabella movimenti magazzino
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS movimenti_magazzino (
