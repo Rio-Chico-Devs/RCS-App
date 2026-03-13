@@ -40,9 +40,9 @@ _BASE_STYLE = """
     QTabWidget::pane { border: none; background: transparent; }
     QTabBar::tab {
         background: #edf2f7; color: #4a5568;
-        border-radius: 6px 6px 0 0; padding: 10px 28px;
+        border-radius: 6px 6px 0 0; padding: 10px 20px;
         font-size: 14px; font-weight: 600;
-        margin-right: 4px;
+        margin-right: 4px; min-width: 140px;
     }
     QTabBar::tab:selected { background: #ffffff; color: #2d3748; }
     QLabel { color: #2d3748; font-family: system-ui, -apple-system, sans-serif;
@@ -447,7 +447,8 @@ class GestioneMaterialiWindow(QMainWindow):
         self.tabella_fornitori_mat.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
         self.tabella_fornitori_mat.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.tabella_fornitori_mat.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        self.tabella_fornitori_mat.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        self.tabella_fornitori_mat.horizontalHeader().setSectionResizeMode(5, QHeaderView.Fixed)
+        self.tabella_fornitori_mat.setColumnWidth(5, 160)
         self.tabella_fornitori_mat.verticalHeader().setVisible(False)
         self.tabella_fornitori_mat.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabella_fornitori_mat.setSelectionBehavior(QTableWidget.SelectRows)
@@ -742,9 +743,10 @@ class GestioneMaterialiWindow(QMainWindow):
             btn_layout_row.setSpacing(6)
 
             btn_mod = QPushButton("Modifica")
+            btn_mod.setMinimumWidth(70)
             btn_mod.setStyleSheet("""
                 QPushButton { background-color: #edf2f7; color: #2d3748; border: none;
-                              border-radius: 4px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+                              border-radius: 4px; padding: 4px 8px; font-size: 12px; font-weight: 600; }
                 QPushButton:hover { background-color: #e2e8f0; }
             """)
             btn_mod.clicked.connect(lambda checked, mid=mf_id, mn=forn_nome,
@@ -752,9 +754,10 @@ class GestioneMaterialiWindow(QMainWindow):
                                     self._modifica_fornitore_materiale(mid, mn, pf, sm, sx))
 
             btn_del = QPushButton("Elimina")
+            btn_del.setMinimumWidth(65)
             btn_del.setStyleSheet("""
                 QPushButton { background-color: #fff5f5; color: #c53030; border: 1px solid #fed7d7;
-                              border-radius: 4px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+                              border-radius: 4px; padding: 4px 8px; font-size: 12px; font-weight: 600; }
                 QPushButton:hover { background-color: #fed7d7; }
             """)
             btn_del.clicked.connect(lambda checked, mid=mf_id, mn=forn_nome:
