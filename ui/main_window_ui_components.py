@@ -163,6 +163,7 @@ class MainWindowUIComponents:
         # Sottotitolo
         subtitle_label = QLabel("Sistema di calcolo preventivi e statistiche RCS")
         subtitle_label.setAlignment(Qt.AlignCenter)
+        subtitle_label.setWordWrap(True)
         subtitle_label.setStyleSheet("""
             QLabel {
                 font-size: 16px;
@@ -315,6 +316,7 @@ class MainWindowUIComponents:
         footer_layout.setContentsMargins(0, 0, 0, 0)
         
         footer_label = QLabel("Software Aziendale RCS v2.3.0 | Sistema di calcolo preventivi, gestione revisioni e generazione documenti")
+        footer_label.setWordWrap(True)
         footer_label.setStyleSheet("""
             QLabel {
                 color: #a0aec0;

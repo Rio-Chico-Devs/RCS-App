@@ -65,13 +65,15 @@ class ConfrontoPreventiviWindow(QMainWindow):
 
         # Titolo
         title_label = QLabel("Confronto Preventivi")
-        title_label.setFont(QFont("Segoe UI", 24, QFont.Bold))
+        title_label.setFont(QFont("Segoe UI", 22, QFont.Bold))
+        title_label.setWordWrap(True)
         title_label.setStyleSheet("color: #2d3748; border: none; padding: 0;")
         header_layout.addWidget(title_label)
 
         # Sottotitolo (cambia in base alla fase)
         self.subtitle_label = QLabel("Seleziona il primo preventivo da confrontare")
         self.subtitle_label.setFont(QFont("Segoe UI", 12))
+        self.subtitle_label.setWordWrap(True)
         self.subtitle_label.setStyleSheet("color: #4a5568; border: none; padding: 0;")
         header_layout.addWidget(self.subtitle_label)
 
@@ -456,6 +458,7 @@ class ConfrontoPreventiviWindow(QMainWindow):
 
         prev1_info = QLabel(f"{self.preventivo1_data.get('nome_cliente', 'N/A')} - {self.preventivo1_data.get('descrizione', 'N/A')}")
         prev1_info.setFont(QFont("Segoe UI", 10))
+        prev1_info.setWordWrap(True)
         prev1_info.setStyleSheet("color: #718096; border: none;")
         prev1_header.addWidget(prev1_info)
 
@@ -485,6 +488,7 @@ class ConfrontoPreventiviWindow(QMainWindow):
 
         prev2_info = QLabel(f"{self.preventivo2_data.get('nome_cliente', 'N/A')} - {self.preventivo2_data.get('descrizione', 'N/A')}")
         prev2_info.setFont(QFont("Segoe UI", 10))
+        prev2_info.setWordWrap(True)
         prev2_info.setStyleSheet("color: #718096; border: none;")
         prev2_header.addWidget(prev2_info)
 

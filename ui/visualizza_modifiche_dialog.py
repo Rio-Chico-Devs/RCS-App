@@ -183,9 +183,10 @@ class VisualizzaModificheDialog(QDialog):
     def create_header(self, parent_layout: QVBoxLayout) -> None:
         """Header del dialog"""
         title_label = QLabel(f"Storico Modifiche - Preventivo #{self.preventivo_id:03d}")
+        title_label.setWordWrap(True)
         title_label.setStyleSheet("""
             QLabel {
-                font-size: 22px;
+                font-size: 20px;
                 font-weight: 700;
                 color: #2d3748;
                 padding: 0;
@@ -216,7 +217,9 @@ class VisualizzaModificheDialog(QDialog):
                 background-color: #f7fafc;
                 color: #4a5568;
                 border: 1px solid #e2e8f0;
-                min-height: 32px;
+                min-height: 38px;
+                min-width: 180px;
+                padding: 8px 16px;
             }
             QPushButton:hover {
                 background-color: #edf2f7;
@@ -235,7 +238,9 @@ class VisualizzaModificheDialog(QDialog):
             QPushButton {
                 background-color: #4a5568;
                 color: #ffffff;
-                min-height: 32px;
+                min-height: 38px;
+                min-width: 200px;
+                padding: 8px 16px;
             }
             QPushButton:hover {
                 background-color: #2d3748;
@@ -445,7 +450,8 @@ class VisualizzaModificheDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
 
         title = QLabel("Confronto: Versione Selezionata vs Versione Corrente")
-        title.setStyleSheet("font-size: 18px; font-weight: 700; color: #2d3748;")
+        title.setWordWrap(True)
+        title.setStyleSheet("font-size: 16px; font-weight: 700; color: #2d3748;")
         layout.addWidget(title)
 
         splitter = QSplitter(Qt.Horizontal)
