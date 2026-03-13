@@ -218,8 +218,9 @@ class PreventivoUIComponents:
                     background-color: #4a5568;
                     color: #ffffff;
                     font-size: 14px;
-                    min-height: 36px;
-                    max-width: 180px;
+                    min-height: 38px;
+                    min-width: 160px;
+                    padding: 8px 20px;
                 }
                 QPushButton:hover {
                     background-color: #2d3748;
@@ -592,20 +593,21 @@ class PreventivoUIComponents:
                 
                 # Label del materiale
                 label = QLabel(item_text)
+                label.setWordWrap(True)
                 label.setStyleSheet("color: #2d3748; font-size: 13px;")
                 layout.addWidget(label)
                 layout.addStretch()
                 
                 # Pulsante Modifica
                 btn_modifica = QPushButton("Modifica")
-                btn_modifica.setMaximumWidth(80)
+                btn_modifica.setMinimumWidth(80)
                 btn_modifica.setStyleSheet("""
                     QPushButton {
                         background-color: #4a5568;
                         color: white;
                         border: none;
-                        padding: 4px 8px;
-                        min-height: 24px;
+                        padding: 6px 12px;
+                        min-height: 30px;
                     }
                     QPushButton:hover {
                         background-color: #2d3748;
@@ -616,14 +618,14 @@ class PreventivoUIComponents:
                 
                 # Pulsante Elimina
                 btn_elimina = QPushButton("Elimina")
-                btn_elimina.setMaximumWidth(80)
+                btn_elimina.setMinimumWidth(80)
                 btn_elimina.setStyleSheet("""
                     QPushButton {
                         background-color: #e53e3e;
                         color: white;
                         border: none;
-                        padding: 4px 8px;
-                        min-height: 24px;
+                        padding: 6px 12px;
+                        min-height: 30px;
                     }
                     QPushButton:hover {
                         background-color: #c53030;

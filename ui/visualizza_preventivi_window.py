@@ -324,7 +324,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
             QPushButton {
                 background-color: #4a5568;
                 color: #ffffff;
-                min-height: 32px;
+                min-height: 38px;
+                min-width: 140px;
                 padding: 8px 16px;
             }
             QPushButton:hover {
@@ -339,7 +340,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
             QPushButton {
                 background-color: #4a5568;
                 color: #ffffff;
-                min-height: 32px;
+                min-height: 38px;
+                min-width: 100px;
                 padding: 8px 16px;
             }
             QPushButton:hover {
@@ -354,7 +356,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
             QPushButton {
                 background-color: #4a5568;
                 color: #ffffff;
-                min-height: 32px;
+                min-height: 38px;
+                min-width: 130px;
                 padding: 8px 16px;
             }
             QPushButton:hover {
@@ -369,7 +372,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
             QPushButton {
                 background-color: #805ad5;
                 color: #ffffff;
-                min-height: 32px;
+                min-height: 38px;
+                min-width: 160px;
                 padding: 8px 16px;
             }
             QPushButton:hover {
@@ -394,7 +398,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
                 background-color: #f7fafc;
                 color: #4a5568;
                 border: 1px solid #e2e8f0;
-                min-height: 32px;
+                min-height: 38px;
+                min-width: 160px;
                 padding: 8px 16px;
             }
             QPushButton:hover {
@@ -410,7 +415,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
                 background-color: #ebf8ff;
                 color: #2b6cb0;
                 border: 1px solid #bee3f8;
-                min-height: 32px;
+                min-height: 38px;
+                min-width: 160px;
                 padding: 8px 16px;
             }
             QPushButton:hover {
@@ -426,7 +432,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
                 background-color: #f7fafc;
                 color: #4a5568;
                 border: 1px solid #e2e8f0;
-                min-height: 32px;
+                min-height: 38px;
+                min-width: 150px;
                 padding: 8px 16px;
             }
             QPushButton:hover {
