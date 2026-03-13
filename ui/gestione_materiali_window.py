@@ -766,7 +766,7 @@ class GestioneMaterialiWindow(QMainWindow):
             btn_layout_row.addWidget(btn_mod)
             btn_layout_row.addWidget(btn_del)
             self.tabella_fornitori_mat.setCellWidget(row, 5, btn_frame)
-            self.tabella_fornitori_mat.setRowHeight(row, 44)
+            self.tabella_fornitori_mat.setRowHeight(row, 54)
 
     def _aggiungi_fornitore_materiale(self):
         if not hasattr(self, 'materiale_corrente'):
