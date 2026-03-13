@@ -28,8 +28,8 @@ class BarraScorta(QWidget):
     def __init__(self, percentuale=0, parent=None):
         super().__init__(parent)
         self.percentuale = max(0, min(100, percentuale))
-        self.setMinimumHeight(22)
-        self.setMaximumHeight(22)
+        self.setMinimumHeight(32)
+        self.setMaximumHeight(32)
         self.setMinimumWidth(200)
 
     def set_percentuale(self, percentuale):
@@ -63,7 +63,7 @@ class BarraScorta(QWidget):
         # Testo percentuale
         painter.setPen(QColor(45, 55, 72))
         from PyQt5.QtGui import QFont
-        font = QFont("system-ui", 10, QFont.Bold)
+        font = QFont("system-ui", 12, QFont.Bold)
         painter.setFont(font)
         painter.drawText(0, 0, w, h, Qt.AlignCenter, f"{self.percentuale:.0f}%")
 
@@ -677,8 +677,8 @@ class MagazzinoWindow(QMainWindow):
         btn_back.setStyleSheet("""
             QPushButton {
                 background-color: #f7fafc; color: #4a5568;
-                border: 1px solid #e2e8f0; min-height: 32px;
-                padding: 4px 16px; font-size: 13px; font-weight: 600;
+                border: 1px solid #e2e8f0; min-height: 42px;
+                padding: 6px 20px; font-size: 15px; font-weight: 600;
                 border-radius: 6px;
             }
             QPushButton:hover { background-color: #edf2f7; }
@@ -686,7 +686,7 @@ class MagazzinoWindow(QMainWindow):
         btn_back.clicked.connect(self.carica_scorte)
 
         lbl_title = QLabel(f"Fornitori — {nome_materiale}")
-        lbl_title.setStyleSheet("font-size: 16px; font-weight: 700; color: #2d3748;")
+        lbl_title.setStyleSheet("font-size: 22px; font-weight: 700; color: #2d3748;")
 
         header_layout.addWidget(btn_back)
         header_layout.addWidget(lbl_title)
@@ -704,10 +704,10 @@ class MagazzinoWindow(QMainWindow):
             table.setHorizontalHeaderLabels(["Fornitore", "Scorta Min", "Barra Scorte", "Giacenza", "Scorta Max"])
             table.setStyleSheet("""
                 QTableWidget { background-color: #ffffff; border: 1px solid #e2e8f0;
-                               border-radius: 8px; font-size: 13px; }
+                               border-radius: 8px; font-size: 16px; }
                 QHeaderView::section { background-color: #f7fafc; color: #4a5568;
-                                       font-weight: 600; padding: 8px; border: none;
-                                       border-bottom: 2px solid #e2e8f0; }
+                                       font-weight: 700; font-size: 15px; padding: 12px 10px;
+                                       border: none; border-bottom: 2px solid #e2e8f0; }
             """)
             table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
             table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
@@ -724,20 +724,20 @@ class MagazzinoWindow(QMainWindow):
                 table.setItem(row, 1, QTableWidgetItem(f"{s_min:.1f} m²"))
 
                 barra = BarraScorta((giacenza / s_max * 100) if s_max > 0 else 0)
-                barra.setMinimumHeight(24)
+                barra.setMinimumHeight(32)
                 table.setCellWidget(row, 2, barra)
 
                 item_giac = QTableWidgetItem(f"{giacenza:.2f} m²")
                 item_giac.setTextAlignment(Qt.AlignCenter)
                 table.setItem(row, 3, item_giac)
                 table.setItem(row, 4, QTableWidgetItem(f"{s_max:.1f} m²"))
-                table.setRowHeight(row, 34)
+                table.setRowHeight(row, 52)
 
             self.scorte_layout.addWidget(table)
 
             totale = sum(mf[5] for mf in fornitori)
             lbl_tot = QLabel(f"Giacenza totale: {totale:.2f} m²")
-            lbl_tot.setStyleSheet("font-size: 13px; font-weight: 600; color: #4a5568; padding: 4px 0;")
+            lbl_tot.setStyleSheet("font-size: 16px; font-weight: 600; color: #4a5568; padding: 8px 0;")
             self.scorte_layout.addWidget(lbl_tot)
 
         self.scorte_layout.addStretch()
