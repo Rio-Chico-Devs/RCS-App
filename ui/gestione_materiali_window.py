@@ -398,7 +398,7 @@ class GestioneMaterialiWindow(QMainWindow):
 
         self.btn_salva = QPushButton("Salva Materiale")
         self.btn_salva.setStyleSheet("""
-            QPushButton { background-color: #4a5568; color: #ffffff; min-height: 40px; }
+            QPushButton { background-color: #4a5568; color: #ffffff; min-height: 32px; }
             QPushButton:hover { background-color: #2d3748; }
             QPushButton:disabled { background-color: #a0aec0; color: #ffffff; }
         """)
@@ -406,7 +406,7 @@ class GestioneMaterialiWindow(QMainWindow):
 
         self.btn_elimina = QPushButton("Elimina Materiale")
         self.btn_elimina.setStyleSheet("""
-            QPushButton { background-color: #e53e3e; color: #ffffff; min-height: 40px; }
+            QPushButton { background-color: #e53e3e; color: #ffffff; min-height: 32px; }
             QPushButton:hover { background-color: #c53030; }
             QPushButton:disabled { background-color: #a0aec0; color: #ffffff; }
         """)
@@ -415,7 +415,7 @@ class GestioneMaterialiWindow(QMainWindow):
         self.btn_reset = QPushButton("Reset")
         self.btn_reset.setStyleSheet("""
             QPushButton { background-color: #f7fafc; color: #4a5568;
-                          border: 1px solid #e2e8f0; min-height: 40px; }
+                          border: 1px solid #e2e8f0; min-height: 32px; }
             QPushButton:hover { background-color: #edf2f7; }
         """)
         self.btn_reset.clicked.connect(self.reset_form)
@@ -743,7 +743,7 @@ class GestioneMaterialiWindow(QMainWindow):
             btn_layout_row.setSpacing(6)
 
             btn_mod = QPushButton("Modifica")
-            btn_mod.setFixedSize(86, 28)
+            btn_mod.setFixedSize(86, 32)
             btn_mod.setStyleSheet("""
                 QPushButton { background-color: #edf2f7; color: #2d3748; border: none;
                               border-radius: 4px; padding: 2px 4px; font-size: 12px; font-weight: 600; }
@@ -754,7 +754,7 @@ class GestioneMaterialiWindow(QMainWindow):
                                     self._modifica_fornitore_materiale(mid, mn, pf, sm, sx))
 
             btn_del = QPushButton("Elimina")
-            btn_del.setFixedSize(78, 28)
+            btn_del.setFixedSize(78, 32)
             btn_del.setStyleSheet("""
                 QPushButton { background-color: #fff5f5; color: #c53030; border: 1px solid #fed7d7;
                               border-radius: 4px; padding: 2px 4px; font-size: 12px; font-weight: 600; }
@@ -766,7 +766,7 @@ class GestioneMaterialiWindow(QMainWindow):
             btn_layout_row.addWidget(btn_mod)
             btn_layout_row.addWidget(btn_del)
             self.tabella_fornitori_mat.setCellWidget(row, 5, btn_frame)
-            self.tabella_fornitori_mat.setRowHeight(row, 54)
+            self.tabella_fornitori_mat.setRowHeight(row, 44)
 
     def _aggiungi_fornitore_materiale(self):
         if not hasattr(self, 'materiale_corrente'):
