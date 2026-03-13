@@ -335,12 +335,13 @@ class GestioneMaterialiWindow(QMainWindow):
         left_layout.addWidget(lista_group)
         layout.addWidget(left)
 
-        # ── Right: form dettagli ──────────────────────────────────────
+        # ── Right: form dettagli + fornitori ─────────────────────────
         right = QWidget()
         right.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         right_layout = QVBoxLayout(right)
-        right_layout.setSpacing(20)
+        right_layout.setSpacing(14)
 
+        # --- Gruppo: dati base materiale ---
         form_group = QGroupBox("Dettagli Materiale")
         form_group.setGraphicsEffect(_make_shadow())
         form_inner = QVBoxLayout(form_group)
@@ -381,28 +382,6 @@ class GestioneMaterialiWindow(QMainWindow):
         self.edit_prezzo.setSuffix(" €")
         self.edit_prezzo.setMinimumHeight(36)
 
-        self.edit_fornitore = QLineEdit()
-        self.edit_fornitore.setPlaceholderText("es. CIT, Angeloni...")
-
-        self.edit_prezzo_fornitore = NoScrollDoubleSpinBox()
-        self.edit_prezzo_fornitore.setDecimals(2)
-        self.edit_prezzo_fornitore.setMaximum(9999.99)
-        self.edit_prezzo_fornitore.setSuffix(" €/m²")
-        self.edit_prezzo_fornitore.setMinimumHeight(36)
-
-        self.edit_scorta_massima = NoScrollDoubleSpinBox()
-        self.edit_scorta_massima.setDecimals(2)
-        self.edit_scorta_massima.setMaximum(99999.99)
-        self.edit_scorta_massima.setSuffix(" m²")
-        self.edit_scorta_massima.setMinimumHeight(36)
-
-        self.edit_scorta_minima = NoScrollDoubleSpinBox()
-        self.edit_scorta_minima.setDecimals(2)
-        self.edit_scorta_minima.setMaximum(99999.99)
-        self.edit_scorta_minima.setSuffix(" m²")
-        self.edit_scorta_minima.setMinimumHeight(36)
-        self.edit_scorta_minima.setToolTip("Soglia minima: la barra diventa rossa sotto questo valore")
-
         self.combo_categoria = QComboBox()
         self.combo_categoria.setMinimumHeight(36)
         self.combo_categoria.setToolTip("Categoria opzionale per raggruppare materiali simili")
@@ -410,10 +389,6 @@ class GestioneMaterialiWindow(QMainWindow):
         form_fields.addRow(_std_label("Nome Materiale:"), self.edit_nome)
         form_fields.addRow(_std_label("Spessore:"), self.edit_spessore)
         form_fields.addRow(_std_label("Prezzo (Preventivo):"), self.edit_prezzo)
-        form_fields.addRow(_std_label("Fornitore:"), self.edit_fornitore)
-        form_fields.addRow(_std_label("Prezzo Fornitore:"), self.edit_prezzo_fornitore)
-        form_fields.addRow(_std_label("Scorta Massima:"), self.edit_scorta_massima)
-        form_fields.addRow(_std_label("Scorta Minima:"), self.edit_scorta_minima)
         form_fields.addRow(_std_label("Categoria (opzionale):"), self.combo_categoria)
 
         form_inner.addLayout(form_fields)
@@ -421,7 +396,7 @@ class GestioneMaterialiWindow(QMainWindow):
         form_btns = QHBoxLayout()
         form_btns.setSpacing(12)
 
-        self.btn_salva = QPushButton("Salva Modifiche")
+        self.btn_salva = QPushButton("Salva Materiale")
         self.btn_salva.setStyleSheet("""
             QPushButton { background-color: #4a5568; color: #ffffff; min-height: 40px; }
             QPushButton:hover { background-color: #2d3748; }
@@ -452,6 +427,42 @@ class GestioneMaterialiWindow(QMainWindow):
         form_inner.addLayout(form_btns)
 
         right_layout.addWidget(form_group)
+
+        # --- Gruppo: fornitori del materiale ---
+        self.fornitori_group = QGroupBox("Fornitori del Materiale")
+        self.fornitori_group.setGraphicsEffect(_make_shadow())
+        self.fornitori_group.setVisible(False)
+        forn_inner = QVBoxLayout(self.fornitori_group)
+        forn_inner.setContentsMargins(20, 28, 20, 15)
+        forn_inner.setSpacing(10)
+
+        # Tabella fornitori
+        self.tabella_fornitori_mat = QTableWidget()
+        self.tabella_fornitori_mat.setColumnCount(6)
+        self.tabella_fornitori_mat.setHorizontalHeaderLabels(
+            ["Fornitore", "€/m²", "Scorta Min (m²)", "Scorta Max (m²)", "Giacenza (m²)", ""]
+        )
+        self.tabella_fornitori_mat.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.tabella_fornitori_mat.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.tabella_fornitori_mat.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.tabella_fornitori_mat.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.tabella_fornitori_mat.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        self.tabella_fornitori_mat.horizontalHeader().setSectionResizeMode(5, QHeaderView.ResizeToContents)
+        self.tabella_fornitori_mat.verticalHeader().setVisible(False)
+        self.tabella_fornitori_mat.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.tabella_fornitori_mat.setSelectionBehavior(QTableWidget.SelectRows)
+        self.tabella_fornitori_mat.setMaximumHeight(180)
+        forn_inner.addWidget(self.tabella_fornitori_mat)
+
+        btn_aggiungi_forn = QPushButton("+ Aggiungi Fornitore")
+        btn_aggiungi_forn.setStyleSheet("""
+            QPushButton { background-color: #38a169; color: #ffffff; min-height: 34px; padding: 6px 16px; }
+            QPushButton:hover { background-color: #2f855a; }
+        """)
+        btn_aggiungi_forn.clicked.connect(self._aggiungi_fornitore_materiale)
+        forn_inner.addWidget(btn_aggiungi_forn, alignment=Qt.AlignLeft)
+
+        right_layout.addWidget(self.fornitori_group)
         right_layout.addStretch()
         layout.addWidget(right)
 
@@ -682,38 +693,130 @@ class GestioneMaterialiWindow(QMainWindow):
             self.abilita_pulsanti_form(False)
             self.lbl_selezione.setText("Seleziona un materiale per modificarlo")
             self.lbl_info_materiale.setText("")
+            self.fornitori_group.setVisible(False)
             return
 
         mat = current_item.data(Qt.UserRole)
         self.materiale_corrente = mat
         id_mat, nome, spessore, prezzo = mat[:4]
-        fornitore = mat[4] if len(mat) > 4 else ""
-        prezzo_fornitore = mat[5] if len(mat) > 5 else 0.0
-        scorta_massima = mat[6] if len(mat) > 6 else 0.0
-        scorta_minima = mat[7] if len(mat) > 7 else 0.0
         categoria_id = mat[8] if len(mat) > 8 else None
 
+        fornitori = self.db_manager.get_fornitori_per_materiale(id_mat)
+        n_forn = len(fornitori)
         self.lbl_selezione.setText(f"Materiale selezionato: {nome}")
-        self.lbl_info_materiale.setText(f"ID: {id_mat} • Fornitore: {fornitore or '—'}")
+        self.lbl_info_materiale.setText(f"ID: {id_mat}  •  {n_forn} fornitore/i")
 
         self.edit_nome.setText(nome)
         self.edit_spessore.setValue(spessore)
         self.edit_prezzo.setValue(prezzo)
-        self.edit_fornitore.setText(fornitore)
-        self.edit_prezzo_fornitore.setValue(prezzo_fornitore)
-        self.edit_scorta_massima.setValue(scorta_massima)
-        self.edit_scorta_minima.setValue(scorta_minima)
 
         idx = self.combo_categoria.findData(categoria_id)
         self.combo_categoria.setCurrentIndex(idx if idx >= 0 else 0)
 
         self.abilita_form(True)
         self.abilita_pulsanti_form(True)
+        self._carica_tabella_fornitori(id_mat)
+        self.fornitori_group.setVisible(True)
+
+    def _carica_tabella_fornitori(self, materiale_id):
+        """Ricarica la tabella dei fornitori per il materiale selezionato"""
+        fornitori = self.db_manager.get_fornitori_per_materiale(materiale_id)
+        self.tabella_fornitori_mat.setRowCount(len(fornitori))
+
+        for row, mf in enumerate(fornitori):
+            mf_id, forn_nome, prezzo_forn, s_min, s_max, giacenza = mf
+            self.tabella_fornitori_mat.setItem(row, 0, QTableWidgetItem(forn_nome))
+            self.tabella_fornitori_mat.setItem(row, 1, QTableWidgetItem(f"€ {prezzo_forn:.2f}"))
+            self.tabella_fornitori_mat.setItem(row, 2, QTableWidgetItem(f"{s_min:.2f}"))
+            self.tabella_fornitori_mat.setItem(row, 3, QTableWidgetItem(f"{s_max:.2f}"))
+            self.tabella_fornitori_mat.setItem(row, 4, QTableWidgetItem(f"{giacenza:.2f}"))
+            for col in range(5):
+                item = self.tabella_fornitori_mat.item(row, col)
+                if item:
+                    item.setData(Qt.UserRole, mf_id)
+
+            # Pulsanti azioni
+            btn_frame = QFrame()
+            btn_layout_row = QHBoxLayout(btn_frame)
+            btn_layout_row.setContentsMargins(4, 2, 4, 2)
+            btn_layout_row.setSpacing(6)
+
+            btn_mod = QPushButton("Modifica")
+            btn_mod.setStyleSheet("""
+                QPushButton { background-color: #edf2f7; color: #2d3748; border: none;
+                              border-radius: 4px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+                QPushButton:hover { background-color: #e2e8f0; }
+            """)
+            btn_mod.clicked.connect(lambda checked, mid=mf_id, mn=forn_nome,
+                                    pf=prezzo_forn, sm=s_min, sx=s_max:
+                                    self._modifica_fornitore_materiale(mid, mn, pf, sm, sx))
+
+            btn_del = QPushButton("Elimina")
+            btn_del.setStyleSheet("""
+                QPushButton { background-color: #fff5f5; color: #c53030; border: 1px solid #fed7d7;
+                              border-radius: 4px; padding: 3px 10px; font-size: 12px; font-weight: 600; }
+                QPushButton:hover { background-color: #fed7d7; }
+            """)
+            btn_del.clicked.connect(lambda checked, mid=mf_id, mn=forn_nome:
+                                    self._elimina_fornitore_materiale(mid, mn))
+
+            btn_layout_row.addWidget(btn_mod)
+            btn_layout_row.addWidget(btn_del)
+            self.tabella_fornitori_mat.setCellWidget(row, 5, btn_frame)
+            self.tabella_fornitori_mat.setRowHeight(row, 36)
+
+    def _aggiungi_fornitore_materiale(self):
+        if not hasattr(self, 'materiale_corrente'):
+            return
+        mat_id = self.materiale_corrente[0]
+        mat_nome = self.materiale_corrente[1]
+        dialog = FornitoreDialog(self.db_manager, mat_nome, None, self)
+        if dialog.exec_() == QDialog.Accepted:
+            d = dialog.get_data()
+            res = self.db_manager.add_fornitore_a_materiale(
+                mat_id, d['fornitore_nome'], d['prezzo_fornitore'], d['scorta_minima'], d['scorta_massima']
+            )
+            if res:
+                self._carica_tabella_fornitori(mat_id)
+                self.lbl_info_materiale.setText(
+                    f"ID: {mat_id}  •  {len(self.db_manager.get_fornitori_per_materiale(mat_id))} fornitore/i"
+                )
+            else:
+                QMessageBox.warning(self, "Attenzione", "Fornitore già presente per questo materiale.")
+
+    def _modifica_fornitore_materiale(self, mf_id, forn_nome, prezzo_forn, s_min, s_max):
+        if not hasattr(self, 'materiale_corrente'):
+            return
+        mat_id = self.materiale_corrente[0]
+        mat_nome = self.materiale_corrente[1]
+        dati_correnti = {'fornitore_nome': forn_nome, 'prezzo_fornitore': prezzo_forn,
+                         'scorta_minima': s_min, 'scorta_massima': s_max}
+        dialog = FornitoreDialog(self.db_manager, mat_nome, dati_correnti, self)
+        if dialog.exec_() == QDialog.Accepted:
+            d = dialog.get_data()
+            res = self.db_manager.update_fornitore_materiale(
+                mf_id, d['fornitore_nome'], d['prezzo_fornitore'], d['scorta_minima'], d['scorta_massima']
+            )
+            if res:
+                self._carica_tabella_fornitori(mat_id)
+            else:
+                QMessageBox.warning(self, "Attenzione", "Errore durante la modifica.")
+
+    def _elimina_fornitore_materiale(self, mf_id, forn_nome):
+        if not hasattr(self, 'materiale_corrente'):
+            return
+        mat_id = self.materiale_corrente[0]
+        risposta = QMessageBox.question(
+            self, "Elimina Fornitore",
+            f"Rimuovere il fornitore '{forn_nome}' da questo materiale?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if risposta == QMessageBox.Yes:
+            self.db_manager.delete_fornitore_materiale(mf_id)
+            self._carica_tabella_fornitori(mat_id)
 
     def abilita_form(self, enabled):
-        for w in [self.edit_nome, self.edit_spessore, self.edit_prezzo,
-                  self.edit_fornitore, self.edit_prezzo_fornitore,
-                  self.edit_scorta_massima, self.edit_scorta_minima, self.combo_categoria]:
+        for w in [self.edit_nome, self.edit_spessore, self.edit_prezzo, self.combo_categoria]:
             w.setEnabled(enabled)
 
     def abilita_pulsanti_form(self, enabled):
@@ -727,10 +830,6 @@ class GestioneMaterialiWindow(QMainWindow):
             self.edit_nome.clear()
             self.edit_spessore.setValue(0.0)
             self.edit_prezzo.setValue(0.0)
-            self.edit_fornitore.clear()
-            self.edit_prezzo_fornitore.setValue(0.0)
-            self.edit_scorta_massima.setValue(0.0)
-            self.edit_scorta_minima.setValue(0.0)
             self.combo_categoria.setCurrentIndex(0)
 
     def nuovo_materiale(self):
@@ -759,31 +858,18 @@ class GestioneMaterialiWindow(QMainWindow):
             QMessageBox.warning(self, "Errore", "Il prezzo deve essere maggiore di 0.")
             return
 
-        risposta = QMessageBox.question(
-            self, "Conferma Modifiche",
-            f"Salvare le modifiche al materiale '{nome}'?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes
-        )
-
-        if risposta == QMessageBox.Yes:
-            try:
-                categoria_id = self.combo_categoria.currentData()
-                success = self.db_manager.update_materiale(
-                    self.materiale_corrente[0], nome, spessore, prezzo,
-                    self.edit_fornitore.text().strip(),
-                    self.edit_prezzo_fornitore.value(),
-                    self.edit_scorta_massima.value(),
-                    self.edit_scorta_minima.value(),
-                    categoria_id
-                )
-                if success:
-                    QMessageBox.information(self, "Successo", "Materiale aggiornato con successo!")
-                    self.carica_materiali()
-                    self.materiali_modificati.emit()
-                else:
-                    QMessageBox.critical(self, "Errore", "Nome materiale già esistente o errore nel database.")
-            except Exception as e:
-                QMessageBox.critical(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
+        try:
+            categoria_id = self.combo_categoria.currentData()
+            success = self.db_manager.update_materiale_base(
+                self.materiale_corrente[0], nome, spessore, prezzo, categoria_id
+            )
+            if success:
+                self.carica_materiali()
+                self.materiali_modificati.emit()
+            else:
+                QMessageBox.critical(self, "Errore", "Nome materiale già esistente o errore nel database.")
+        except Exception as e:
+            QMessageBox.critical(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
 
     def elimina_materiale(self):
         if not hasattr(self, 'materiale_corrente'):
@@ -1006,7 +1092,7 @@ class NuovoMaterialeDialog(QDialog):
 
     def init_ui(self):
         self.setWindowTitle("Nuovo Materiale")
-        self.setFixedSize(450, 560)
+        self.setFixedSize(420, 320)
         self.setStyleSheet(_DIALOG_STYLE)
 
         layout = QVBoxLayout(self)
@@ -1016,6 +1102,11 @@ class NuovoMaterialeDialog(QDialog):
         title = QLabel("Aggiungi Nuovo Materiale")
         title.setStyleSheet("QLabel { font-size: 18px; font-weight: 700; color: #2d3748; padding-bottom: 10px; }")
         layout.addWidget(title)
+
+        lbl_info = QLabel("I fornitori si aggiungono dopo la creazione, dalla sezione 'Fornitori del Materiale'.")
+        lbl_info.setStyleSheet("QLabel { color: #718096; font-size: 12px; }")
+        lbl_info.setWordWrap(True)
+        layout.addWidget(lbl_info)
 
         form = QFormLayout()
         form.setVerticalSpacing(16)
@@ -1033,25 +1124,6 @@ class NuovoMaterialeDialog(QDialog):
         self.edit_prezzo.setMaximum(9999.99)
         self.edit_prezzo.setSuffix(" €")
 
-        self.edit_fornitore = QLineEdit()
-        self.edit_fornitore.setPlaceholderText("es. CIT, Angeloni...")
-
-        self.edit_prezzo_fornitore = NoScrollDoubleSpinBox()
-        self.edit_prezzo_fornitore.setDecimals(2)
-        self.edit_prezzo_fornitore.setMaximum(9999.99)
-        self.edit_prezzo_fornitore.setSuffix(" €/m²")
-
-        self.edit_scorta_massima = NoScrollDoubleSpinBox()
-        self.edit_scorta_massima.setDecimals(2)
-        self.edit_scorta_massima.setMaximum(99999.99)
-        self.edit_scorta_massima.setSuffix(" m²")
-
-        self.edit_scorta_minima = NoScrollDoubleSpinBox()
-        self.edit_scorta_minima.setDecimals(2)
-        self.edit_scorta_minima.setMaximum(99999.99)
-        self.edit_scorta_minima.setSuffix(" m²")
-        self.edit_scorta_minima.setToolTip("Soglia minima: la barra diventa rossa sotto questo valore")
-
         self.combo_categoria = QComboBox()
         self.combo_categoria.addItem("— Nessuna categoria —", None)
         for cat in self.db_manager.get_all_categorie():
@@ -1060,10 +1132,6 @@ class NuovoMaterialeDialog(QDialog):
         form.addRow("Nome Materiale:", self.edit_nome)
         form.addRow("Spessore:", self.edit_spessore)
         form.addRow("Prezzo (Preventivo):", self.edit_prezzo)
-        form.addRow("Fornitore:", self.edit_fornitore)
-        form.addRow("Prezzo Fornitore:", self.edit_prezzo_fornitore)
-        form.addRow("Scorta Massima:", self.edit_scorta_massima)
-        form.addRow("Scorta Minima:", self.edit_scorta_minima)
         form.addRow("Categoria (opzionale):", self.combo_categoria)
 
         layout.addLayout(form)
@@ -1078,7 +1146,7 @@ class NuovoMaterialeDialog(QDialog):
         """)
         btn_annulla.clicked.connect(self.reject)
 
-        btn_salva = QPushButton("Salva Materiale")
+        btn_salva = QPushButton("Crea Materiale")
         btn_salva.setStyleSheet("""
             QPushButton { background-color: #4a5568; color: #ffffff; }
             QPushButton:hover { background-color: #2d3748; }
@@ -1108,12 +1176,7 @@ class NuovoMaterialeDialog(QDialog):
         try:
             categoria_id = self.combo_categoria.currentData()
             mat_id = self.db_manager.add_materiale(
-                nome, spessore, prezzo,
-                self.edit_fornitore.text().strip(),
-                self.edit_prezzo_fornitore.value(),
-                self.edit_scorta_massima.value(),
-                self.edit_scorta_minima.value(),
-                categoria_id
+                nome, spessore, prezzo, "", 0.0, 0.0, 0.0, categoria_id
             )
             if mat_id:
                 self.accept()
@@ -1121,6 +1184,106 @@ class NuovoMaterialeDialog(QDialog):
                 QMessageBox.critical(self, "Errore", "Nome materiale già esistente.")
         except Exception as e:
             QMessageBox.critical(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
+
+
+class FornitoreDialog(QDialog):
+    """Dialog per aggiungere/modificare un fornitore per un materiale"""
+
+    def __init__(self, db_manager, nome_materiale, dati_correnti=None, parent=None):
+        super().__init__(parent)
+        self.db_manager = db_manager
+        self.dati_correnti = dati_correnti  # None = nuovo, dict = modifica
+        self.setWindowTitle(f"{'Modifica' if dati_correnti else 'Aggiungi'} Fornitore – {nome_materiale}")
+        self.setFixedSize(420, 360)
+        self.setStyleSheet(_DIALOG_STYLE)
+        self._build_ui()
+
+    def _build_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 25, 30, 25)
+        layout.setSpacing(20)
+
+        modifica = self.dati_correnti is not None
+        title = QLabel("Modifica Fornitore" if modifica else "Aggiungi Fornitore")
+        title.setStyleSheet("QLabel { font-size: 18px; font-weight: 700; color: #2d3748; }")
+        layout.addWidget(title)
+
+        form = QFormLayout()
+        form.setVerticalSpacing(14)
+
+        # Combo fornitore dalla lista registrata
+        self.combo_fornitore = QComboBox()
+        fornitori = self.db_manager.get_all_fornitori()
+        for fid, fnome in fornitori:
+            self.combo_fornitore.addItem(fnome, fnome)
+        # Se modifica, preseleziona il fornitore attuale
+        if modifica and self.dati_correnti.get('fornitore_nome'):
+            idx = self.combo_fornitore.findData(self.dati_correnti['fornitore_nome'])
+            if idx >= 0:
+                self.combo_fornitore.setCurrentIndex(idx)
+
+        self.edit_prezzo = NoScrollDoubleSpinBox()
+        self.edit_prezzo.setDecimals(2)
+        self.edit_prezzo.setMaximum(9999.99)
+        self.edit_prezzo.setSuffix(" €/m²")
+        if modifica:
+            self.edit_prezzo.setValue(self.dati_correnti.get('prezzo_fornitore', 0.0))
+
+        self.edit_scorta_minima = NoScrollDoubleSpinBox()
+        self.edit_scorta_minima.setDecimals(2)
+        self.edit_scorta_minima.setMaximum(99999.99)
+        self.edit_scorta_minima.setSuffix(" m²")
+        self.edit_scorta_minima.setToolTip("Soglia minima: la barra diventa rossa sotto questo valore")
+        if modifica:
+            self.edit_scorta_minima.setValue(self.dati_correnti.get('scorta_minima', 0.0))
+
+        self.edit_scorta_massima = NoScrollDoubleSpinBox()
+        self.edit_scorta_massima.setDecimals(2)
+        self.edit_scorta_massima.setMaximum(99999.99)
+        self.edit_scorta_massima.setSuffix(" m²")
+        if modifica:
+            self.edit_scorta_massima.setValue(self.dati_correnti.get('scorta_massima', 0.0))
+
+        form.addRow("Fornitore:", self.combo_fornitore)
+        form.addRow("Prezzo Fornitore:", self.edit_prezzo)
+        form.addRow("Scorta Minima:", self.edit_scorta_minima)
+        form.addRow("Scorta Massima:", self.edit_scorta_massima)
+        layout.addLayout(form)
+
+        btns = QHBoxLayout()
+        btns.setSpacing(12)
+        btn_annulla = QPushButton("Annulla")
+        btn_annulla.setStyleSheet("""
+            QPushButton { background-color: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; }
+            QPushButton:hover { background-color: #edf2f7; }
+        """)
+        btn_annulla.clicked.connect(self.reject)
+
+        btn_salva = QPushButton("Salva")
+        btn_salva.setStyleSheet("""
+            QPushButton { background-color: #4a5568; color: #ffffff; }
+            QPushButton:hover { background-color: #2d3748; }
+        """)
+        btn_salva.clicked.connect(self._salva)
+
+        btns.addWidget(btn_annulla)
+        btns.addWidget(btn_salva)
+        layout.addLayout(btns)
+
+    def _salva(self):
+        forn_nome = self.combo_fornitore.currentData()
+        if not forn_nome:
+            QMessageBox.warning(self, "Attenzione", "Seleziona un fornitore.")
+            return
+        self.accept()
+
+    def get_data(self):
+        return {
+            'fornitore_nome': self.combo_fornitore.currentData(),
+            'prezzo_fornitore': self.edit_prezzo.value(),
+            'scorta_minima': self.edit_scorta_minima.value(),
+            'scorta_massima': self.edit_scorta_massima.value(),
+        }
 
 
 class _CategoriaDialogBase(QDialog):
