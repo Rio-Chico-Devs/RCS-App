@@ -452,7 +452,7 @@ class GestioneMaterialiWindow(QMainWindow):
         self.tabella_fornitori_mat.verticalHeader().setVisible(False)
         self.tabella_fornitori_mat.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabella_fornitori_mat.setSelectionBehavior(QTableWidget.SelectRows)
-        self.tabella_fornitori_mat.setMaximumHeight(180)
+        self.tabella_fornitori_mat.setMaximumHeight(220)
         forn_inner.addWidget(self.tabella_fornitori_mat)
 
         btn_aggiungi_forn = QPushButton("+ Aggiungi Fornitore")
@@ -766,7 +766,7 @@ class GestioneMaterialiWindow(QMainWindow):
             btn_layout_row.addWidget(btn_mod)
             btn_layout_row.addWidget(btn_del)
             self.tabella_fornitori_mat.setCellWidget(row, 5, btn_frame)
-            self.tabella_fornitori_mat.setRowHeight(row, 36)
+            self.tabella_fornitori_mat.setRowHeight(row, 44)
 
     def _aggiungi_fornitore_materiale(self):
         if not hasattr(self, 'materiale_corrente'):
