@@ -619,9 +619,9 @@ class MagazzinoWindow(QMainWindow):
         barra = BarraScorta(percentuale)
         card_layout.addWidget(barra)
 
-        # Bottone fornitori (drill-down)
-        if n_fornitori > 0:
-            btn_forn = QPushButton("Fornitori")
+        # Bottone fornitori (drill-down) - sempre visibile, disabilitato se <=1 fornitore
+        btn_forn = QPushButton("Fornitori")
+        if n_fornitori > 1:
             btn_forn.setStyleSheet("""
                 QPushButton {
                     background-color: #ebf8ff; color: #2b6cb0;
@@ -631,7 +631,16 @@ class MagazzinoWindow(QMainWindow):
                 QPushButton:hover { background-color: #bee3f8; }
             """)
             btn_forn.clicked.connect(lambda checked, mid=mat_id, mn=nome: self._mostra_fornitori_materiale(mid, mn))
-            card_layout.addWidget(btn_forn)
+        else:
+            btn_forn.setStyleSheet("""
+                QPushButton {
+                    background-color: #f7fafc; color: #a0aec0;
+                    border: 1px solid #e2e8f0; min-height: 30px;
+                    padding: 4px 12px; font-size: 12px; font-weight: 600;
+                }
+            """)
+            btn_forn.setEnabled(False)
+        card_layout.addWidget(btn_forn)
 
         # Bottone storico
         btn_storico = QPushButton("Storico")
@@ -649,39 +658,57 @@ class MagazzinoWindow(QMainWindow):
         return card
 
     def _mostra_fornitori_materiale(self, materiale_id, nome_materiale):
-        """Dialog con il dettaglio per-fornitore di un materiale con barre scorte"""
-        from PyQt5.QtGui import QPainter, QLinearGradient
+        """Mostra inline (nel pannello scorte) la tabella fornitori del materiale selezionato"""
         fornitori = self.db_manager.get_fornitori_per_materiale(materiale_id)
 
-        dialog = QDialog(self)
-        dialog.setWindowTitle(f"Scorte per Fornitore – {nome_materiale}")
-        dialog.setMinimumSize(700, 420)
-        dialog.setStyleSheet("""
-            QDialog { background-color: #fafbfc; }
-            QLabel { color: #2d3748; font-family: system-ui, -apple-system, sans-serif; }
-            QTableWidget { background-color: #ffffff; border: 1px solid #e2e8f0;
-                           border-radius: 8px; font-size: 13px; }
-            QHeaderView::section { background-color: #f7fafc; color: #4a5568;
-                                   font-weight: 600; padding: 8px; border: none;
-                                   border-bottom: 2px solid #e2e8f0; }
+        # Pulisci layout scorte
+        while self.scorte_layout.count():
+            child = self.scorte_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+        # Header: bottone indietro + titolo
+        header = QWidget()
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(12)
+
+        btn_back = QPushButton("← Tutti i materiali")
+        btn_back.setStyleSheet("""
+            QPushButton {
+                background-color: #f7fafc; color: #4a5568;
+                border: 1px solid #e2e8f0; min-height: 32px;
+                padding: 4px 16px; font-size: 13px; font-weight: 600;
+                border-radius: 6px;
+            }
+            QPushButton:hover { background-color: #edf2f7; }
         """)
+        btn_back.clicked.connect(self.carica_scorte)
 
-        dlg_layout = QVBoxLayout(dialog)
-        dlg_layout.setContentsMargins(25, 25, 25, 25)
-        dlg_layout.setSpacing(12)
+        lbl_title = QLabel(f"Fornitori — {nome_materiale}")
+        lbl_title.setStyleSheet("font-size: 16px; font-weight: 700; color: #2d3748;")
 
-        title = QLabel(f"Dettaglio scorte: {nome_materiale}")
-        title.setStyleSheet("font-size: 16px; font-weight: 700;")
-        dlg_layout.addWidget(title)
+        header_layout.addWidget(btn_back)
+        header_layout.addWidget(lbl_title)
+        header_layout.addStretch()
+        self.scorte_layout.addWidget(header)
 
+        # Tabella fornitori
         if not fornitori:
             lbl = QLabel("Nessun fornitore configurato per questo materiale.\nAggiungili da Gestione Materiali.")
-            lbl.setStyleSheet("color: #718096; font-size: 14px;")
+            lbl.setStyleSheet("color: #718096; font-size: 14px; padding: 40px;")
             lbl.setAlignment(Qt.AlignCenter)
-            dlg_layout.addWidget(lbl)
+            self.scorte_layout.addWidget(lbl)
         else:
             table = QTableWidget(len(fornitori), 5)
             table.setHorizontalHeaderLabels(["Fornitore", "Scorta Min", "Barra Scorte", "Giacenza", "Scorta Max"])
+            table.setStyleSheet("""
+                QTableWidget { background-color: #ffffff; border: 1px solid #e2e8f0;
+                               border-radius: 8px; font-size: 13px; }
+                QHeaderView::section { background-color: #f7fafc; color: #4a5568;
+                                       font-weight: 600; padding: 8px; border: none;
+                                       border-bottom: 2px solid #e2e8f0; }
+            """)
             table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
             table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
             table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
@@ -696,9 +723,7 @@ class MagazzinoWindow(QMainWindow):
                 table.setItem(row, 0, QTableWidgetItem(forn_nome))
                 table.setItem(row, 1, QTableWidgetItem(f"{s_min:.1f} m²"))
 
-                barra = BarraScorta(
-                    (giacenza / s_max * 100) if s_max > 0 else 0
-                )
+                barra = BarraScorta((giacenza / s_max * 100) if s_max > 0 else 0)
                 barra.setMinimumHeight(24)
                 table.setCellWidget(row, 2, barra)
 
@@ -708,22 +733,14 @@ class MagazzinoWindow(QMainWindow):
                 table.setItem(row, 4, QTableWidgetItem(f"{s_max:.1f} m²"))
                 table.setRowHeight(row, 34)
 
-            dlg_layout.addWidget(table)
+            self.scorte_layout.addWidget(table)
 
             totale = sum(mf[5] for mf in fornitori)
             lbl_tot = QLabel(f"Giacenza totale: {totale:.2f} m²")
-            lbl_tot.setStyleSheet("font-size: 13px; font-weight: 600; color: #4a5568;")
-            dlg_layout.addWidget(lbl_tot)
+            lbl_tot.setStyleSheet("font-size: 13px; font-weight: 600; color: #4a5568; padding: 4px 0;")
+            self.scorte_layout.addWidget(lbl_tot)
 
-        btn_chiudi = QPushButton("Chiudi")
-        btn_chiudi.setStyleSheet("""
-            QPushButton { background-color: #4a5568; color: #ffffff; min-height: 36px; padding: 8px 24px; }
-            QPushButton:hover { background-color: #2d3748; }
-        """)
-        btn_chiudi.clicked.connect(dialog.accept)
-        dlg_layout.addWidget(btn_chiudi, alignment=Qt.AlignRight)
-
-        dialog.exec_()
+        self.scorte_layout.addStretch()
 
     def mostra_storico(self, materiale_id, nome_materiale):
         """Mostra lo storico movimenti di un materiale"""
