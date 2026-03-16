@@ -22,6 +22,7 @@ v1.1.0 (25/09/2025):
 # pyright: reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 # pyright: reportUnusedVariable=false
 
+import sys
 from PyQt5.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QTextEdit, QDialogButtonBox, QLabel, QListWidgetItem
 from PyQt5.QtCore import Qt
 from ui.preventivo_window import PreventivoWindow
@@ -281,8 +282,14 @@ class MainWindowBusinessLogic:
                     try:
                         preventivo_data = getattr(window_instance.db_manager, metodo_name)(preventivo_id)
                         break
-                    except Exception:
+                    except Exception as e:
+                        print(f"[genera_documento] {metodo_name}({preventivo_id}) fallito: {e}", file=sys.stderr)
                         continue
+
+            if preventivo_data is None:
+                QMessageBox.critical(window_instance, "Errore",
+                                     "Impossibile caricare i dati del preventivo selezionato.")
+                return
 
             # Estrai dati cliente e materiali
             if isinstance(preventivo_data, dict):
@@ -370,8 +377,14 @@ class MainWindowBusinessLogic:
                     try:
                         preventivo_data = getattr(window_instance.db_manager, metodo_name)(preventivo_id)
                         break
-                    except Exception:
+                    except Exception as e:
+                        print(f"[anteprima_documento] {metodo_name}({preventivo_id}) fallito: {e}", file=sys.stderr)
                         continue
+
+            if preventivo_data is None:
+                QMessageBox.critical(window_instance, "Errore",
+                                     "Impossibile caricare i dati del preventivo selezionato.")
+                return
 
             # Prepara dati cliente e materiali
             if isinstance(preventivo_data, dict):

@@ -192,8 +192,9 @@ class MaterialeBusinessLogic:
                         mc.diametro, mc.lunghezza, mc.sviluppo)
                     mc.scarto_mm2 = 0.0
         except Exception as e:
-            pass
-    
+            import sys
+            print(f"[aggiorna_display] errore aggiornamento interfaccia: {e}", file=sys.stderr)
+
     @staticmethod
     def copia_materiale(materiale_originale):
         """Copia un materiale esistente"""
