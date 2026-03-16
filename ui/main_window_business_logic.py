@@ -499,8 +499,15 @@ class MainWindowBusinessLogic:
             testo_conferma = "Sei sicuro di voler eliminare questa revisione?\n\nSolo questa revisione verrà eliminata. Il preventivo originale e le altre revisioni rimarranno invariati."
             testo_successo = "Revisione eliminata con successo."
         else:
-            testo_conferma = "Sei sicuro di voler eliminare questo preventivo?\n\nQuesta azione eliminerà anche tutte le sue revisioni e non può essere annullata."
-            testo_successo = "Preventivo e tutte le sue revisioni sono stati eliminati con successo."
+            revisioni = window_instance.db_manager.get_revisioni_preventivo(preventivo_id)
+            # get_revisioni_preventivo restituisce originale + revisioni, quindi le revisioni sono len-1
+            n_revisioni = max(0, len(revisioni) - 1)
+            if n_revisioni > 0:
+                avviso = f"\n\nAttenzione: questo preventivo ha {n_revisioni} revision{'e' if n_revisioni == 1 else 'i'} collegate che verranno eliminate insieme ad esso."
+            else:
+                avviso = ""
+            testo_conferma = f"Sei sicuro di voler eliminare questo preventivo?{avviso}\n\nQuesta azione non può essere annullata."
+            testo_successo = "Preventivo e tutte le sue revisioni sono stati eliminati con successo." if n_revisioni > 0 else "Preventivo eliminato con successo."
 
         # Dialog di conferma con stile unificato
         dialog = QMessageBox(window_instance)
