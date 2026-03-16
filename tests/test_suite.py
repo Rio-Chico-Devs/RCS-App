@@ -250,6 +250,17 @@ class TestFornitori(unittest.TestCase):
         self.assertIn("FORN_NEW", nomi)
         self.assertNotIn("FORN_OLD", nomi)
 
+    def test_rename_fornitore_aggiorna_materiale_fornitori(self):
+        """rename_fornitore deve aggiornare anche la tabella materiale_fornitori."""
+        mid = self.db.add_materiale("MAT_REN", 0.1, 1.0)
+        self.db.add_fornitore("FORN_REN_OLD")
+        self.db.add_fornitore_a_materiale(mid, "FORN_REN_OLD", 10.0)
+        self.db.rename_fornitore("FORN_REN_OLD", "FORN_REN_NEW")
+        fornitori = self.db.get_fornitori_per_materiale(mid)
+        nomi = [r[1] for r in fornitori]
+        self.assertIn("FORN_REN_NEW", nomi)
+        self.assertNotIn("FORN_REN_OLD", nomi)
+
     def test_rename_fornitore_nome_occupato_fallisce(self):
         self.db.add_fornitore("FORN_1")
         self.db.add_fornitore("FORN_2")
@@ -257,20 +268,17 @@ class TestFornitori(unittest.TestCase):
         self.assertFalse(bool(result))
 
     def test_rename_fornitore_non_esistente(self):
-        """BUG NOTO: rename_fornitore usa UPDATE senza controllare rowcount,
-        quindi restituisce True anche se il fornitore non esiste.
-        Il test documenta il comportamento attuale."""
+        """rename_fornitore restituisce False se il fornitore di origine non esiste."""
         result = self.db.rename_fornitore("NON_ESISTE_XYZ", "QUALCOSA")
-        # Comportamento attuale: True (nessuna riga modificata ma nessuna eccezione)
-        self.assertTrue(bool(result))
-        # Verifica che "QUALCOSA" NON sia stato aggiunto ai fornitori
+        self.assertFalse(bool(result))
+        # "QUALCOSA" non deve comparire tra i fornitori
         tutti = self.db.get_all_fornitori()
         nomi = [r[1] for r in tutti]
         self.assertNotIn("QUALCOSA", nomi)
 
     def test_assegna_materiali_a_fornitore(self):
-        """assegna_materiali_a_fornitore aggiorna il campo legacy materiali.fornitore,
-        NON la tabella materiale_fornitori. Verifica via get_scorte_per_fornitore."""
+        """assegna_materiali_a_fornitore aggiorna materiali.fornitore (campo legacy).
+        get_scorte_per_fornitore ora cerca in entrambi i sistemi."""
         mid = self.db.add_materiale("MAT_FORN", 0.1, 1.0)
         self.db.add_fornitore("FORN_ASSEGNA")
         self.db.assegna_materiali_a_fornitore("FORN_ASSEGNA", [mid])
@@ -283,12 +291,27 @@ class TestFornitori(unittest.TestCase):
         # Non deve sollevare eccezione
         self.db.assegna_materiali_a_fornitore("FORN_VUOTO", [])
 
-    def test_get_scorte_per_fornitore(self):
-        """get_scorte_per_fornitore legge il campo legacy materiali.fornitore.
-        Si deve usare update_materiale (o fornitore= in add_materiale) per renderlo visibile."""
-        mid = self.db.add_materiale("MAT_SC_FORN", 0.1, 1.0, fornitore="FORN_SCORTE")
+    def test_get_scorte_per_fornitore_legacy(self):
+        """Trova materiali tramite campo legacy materiali.fornitore."""
+        self.db.add_materiale("MAT_SC_FORN_LEG", 0.1, 1.0, fornitore="FORN_SCORTE")
         scorte = self.db.get_scorte_per_fornitore("FORN_SCORTE")
         self.assertGreater(len(scorte), 0)
+
+    def test_get_scorte_per_fornitore_materiale_fornitori(self):
+        """Trova materiali tramite tabella materiale_fornitori (sistema nuovo)."""
+        mid = self.db.add_materiale("MAT_SC_FORN_NEW", 0.1, 1.0)
+        self.db.add_fornitore_a_materiale(mid, "FORN_SCORTE_NEW", 5.0)
+        scorte = self.db.get_scorte_per_fornitore("FORN_SCORTE_NEW")
+        ids = [r[0] for r in scorte]
+        self.assertIn(mid, ids)
+
+    def test_get_scorte_per_fornitore_nessun_duplicato(self):
+        """Se un materiale è associato al fornitore sia via legacy che via tabella, appare una sola volta."""
+        mid = self.db.add_materiale("MAT_SC_DUP", 0.1, 1.0, fornitore="FORN_DUP")
+        self.db.add_fornitore_a_materiale(mid, "FORN_DUP", 5.0)
+        scorte = self.db.get_scorte_per_fornitore("FORN_DUP")
+        ids = [r[0] for r in scorte]
+        self.assertEqual(ids.count(mid), 1)
 
     def test_get_scorte_fornitore_non_esistente_lista_vuota(self):
         scorte = self.db.get_scorte_per_fornitore("FANTASMA")
