@@ -312,15 +312,15 @@ class TestPreventivi_Invasivi(unittest.TestCase):
         for entry in storico:
             self.assertIn("timestamp", entry)
 
-    def test_delete_revisione_elimina_tutto_il_gruppo(self):
-        """delete_preventivo_e_revisioni usa COALESCE(preventivo_originale_id, id) per trovare
-        il gruppo_id: cancellare una revisione elimina TUTTO il gruppo (originale + revisioni)."""
+    def test_delete_revisione_elimina_solo_revisione(self):
+        """delete_preventivo_e_revisioni su una revisione elimina solo quella revisione,
+        lasciando intatto il preventivo originale."""
         pid_orig = self._add(nome_cliente="ORIG_KEEP")
         rev_id = self.db.add_revisione_preventivo(pid_orig, _prev(numero_revisione=2), "r1")
         self.db.delete_preventivo_e_revisioni(rev_id)
-        # Sia la revisione che l'originale vengono eliminati
+        # Solo la revisione viene eliminata, l'originale sopravvive
         self.assertIsNone(self.db.get_preventivo_by_id(rev_id))
-        self.assertIsNone(self.db.get_preventivo_by_id(pid_orig))
+        self.assertIsNotNone(self.db.get_preventivo_by_id(pid_orig))
 
     def test_catena_revisioni_tre_livelli(self):
         """rev1 → rev2 → rev3: tutte leggibili, numero revisione crescente."""

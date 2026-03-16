@@ -1089,13 +1089,14 @@ class DatabaseManager:
             return cursor.fetchall()
 
     def delete_preventivo_e_revisioni(self, preventivo_id):
-        """NUOVO: Elimina un preventivo e tutte le sue revisioni"""
+        """Elimina un preventivo e tutte le sue revisioni se è l'originale,
+        oppure solo la revisione se viene passato l'ID di una revisione."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
-            # Trova l'ID originale del preventivo
+            # Controlla se è un originale o una revisione
             cursor.execute("""
-                SELECT COALESCE(preventivo_originale_id, id) as gruppo_id
+                SELECT preventivo_originale_id
                 FROM preventivi WHERE id = ?
             """, (preventivo_id,))
 
@@ -1103,13 +1104,19 @@ class DatabaseManager:
             if not result:
                 return False
 
-            gruppo_id = result[0]
+            preventivo_originale_id = result[0]
 
-            # Elimina tutte le revisioni del gruppo
-            cursor.execute("""
-                DELETE FROM preventivi
-                WHERE preventivo_originale_id = ? OR id = ?
-            """, (gruppo_id, gruppo_id))
+            if preventivo_originale_id is None:
+                # È un originale: elimina originale + tutte le sue revisioni
+                cursor.execute("""
+                    DELETE FROM preventivi
+                    WHERE preventivo_originale_id = ? OR id = ?
+                """, (preventivo_id, preventivo_id))
+            else:
+                # È una revisione: elimina solo questa revisione
+                cursor.execute("""
+                    DELETE FROM preventivi WHERE id = ?
+                """, (preventivo_id,))
 
             conn.commit()
             return cursor.rowcount > 0

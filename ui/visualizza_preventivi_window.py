@@ -719,10 +719,23 @@ class VisualizzaPreventiviWindow(QMainWindow):
             QMessageBox.warning(self, "Attenzione", "Seleziona un preventivo da eliminare.")
             return
 
+        preventivo_id = current_item.data(Qt.UserRole)
+
+        # Determina se è una revisione o l'originale per mostrare il messaggio corretto
+        prev_data = self.db_manager.get_preventivo_by_id(preventivo_id)
+        is_revisione = prev_data is not None and prev_data.get('preventivo_originale_id') is not None
+
+        if is_revisione:
+            testo_conferma = "Sei sicuro di voler eliminare questa revisione?\n\nSolo questa revisione verrà eliminata. Il preventivo originale e le altre revisioni rimarranno invariati."
+            testo_successo = "Revisione eliminata con successo."
+        else:
+            testo_conferma = "Sei sicuro di voler eliminare questo preventivo?\n\nQuesta azione eliminerà anche tutte le sue revisioni e non può essere annullata."
+            testo_successo = "Preventivo e tutte le sue revisioni sono stati eliminati con successo."
+
         # Dialog di conferma
         dialog = QMessageBox(self)
         dialog.setWindowTitle("Conferma Eliminazione")
-        dialog.setText("Sei sicuro di voler eliminare questo preventivo?\n\nQuesta azione eliminerà anche tutte le sue revisioni e non può essere annullata.")
+        dialog.setText(testo_conferma)
         dialog.setIcon(QMessageBox.Question)
         dialog.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         dialog.setDefaultButton(QMessageBox.No)
@@ -730,11 +743,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
         risposta = dialog.exec_()
 
         if risposta == QMessageBox.Yes:
-            preventivo_id = current_item.data(Qt.UserRole)
-
             if self.db_manager.delete_preventivo_e_revisioni(preventivo_id):
-                QMessageBox.information(self, "Successo",
-                                      "Preventivo e tutte le sue revisioni sono stati eliminati con successo.")
+                QMessageBox.information(self, "Successo", testo_successo)
                 self.load_preventivi()
                 self.preventivo_modificato.emit()
             else:
