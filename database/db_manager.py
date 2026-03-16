@@ -982,15 +982,22 @@ class DatabaseManager:
                 return False
 
     def get_scorte_per_fornitore(self, nome_fornitore):
-        """Restituisce le scorte dei materiali di un fornitore specifico"""
+        """Restituisce le scorte dei materiali di un fornitore specifico.
+        Considera sia il campo legacy materiali.fornitore sia la tabella materiale_fornitori."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                SELECT id, nome, giacenza, capacita_magazzino, fornitore, prezzo_fornitore
-                FROM materiali
-                WHERE fornitore = ?
-                ORDER BY nome
-            """, (nome_fornitore,))
+                SELECT DISTINCT m.id, m.nome,
+                    COALESCE(mf.giacenza, m.giacenza) as giacenza,
+                    COALESCE(mf.scorta_massima, m.capacita_magazzino) as capacita_magazzino,
+                    ? as fornitore,
+                    COALESCE(mf.prezzo_fornitore, m.prezzo_fornitore) as prezzo_fornitore
+                FROM materiali m
+                LEFT JOIN materiale_fornitori mf
+                    ON mf.materiale_id = m.id AND mf.fornitore_nome = ?
+                WHERE m.fornitore = ? OR mf.fornitore_nome = ?
+                ORDER BY m.nome
+            """, (nome_fornitore, nome_fornitore, nome_fornitore, nome_fornitore))
             return cursor.fetchall()
 
     def rename_fornitore(self, old_nome, new_nome):
@@ -999,7 +1006,10 @@ class DatabaseManager:
             cursor = conn.cursor()
             try:
                 cursor.execute("UPDATE fornitori SET nome = ? WHERE nome = ?", (new_nome, old_nome))
+                if cursor.rowcount == 0:
+                    return False
                 cursor.execute("UPDATE materiali SET fornitore = ? WHERE fornitore = ?", (new_nome, old_nome))
+                cursor.execute("UPDATE materiale_fornitori SET fornitore_nome = ? WHERE fornitore_nome = ?", (new_nome, old_nome))
                 conn.commit()
                 return True
             except sqlite3.IntegrityError:
