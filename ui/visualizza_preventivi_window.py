@@ -28,9 +28,10 @@ v1.0.0 (2026-02-06):
 # pyright: reportUnknownLambdaType=false
 
 from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
-                             QWidget, QLabel, QListWidget, QMessageBox, QListWidgetItem,
-                             QGroupBox, QFrame, QGraphicsDropShadowEffect,
-                             QLineEdit, QComboBox, QScrollArea, QSizePolicy)
+                             QWidget, QLabel, QTableWidget, QTableWidgetItem,
+                             QMessageBox, QGroupBox, QFrame, QGraphicsDropShadowEffect,
+                             QLineEdit, QComboBox, QAbstractItemView, QSizePolicy,
+                             QHeaderView)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QColor
 from typing import Optional, Any
@@ -83,27 +84,35 @@ class VisualizzaPreventiviWindow(QMainWindow):
                 background-color: transparent;
                 color: #4a5568;
             }
-            QListWidget {
+            QTableWidget {
                 background-color: #ffffff;
                 border: 1px solid #e2e8f0;
                 border-radius: 8px;
-                font-size: 14px;
-                padding: 8px;
+                font-size: 13px;
                 font-family: system-ui, -apple-system, sans-serif;
+                gridline-color: #f0f4f8;
             }
-            QListWidget::item {
-                border-radius: 6px;
-                padding: 12px;
-                margin: 2px 0px;
-                border-bottom: 1px solid #f7fafc;
+            QTableWidget::item {
+                padding: 6px 10px;
                 color: #2d3748;
+                border: none;
             }
-            QListWidget::item:hover {
+            QTableWidget::item:hover {
                 background-color: #f7fafc;
             }
-            QListWidget::item:selected {
+            QTableWidget::item:selected {
                 background-color: #edf2f7;
                 color: #2d3748;
+            }
+            QHeaderView::section {
+                background-color: #f7fafc;
+                color: #4a5568;
+                font-size: 12px;
+                font-weight: 600;
+                padding: 8px 10px;
+                border: none;
+                border-bottom: 2px solid #e2e8f0;
+                border-right: 1px solid #e2e8f0;
             }
             QLineEdit, QComboBox {
                 border: 1px solid #e2e8f0;
@@ -294,78 +303,72 @@ class VisualizzaPreventiviWindow(QMainWindow):
         parent_layout.addWidget(filters_container)
 
     def create_lista_preventivi(self, parent_layout: QVBoxLayout) -> None:
-        """Lista preventivi con pannello dettaglio a destra"""
+        """Tabella preventivi a tutta larghezza con nota sotto"""
         lista_group = QGroupBox("Preventivi")
         lista_group.setGraphicsEffect(self.create_shadow_effect())
 
-        lista_group_layout = QVBoxLayout(lista_group)
-        lista_group_layout.setContentsMargins(15, 20, 15, 15)
-        lista_group_layout.setSpacing(8)
+        lista_layout = QVBoxLayout(lista_group)
+        lista_layout.setContentsMargins(15, 20, 15, 15)
+        lista_layout.setSpacing(8)
 
-        # Contenuto orizzontale: lista a sinistra, dettaglio a destra
-        split_layout = QHBoxLayout()
-        split_layout.setSpacing(16)
+        # Tabella principale
+        self.lista_preventivi = QTableWidget()
+        self.lista_preventivi.setColumnCount(9)
+        self.lista_preventivi.setHorizontalHeaderLabels([
+            "#", "Tipo", "Cliente", "Misura", "Categoria", "Sottocategoria",
+            "Descrizione", "Prev. €", "Prezzo €"
+        ])
+        self.lista_preventivi.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.lista_preventivi.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.lista_preventivi.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.lista_preventivi.verticalHeader().setVisible(False)
+        self.lista_preventivi.setShowGrid(True)
+        self.lista_preventivi.setAlternatingRowColors(True)
+        self.lista_preventivi.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.lista_preventivi.setMinimumHeight(220)
 
-        # --- Colonna sinistra: lista + conteggio ---
-        left_col = QVBoxLayout()
-        left_col.setSpacing(6)
+        hdr = self.lista_preventivi.horizontalHeader()
+        hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)   # #
+        hdr.setSectionResizeMode(1, QHeaderView.ResizeToContents)   # Tipo
+        hdr.setSectionResizeMode(2, QHeaderView.Interactive)        # Cliente
+        hdr.setSectionResizeMode(3, QHeaderView.ResizeToContents)   # Misura
+        hdr.setSectionResizeMode(4, QHeaderView.Interactive)        # Categoria
+        hdr.setSectionResizeMode(5, QHeaderView.Interactive)        # Sottocategoria
+        hdr.setSectionResizeMode(6, QHeaderView.Stretch)            # Descrizione (prende spazio rimanente)
+        hdr.setSectionResizeMode(7, QHeaderView.ResizeToContents)   # Prev €
+        hdr.setSectionResizeMode(8, QHeaderView.ResizeToContents)   # Prezzo €
 
-        self.lista_preventivi = QListWidget()
-        self.lista_preventivi.setMinimumHeight(200)
-        self.lista_preventivi.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-        self.lista_preventivi.itemDoubleClicked.connect(self.visualizza_preventivo)
+        self.lista_preventivi.doubleClicked.connect(self.visualizza_preventivo)
         self.lista_preventivi.currentItemChanged.connect(self._on_selezione_cambiata)
-        left_col.addWidget(self.lista_preventivi)
+        lista_layout.addWidget(self.lista_preventivi)
 
-        self.lbl_conteggio = QLabel("0 preventivi caricati")
-        self.lbl_conteggio.setStyleSheet("QLabel { color: #718096; font-size: 13px; font-weight: 500; }")
-        left_col.addWidget(self.lbl_conteggio)
-
-        left_widget = QWidget()
-        left_widget.setLayout(left_col)
-        left_widget.setMinimumWidth(320)
-        left_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
-
-        # --- Colonna destra: pannello dettaglio ---
-        self.detail_panel = QFrame()
-        self.detail_panel.setStyleSheet("""
+        # Area nota revisione (sotto la tabella)
+        self.note_frame = QFrame()
+        self.note_frame.setStyleSheet("""
             QFrame {
-                background-color: #f7fafc;
-                border: 1px solid #e2e8f0;
-                border-radius: 8px;
+                background-color: #fffbeb;
+                border: 1px solid #f6e05e;
+                border-radius: 6px;
+                padding: 2px;
             }
         """)
-        self.detail_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        note_row = QHBoxLayout(self.note_frame)
+        note_row.setContentsMargins(12, 6, 12, 6)
+        note_row.setSpacing(8)
+        note_lbl = QLabel("Note revisione:")
+        note_lbl.setStyleSheet("QLabel { font-weight: 600; color: #744210; font-size: 12px; min-width: 110px; }")
+        self.lbl_nota_corrente = QLabel("—")
+        self.lbl_nota_corrente.setWordWrap(True)
+        self.lbl_nota_corrente.setStyleSheet("QLabel { color: #744210; font-size: 12px; }")
+        note_row.addWidget(note_lbl)
+        note_row.addWidget(self.lbl_nota_corrente, 1)
+        lista_layout.addWidget(self.note_frame)
 
-        detail_outer = QVBoxLayout(self.detail_panel)
-        detail_outer.setContentsMargins(0, 0, 0, 0)
+        # Conteggio
+        self.lbl_conteggio = QLabel("0 preventivi caricati")
+        self.lbl_conteggio.setStyleSheet("QLabel { color: #718096; font-size: 13px; font-weight: 500; }")
+        lista_layout.addWidget(self.lbl_conteggio)
 
-        # Scroll area per il dettaglio
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.NoFrame)
-        scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
-
-        scroll_content = QWidget()
-        scroll_content.setStyleSheet("background: transparent;")
-        self.detail_layout = QVBoxLayout(scroll_content)
-        self.detail_layout.setContentsMargins(20, 16, 20, 16)
-        self.detail_layout.setSpacing(10)
-        self.detail_layout.setAlignment(Qt.AlignTop)
-
-        # Placeholder iniziale
-        self.detail_placeholder = QLabel("Seleziona un preventivo per vedere i dettagli")
-        self.detail_placeholder.setAlignment(Qt.AlignCenter)
-        self.detail_placeholder.setStyleSheet("QLabel { color: #a0aec0; font-size: 14px; font-style: italic; }")
-        self.detail_layout.addWidget(self.detail_placeholder)
-
-        scroll.setWidget(scroll_content)
-        detail_outer.addWidget(scroll)
-
-        split_layout.addWidget(left_widget, 2)
-        split_layout.addWidget(self.detail_panel, 3)
-
-        lista_group_layout.addLayout(split_layout)
         parent_layout.addWidget(lista_group)
 
     def create_action_buttons(self, parent_layout: QVBoxLayout) -> None:
@@ -615,116 +618,28 @@ class VisualizzaPreventiviWindow(QMainWindow):
             print(f"Errore nel caricamento sottocategorie filtro: {str(e)}")
         self.filtro_sottocategoria.blockSignals(False)
 
+    def _get_current_preventivo_id(self):
+        """Restituisce l'id del preventivo della riga selezionata nella tabella, o None"""
+        item = self.lista_preventivi.currentItem()
+        return item.data(Qt.UserRole) if item else None
+
     def _on_selezione_cambiata(self, current, previous) -> None:
-        """Aggiorna il pannello dettaglio quando cambia la selezione"""
+        """Aggiorna la nota revisione quando cambia la selezione"""
         if current is None:
-            self._clear_detail_panel()
+            self.lbl_nota_corrente.setText("—")
             return
-        preventivo_id = current.data(Qt.UserRole)
-        self._update_detail_panel(preventivo_id)
-
-    def _clear_detail_panel(self) -> None:
-        """Svuota il pannello dettaglio"""
-        for i in reversed(range(self.detail_layout.count())):
-            w = self.detail_layout.itemAt(i).widget()
-            if w:
-                w.setParent(None)
-        self.detail_placeholder = QLabel("Seleziona un preventivo per vedere i dettagli")
-        self.detail_placeholder.setAlignment(Qt.AlignCenter)
-        self.detail_placeholder.setStyleSheet("QLabel { color: #a0aec0; font-size: 14px; font-style: italic; }")
-        self.detail_layout.addWidget(self.detail_placeholder)
-
-    def _update_detail_panel(self, preventivo_id: int) -> None:
-        """Mostra i dettagli del preventivo nel pannello laterale"""
-        # Svuota il pannello
-        for i in reversed(range(self.detail_layout.count())):
-            w = self.detail_layout.itemAt(i).widget()
-            if w:
-                w.setParent(None)
-
+        row = self.lista_preventivi.currentRow()
+        if row < 0:
+            self.lbl_nota_corrente.setText("—")
+            return
+        id_item = self.lista_preventivi.item(row, 0)
+        if not id_item:
+            self.lbl_nota_corrente.setText("—")
+            return
+        preventivo_id = id_item.data(Qt.UserRole)
         prev = self.db_manager.get_preventivo_by_id(preventivo_id)
-        if not prev:
-            return
-
-        def add_field(label_text: str, value: str, value_style: str = "") -> None:
-            row = QHBoxLayout()
-            row.setSpacing(8)
-            lbl = QLabel(label_text)
-            lbl.setStyleSheet("QLabel { font-weight: 600; color: #4a5568; font-size: 13px; min-width: 130px; max-width: 130px; }")
-            lbl.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-            val = QLabel(value or "—")
-            val.setWordWrap(True)
-            val.setStyleSheet(f"QLabel {{ color: #2d3748; font-size: 13px; {value_style} }}")
-            val.setAlignment(Qt.AlignTop | Qt.AlignLeft)
-            row.addWidget(lbl)
-            row.addWidget(val, 1)
-            container = QWidget()
-            container.setStyleSheet("background: transparent;")
-            container.setLayout(row)
-            self.detail_layout.addWidget(container)
-
-        def add_separator() -> None:
-            sep = QFrame()
-            sep.setFrameShape(QFrame.HLine)
-            sep.setStyleSheet("QFrame { color: #e2e8f0; background: #e2e8f0; max-height: 1px; }")
-            self.detail_layout.addWidget(sep)
-
-        # Titolo
-        numero_rev = prev.get('numero_revisione', 1)
-        tipo = "Originale" if numero_rev == 1 else f"Revisione #{numero_rev}"
-        title = QLabel(f"#{preventivo_id:03d} — {tipo}")
-        title.setStyleSheet("QLabel { font-size: 16px; font-weight: 700; color: #2d3748; }")
-        self.detail_layout.addWidget(title)
-
-        # Data
-        data_raw = prev.get('data_creazione', '')
-        data_display = data_raw[:10] if data_raw else '—'
-        add_field("Data creazione:", data_display)
-        add_separator()
-
-        # Campi cliente
-        add_field("Cliente:", prev.get('nome_cliente', ''))
-        add_field("Numero ordine:", prev.get('numero_ordine', ''))
-        add_field("Codice:", prev.get('codice', ''))
-        add_field("Misura:", prev.get('misura', ''))
-        add_field("Finitura:", prev.get('finitura', ''))
-        add_field("Categoria:", prev.get('categoria', ''))
-        add_field("Sottocategoria:", prev.get('sottocategoria', ''))
-        add_field("Descrizione:", prev.get('descrizione', ''))
-        add_separator()
-
-        # Prezzi
-        p_finale = prev.get('preventivo_finale')
-        p_cliente = prev.get('prezzo_cliente')
-        add_field("Preventivo finale:", f"€ {p_finale:.2f}" if p_finale is not None else "—")
-        add_field("Prezzo cliente:", f"€ {p_cliente:.2f}" if p_cliente is not None else "—")
-        add_separator()
-
-        # Note revisione
-        note = (prev.get('note_revisione') or '').strip()
-        note_title = QLabel("Note revisione:")
-        note_title.setStyleSheet("QLabel { font-weight: 600; color: #4a5568; font-size: 13px; }")
-        self.detail_layout.addWidget(note_title)
-
-        note_box = QFrame()
-        note_box.setStyleSheet("""
-            QFrame {
-                background-color: #fffbeb;
-                border: 1px solid #f6e05e;
-                border-radius: 6px;
-                padding: 4px;
-            }
-        """)
-        note_box_layout = QVBoxLayout(note_box)
-        note_box_layout.setContentsMargins(10, 8, 10, 8)
-        note_val = QLabel(note if note else "Nessuna nota")
-        note_val.setWordWrap(True)
-        note_val.setStyleSheet(
-            "QLabel { color: #744210; font-size: 13px; }" if note
-            else "QLabel { color: #a0aec0; font-size: 13px; font-style: italic; }"
-        )
-        note_box_layout.addWidget(note_val)
-        self.detail_layout.addWidget(note_box)
+        nota = (prev.get('note_revisione') or '').strip() if prev else ''
+        self.lbl_nota_corrente.setText(nota if nota else "—")
 
     def load_clienti_filtro(self) -> None:
         """Carica la lista dei clienti nel filtro"""
@@ -747,8 +662,8 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
     def load_preventivi(self) -> None:
         """Carica TUTTI i preventivi con filtri"""
-        self.lista_preventivi.clear()
-        self._clear_detail_panel()
+        self.lista_preventivi.setRowCount(0)
+        self.lbl_nota_corrente.setText("—")
 
         # Ottieni i valori dei filtri
         filtro_origine_text = self.filtro_origine.currentText()
@@ -806,45 +721,49 @@ class VisualizzaPreventiviWindow(QMainWindow):
                 if filtro_keyword_text not in testo_completo:
                     continue
 
-            # Determina il tipo tra parentesi
-            tipo_preventivo = "Originale" if numero_revisione == 1 else "Revisionato"
-
-            # Aggiungi badge modifiche se presenti
-            badge_modifiche = ""
+            # Tipo con badge modifiche
+            tipo_preventivo = "Originale" if numero_revisione == 1 else f"Rev.#{numero_revisione}"
             if storico_modifiche and len(storico_modifiche) > 0:
-                badge_modifiche = f"/Con modifiche"
+                tipo_preventivo += " ✎"
 
-            # Formatta visualizzazione PULITA
-            # Riga 1: #ID [Tipo] - Cliente: NOME
-            cliente_display = nome_cliente if nome_cliente else "Senza nome"
-            riga1 = f"#{id_prev:03d} [{tipo_preventivo}{badge_modifiche}] - Cliente: {cliente_display}"
+            # Prezzi
+            p_finale = prev_completo.get('preventivo_finale')
+            p_cliente = prev_completo.get('prezzo_cliente')
+            prev_str = f"€ {p_finale:.2f}" if p_finale is not None else "—"
+            prezzo_str = f"€ {p_cliente:.2f}" if p_cliente is not None else "—"
 
-            # Riga 2: Misura: XXX | Descrizione: YYY
-            misura_display = misura if misura else "N/D"
-            desc_display = descrizione[:80] + "..." if len(descrizione) > 80 else descrizione
-            desc_display = desc_display if desc_display else "Nessuna descrizione"
-            riga2 = f"Misura: {misura_display} | Descrizione: {desc_display}"
+            # Aggiungi riga alla tabella
+            row_idx = self.lista_preventivi.rowCount()
+            self.lista_preventivi.insertRow(row_idx)
 
-            testo = f"{riga1}\n{riga2}"
+            def make_cell(text, align=Qt.AlignVCenter | Qt.AlignLeft):
+                cell = QTableWidgetItem(str(text) if text else "")
+                cell.setTextAlignment(align)
+                cell.setData(Qt.UserRole, id_prev)  # id in ogni cella → compatibile con currentItem()
+                return cell
 
-            item = QListWidgetItem(testo)
-            item.setData(Qt.UserRole, id_prev)
-            self.lista_preventivi.addItem(item)
+            self.lista_preventivi.setItem(row_idx, 0, make_cell(f"#{id_prev:03d}", align=Qt.AlignCenter))
+            self.lista_preventivi.setItem(row_idx, 1, make_cell(tipo_preventivo))
+            self.lista_preventivi.setItem(row_idx, 2, make_cell(nome_cliente or "—"))
+            self.lista_preventivi.setItem(row_idx, 3, make_cell(misura or "—"))
+            self.lista_preventivi.setItem(row_idx, 4, make_cell(categoria or "—"))
+            self.lista_preventivi.setItem(row_idx, 5, make_cell(sottocategoria or "—"))
+            self.lista_preventivi.setItem(row_idx, 6, make_cell(descrizione or "—"))
+            self.lista_preventivi.setItem(row_idx, 7, make_cell(prev_str, align=Qt.AlignRight | Qt.AlignVCenter))
+            self.lista_preventivi.setItem(row_idx, 8, make_cell(prezzo_str, align=Qt.AlignRight | Qt.AlignVCenter))
             count += 1
 
+        self.lista_preventivi.resizeRowsToContents()
         # Aggiorna conteggio
         self.lbl_conteggio.setText(f"{count} preventivi visualizzati")
 
     def visualizza_preventivo(self) -> None:
         """Visualizza i dettagli del preventivo selezionato"""
-        current_item = self.lista_preventivi.currentItem()
-        if not current_item:
+        preventivo_id = self._get_current_preventivo_id()
+        if preventivo_id is None:
             QMessageBox.warning(self, "Attenzione", "Seleziona un preventivo da visualizzare.")
             return
 
-        preventivo_id = current_item.data(Qt.UserRole)
-
-        # Importa qui per evitare circular import
         from ui.preventivo_window import PreventivoWindow
 
         self.preventivo_window = PreventivoWindow(
@@ -858,12 +777,10 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
     def modifica_preventivo(self) -> None:
         """Apre un preventivo per la modifica DIRETTA (con versioning)"""
-        current_item = self.lista_preventivi.currentItem()
-        if not current_item:
+        preventivo_id = self._get_current_preventivo_id()
+        if preventivo_id is None:
             QMessageBox.warning(self, "Attenzione", "Seleziona un preventivo da modificare.")
             return
-
-        preventivo_id = current_item.data(Qt.UserRole)
 
         from ui.preventivo_window import PreventivoWindow
 
@@ -878,12 +795,10 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
     def crea_revisione(self) -> None:
         """Crea una revisione di un preventivo esistente"""
-        current_item = self.lista_preventivi.currentItem()
-        if not current_item:
+        preventivo_id = self._get_current_preventivo_id()
+        if preventivo_id is None:
             QMessageBox.warning(self, "Attenzione", "Seleziona un preventivo per creare una revisione.")
             return
-
-        preventivo_id = current_item.data(Qt.UserRole)
 
         # Dialog per note revisione
         from ui.main_window_business_logic import MainWindowBusinessLogic
@@ -905,20 +820,16 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
     def visualizza_modifiche(self) -> None:
         """NUOVO: Apre il dialog per visualizzare lo storico modifiche"""
-        current_item = self.lista_preventivi.currentItem()
-        if not current_item:
+        preventivo_id = self._get_current_preventivo_id()
+        if preventivo_id is None:
             QMessageBox.warning(self, "Attenzione", "Seleziona un preventivo per visualizzare le modifiche.")
             return
 
-        preventivo_id = current_item.data(Qt.UserRole)
-
-        # Verifica se il preventivo ha modifiche
         storico = self.db_manager.get_storico_modifiche(preventivo_id)
         if not storico:
             QMessageBox.information(self, "Info", "Questo preventivo non ha modifiche nello storico.")
             return
 
-        # Importa e apri il dialog
         from ui.visualizza_modifiche_dialog import VisualizzaModificheDialog
 
         dialog = VisualizzaModificheDialog(self.db_manager, preventivo_id, self)
@@ -934,8 +845,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
     def anteprima_documento(self) -> None:
         """Mostra anteprima del documento nel browser senza salvarlo"""
-        current_item = self.lista_preventivi.currentItem()
-        if not current_item:
+        if self._get_current_preventivo_id() is None:
             QMessageBox.warning(self, "Attenzione", "Seleziona un preventivo dalla lista per visualizzare l'anteprima.")
             return
 
@@ -944,25 +854,19 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
     def genera_documento(self) -> None:
         """Genera documento dal preventivo selezionato"""
-        current_item = self.lista_preventivi.currentItem()
-        if not current_item:
+        if self._get_current_preventivo_id() is None:
             QMessageBox.warning(self, "Attenzione", "Seleziona un preventivo dalla lista per generare il documento.")
             return
 
-        # Usa la stessa logica di MainWindowBusinessLogic
         from ui.main_window_business_logic import MainWindowBusinessLogic
-
-        # self ha già db_manager e lista_preventivi come attributi (è un QMainWindow)
         MainWindowBusinessLogic.genera_documento_preventivo(self)
 
     def elimina_preventivo(self) -> None:
         """Elimina il preventivo selezionato"""
-        current_item = self.lista_preventivi.currentItem()
-        if not current_item:
+        preventivo_id = self._get_current_preventivo_id()
+        if preventivo_id is None:
             QMessageBox.warning(self, "Attenzione", "Seleziona un preventivo da eliminare.")
             return
-
-        preventivo_id = current_item.data(Qt.UserRole)
 
         # Determina se è una revisione o l'originale per mostrare il messaggio corretto
         prev_data = self.db_manager.get_preventivo_by_id(preventivo_id)

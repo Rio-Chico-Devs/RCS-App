@@ -255,15 +255,23 @@ class PreventivoWindow(QMainWindow):
         client_grid = QGridLayout(client_grid_widget)
         client_grid.setSpacing(16)
         
-        # Prima riga: Nome Cliente e Numero Ordine
+        # Prima riga: Nome Cliente, Numero Ordine, Categoria, Sottocategoria
         client_grid.addWidget(self.create_standard_label("Nome Cliente:"), 0, 0)
         self.edit_nome_cliente = QLineEdit()
         client_grid.addWidget(self.edit_nome_cliente, 0, 1)
-        
+
         client_grid.addWidget(self.create_standard_label("Numero Ordine:"), 0, 2)
         self.edit_numero_ordine = QLineEdit()
         client_grid.addWidget(self.edit_numero_ordine, 0, 3)
-        
+
+        client_grid.addWidget(self.create_standard_label("Categoria:"), 0, 4)
+        self.edit_categoria = QLineEdit()
+        client_grid.addWidget(self.edit_categoria, 0, 5)
+
+        client_grid.addWidget(self.create_standard_label("Sottocategoria:"), 0, 6)
+        self.edit_sottocategoria = QLineEdit()
+        client_grid.addWidget(self.edit_sottocategoria, 0, 7)
+
         # Seconda riga: Codice, Misura e Finitura
         client_grid.addWidget(self.create_standard_label("Codice:"), 1, 0)
         self.edit_codice = QLineEdit()
@@ -275,22 +283,13 @@ class PreventivoWindow(QMainWindow):
 
         client_grid.addWidget(self.create_standard_label("Finitura:"), 1, 4)
         self.edit_finitura = QLineEdit()
-        client_grid.addWidget(self.edit_finitura, 1, 5)
+        client_grid.addWidget(self.edit_finitura, 1, 5, 1, 3)  # Span su 3 colonne
 
-        # Terza riga: Categoria e Sottocategoria
-        client_grid.addWidget(self.create_standard_label("Categoria:"), 2, 0)
-        self.edit_categoria = QLineEdit()
-        client_grid.addWidget(self.edit_categoria, 2, 1)
-
-        client_grid.addWidget(self.create_standard_label("Sottocategoria:"), 2, 2)
-        self.edit_sottocategoria = QLineEdit()
-        client_grid.addWidget(self.edit_sottocategoria, 2, 3, 1, 3)  # Span su 3 colonne
-
-        # Quarta riga: Descrizione (LineEdit semplice con limite caratteri)
-        client_grid.addWidget(self.create_standard_label("Descrizione:"), 3, 0)
+        # Terza riga: Descrizione (LineEdit semplice con limite caratteri)
+        client_grid.addWidget(self.create_standard_label("Descrizione:"), 2, 0)
         self.edit_descrizione = QLineEdit()
         self.edit_descrizione.setMaxLength(100)  # Limite a 100 caratteri
-        client_grid.addWidget(self.edit_descrizione, 3, 1, 1, 5)  # Span su 5 colonne
+        client_grid.addWidget(self.edit_descrizione, 2, 1, 1, 7)  # Span su 7 colonne
         
         client_layout.addRow(client_grid_widget)
         
