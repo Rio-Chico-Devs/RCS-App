@@ -334,17 +334,13 @@ class VisualizzaPreventiviWindow(QMainWindow):
         hdr = self.lista_preventivi.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)   # #
         hdr.setSectionResizeMode(1, QHeaderView.ResizeToContents)   # Tipo
-        hdr.setSectionResizeMode(2, QHeaderView.Stretch)            # Cliente (prende spazio)
+        hdr.setSectionResizeMode(2, QHeaderView.ResizeToContents)   # Cliente
         hdr.setSectionResizeMode(3, QHeaderView.ResizeToContents)   # Misura
-        hdr.setSectionResizeMode(4, QHeaderView.Interactive)        # Categoria
-        hdr.setSectionResizeMode(5, QHeaderView.Interactive)        # Sottocategoria
-        hdr.setSectionResizeMode(6, QHeaderView.Interactive)        # Descrizione (più corta)
+        hdr.setSectionResizeMode(4, QHeaderView.ResizeToContents)   # Categoria
+        hdr.setSectionResizeMode(5, QHeaderView.ResizeToContents)   # Sottocategoria
+        hdr.setSectionResizeMode(6, QHeaderView.Stretch)            # Descrizione (più lunga)
         hdr.setSectionResizeMode(7, QHeaderView.ResizeToContents)   # Prev €
         hdr.setSectionResizeMode(8, QHeaderView.ResizeToContents)   # Prezzo €
-        # Larghezze iniziali per Interactive columns
-        self.lista_preventivi.setColumnWidth(4, 130)   # Categoria
-        self.lista_preventivi.setColumnWidth(5, 140)   # Sottocategoria
-        self.lista_preventivi.setColumnWidth(6, 160)   # Descrizione
 
         self.lista_preventivi.doubleClicked.connect(self.visualizza_preventivo)
         self.lista_preventivi.currentItemChanged.connect(self._on_selezione_cambiata)
