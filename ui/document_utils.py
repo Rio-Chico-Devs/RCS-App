@@ -638,10 +638,7 @@ class DocumentUtils:
         d = round(W * 0.14)  # dimensione diagonale (~14% della larghezza)
 
         elements = []
-        # Rettangolo identico al normale
-        elements.append(f'<rect x="0" y="0" width="{W}" height="{H}" fill="white" stroke="black" stroke-width="1"/>')
-
-        # Solo una linea diagonale nell'angolo (non un poligono riempito)
+        # Solo una linea diagonale nell'angolo (nessun rettangolo: bordo e sfondo vengono dalla cella ODT)
         if lato in ('sinistra', 'entrambi'):
             elements.append(f'<line x1="0" y1="0" x2="{d}" y2="{H}" stroke="red" stroke-width="1"/>')
         if lato in ('destra', 'entrambi'):
