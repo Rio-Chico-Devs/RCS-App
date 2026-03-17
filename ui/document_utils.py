@@ -751,36 +751,6 @@ class DocumentUtils:
             }
 
     @staticmethod
-    def _genera_figura_conica(lato, altezza_mm, lunghezza_mm, lunghezza_tela, s, nome):
-        """Rettangolo identico al normale con una diagonale nell'angolo di conicità."""
-        # Diagonale fissa nell'angolo: occupa circa 20% della larghezza e tutta l'altezza
-        d = 16  # dimensione diagonale in unità viewBox (su 80 di larghezza)
-        lines = []
-        if lato in ('sinistra', 'entrambi'):
-            lines.append(f'<line x1="0" y1="0" x2="{d}" y2="20" stroke="red" stroke-width="1.2"/>')
-        if lato in ('destra', 'entrambi'):
-            lines.append(f'<line x1="80" y1="0" x2="{80-d}" y2="20" stroke="red" stroke-width="1.2"/>')
-
-        diag_svg = (
-            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 20" preserveAspectRatio="none" '
-            f'style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;">'
-            + ''.join(lines) +
-            '</svg>'
-        )
-
-        return (
-            f'<div style="width: 80mm; height: {s["rect_height"]}; border: 2px solid #000; display: flex; '
-            f'align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; '
-            f'position: relative; flex-shrink: 0; overflow: hidden;">'
-            + diag_svg +
-            f'<input type="text" placeholder="Orient." style="width: {s["orient_width"]}; border: none; '
-            f'font-size: {s["orient_font"]}; background: transparent; position: relative; z-index: 1;">'
-            f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 50%; '
-            f'transform: translateX(-50%); z-index: 1;">{nome}</strong>'
-            f'</div>'
-        )
-
-    @staticmethod
     def _genera_html_template_specifico(preventivo, dati_cliente):
         """Template HTML scalabile - adatta il layout al numero di materiali (1-25)"""
 
@@ -814,15 +784,32 @@ class DocumentUtils:
                     nome = f'Materiale {i+1}'
                     is_conica = False; con_lato = 'sinistra'; con_alt = 0.0; con_lung = 0.0
 
-                # Genera la figura: rettangolo con triangolo sbiegatura o rettangolo normale
+                # Diagonale per tela conica (solo una linea nell'angolo, nient'altro)
+                diag_svg = ''
                 if is_conica and con_lung > 0:
-                    figura_html = DocumentUtils._genera_figura_conica(
-                        con_lato, con_alt, con_lung, lunghezza, s, nome)
-                else:
-                    figura_html = f"""<div style="width: 80mm; height: {s['rect_height']}; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative; flex-shrink: 0;">
-                        <input type="text" placeholder="Orient." style="width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; position: relative; z-index: 1;">
-                        <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; transform: translateX(-50%); z-index: 1;">{nome}</strong>
-                    </div>"""
+                    d = 16
+                    lines = []
+                    if con_lato in ('sinistra', 'entrambi'):
+                        lines.append(f'<line x1="0" y1="0" x2="{d}" y2="20" stroke="red" stroke-width="1.2"/>')
+                    if con_lato in ('destra', 'entrambi'):
+                        lines.append(f'<line x1="80" y1="0" x2="{80-d}" y2="20" stroke="red" stroke-width="1.2"/>')
+                    diag_svg = (
+                        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 20" preserveAspectRatio="none" '
+                        'style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;">'
+                        + ''.join(lines) + '</svg>'
+                    )
+
+                figura_html = (
+                    f'<div style="width: 80mm; height: {s["rect_height"]}; border: 2px solid #000; display: flex; '
+                    f'align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; '
+                    f'position: relative; flex-shrink: 0; overflow: hidden;">'
+                    + diag_svg +
+                    f'<input type="text" placeholder="Orient." style="width: {s["orient_width"]}; border: none; '
+                    f'font-size: {s["orient_font"]}; background: transparent; position: relative; z-index: 1;">'
+                    f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 50%; '
+                    f'transform: translateX(-50%); z-index: 1;">{nome}</strong>'
+                    f'</div>'
+                )
 
                 # Larghezze colonne layout: [campo] [G] [tela 80mm] [H]
                 w_campo = '28mm'
