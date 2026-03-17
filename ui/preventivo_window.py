@@ -79,6 +79,9 @@ class PreventivoWindow(QMainWindow):
         self.descrizione_data = preventivo_data.get('descrizione', '')
         self.codice_data = preventivo_data.get('codice', '')
         self.misura_data = preventivo_data.get('misura', '')
+        self.finitura_data = preventivo_data.get('finitura', '')
+        self.categoria_data = preventivo_data.get('categoria', '')
+        self.sottocategoria_data = preventivo_data.get('sottocategoria', '')
 
         # IMPORTANTE: Carica TUTTI i valori numerici e verifica che siano validi
         self.preventivo.costi_accessori = float(preventivo_data.get('costi_accessori', 0.0))
@@ -274,11 +277,20 @@ class PreventivoWindow(QMainWindow):
         self.edit_finitura = QLineEdit()
         client_grid.addWidget(self.edit_finitura, 1, 5)
 
-        # Terza riga: Descrizione (LineEdit semplice con limite caratteri)
-        client_grid.addWidget(self.create_standard_label("Descrizione:"), 2, 0)
+        # Terza riga: Categoria e Sottocategoria
+        client_grid.addWidget(self.create_standard_label("Categoria:"), 2, 0)
+        self.edit_categoria = QLineEdit()
+        client_grid.addWidget(self.edit_categoria, 2, 1)
+
+        client_grid.addWidget(self.create_standard_label("Sottocategoria:"), 2, 2)
+        self.edit_sottocategoria = QLineEdit()
+        client_grid.addWidget(self.edit_sottocategoria, 2, 3, 1, 3)  # Span su 3 colonne
+
+        # Quarta riga: Descrizione (LineEdit semplice con limite caratteri)
+        client_grid.addWidget(self.create_standard_label("Descrizione:"), 3, 0)
         self.edit_descrizione = QLineEdit()
         self.edit_descrizione.setMaxLength(100)  # Limite a 100 caratteri
-        client_grid.addWidget(self.edit_descrizione, 2, 1, 1, 5)  # Span su 5 colonne
+        client_grid.addWidget(self.edit_descrizione, 3, 1, 1, 5)  # Span su 5 colonne
         
         client_layout.addRow(client_grid_widget)
         
@@ -292,6 +304,10 @@ class PreventivoWindow(QMainWindow):
                 self.edit_misura.setText(self.misura_data)
             if hasattr(self, 'finitura_data'):
                 self.edit_finitura.setText(self.finitura_data)
+            if hasattr(self, 'categoria_data'):
+                self.edit_categoria.setText(self.categoria_data)
+            if hasattr(self, 'sottocategoria_data'):
+                self.edit_sottocategoria.setText(self.sottocategoria_data)
 
         parent_layout.addWidget(client_group)
     
@@ -304,6 +320,8 @@ class PreventivoWindow(QMainWindow):
         self.edit_codice.setEnabled(False)
         self.edit_misura.setEnabled(False)
         self.edit_finitura.setEnabled(False)
+        self.edit_categoria.setEnabled(False)
+        self.edit_sottocategoria.setEnabled(False)
 
         # Disabilita tutti i SpinBox
         self.edit_minuti_taglio.setEnabled(False)
@@ -828,7 +846,9 @@ class PreventivoWindow(QMainWindow):
             'descrizione': self.edit_descrizione.text().strip(),
             'codice': self.edit_codice.text().strip(),
             'misura': self.edit_misura.text().strip(),
-            'finitura': self.edit_finitura.text().strip()
+            'finitura': self.edit_finitura.text().strip(),
+            'categoria': self.edit_categoria.text().strip(),
+            'sottocategoria': self.edit_sottocategoria.text().strip(),
         }
     
     def carica_valori_con_delay(self):
@@ -846,6 +866,10 @@ class PreventivoWindow(QMainWindow):
                 self.edit_misura.setText(self.misura_data or "")
             if hasattr(self, 'finitura_data'):
                 self.edit_finitura.setText(self.finitura_data or "")
+            if hasattr(self, 'categoria_data'):
+                self.edit_categoria.setText(self.categoria_data or "")
+            if hasattr(self, 'sottocategoria_data'):
+                self.edit_sottocategoria.setText(self.sottocategoria_data or "")
 
         # Imposta valori mano d'opera
         try:

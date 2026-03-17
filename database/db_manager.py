@@ -133,7 +133,9 @@ class DatabaseManager:
             ("misura", "TEXT NOT NULL DEFAULT ''"),
             ("descrizione", "TEXT NOT NULL DEFAULT ''"),
             ("codice", "TEXT NOT NULL DEFAULT ''"),
-            ("storico_modifiche", "TEXT DEFAULT '[]'")
+            ("storico_modifiche", "TEXT DEFAULT '[]'"),
+            ("categoria", "TEXT NOT NULL DEFAULT ''"),
+            ("sottocategoria", "TEXT NOT NULL DEFAULT ''"),
         ]
 
         for column_name, column_def in new_columns:
@@ -586,8 +588,9 @@ class DatabaseManager:
                     minuti_avvolgimento, minuti_pulizia, minuti_rettifica,
                     minuti_imballaggio, tot_mano_opera, subtotale,
                     maggiorazione_25, preventivo_finale, prezzo_cliente,
-                    materiali_utilizzati, note_revisione, storico_modifiche
-                ) VALUES (?, 1, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')
+                    materiali_utilizzati, note_revisione, storico_modifiche,
+                    categoria, sottocategoria
+                ) VALUES (?, 1, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?)
             """, (
                 datetime.now().isoformat(),
                 preventivo_data.get('nome_cliente', ''),
@@ -608,7 +611,9 @@ class DatabaseManager:
                 preventivo_data['preventivo_finale'],
                 preventivo_data['prezzo_cliente'],
                 json.dumps(preventivo_data['materiali_utilizzati']),
-                ""
+                "",
+                preventivo_data.get('categoria', ''),
+                preventivo_data.get('sottocategoria', ''),
             ))
             conn.commit()
             return cursor.lastrowid
@@ -674,7 +679,8 @@ class DatabaseManager:
                         minuti_avvolgimento = ?, minuti_pulizia = ?, minuti_rettifica = ?,
                         minuti_imballaggio = ?, tot_mano_opera = ?, subtotale = ?,
                         maggiorazione_25 = ?, preventivo_finale = ?, prezzo_cliente = ?,
-                        materiali_utilizzati = ?, storico_modifiche = ?
+                        materiali_utilizzati = ?, storico_modifiche = ?,
+                        categoria = ?, sottocategoria = ?
                     WHERE id = ?
                 """, (
                     preventivo_data.get('nome_cliente', ''),
@@ -696,6 +702,8 @@ class DatabaseManager:
                     preventivo_data['prezzo_cliente'],
                     json.dumps(preventivo_data['materiali_utilizzati']),
                     storico_aggiornato,
+                    preventivo_data.get('categoria', ''),
+                    preventivo_data.get('sottocategoria', ''),
                     preventivo_id
                 ))
                 conn.commit()
@@ -831,8 +839,9 @@ class DatabaseManager:
                     minuti_avvolgimento, minuti_pulizia, minuti_rettifica,
                     minuti_imballaggio, tot_mano_opera, subtotale,
                     maggiorazione_25, preventivo_finale, prezzo_cliente,
-                    materiali_utilizzati, note_revisione, storico_modifiche
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')
+                    materiali_utilizzati, note_revisione, storico_modifiche,
+                    categoria, sottocategoria
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?)
             """, (
                 datetime.now().isoformat(),
                 nuovo_numero_revisione,
@@ -855,7 +864,9 @@ class DatabaseManager:
                 preventivo_data['preventivo_finale'],
                 preventivo_data['prezzo_cliente'],
                 json.dumps(preventivo_data['materiali_utilizzati']),
-                note_revisione
+                note_revisione,
+                preventivo_data.get('categoria', ''),
+                preventivo_data.get('sottocategoria', ''),
             ))
             conn.commit()
             return cursor.lastrowid
