@@ -630,36 +630,24 @@ class DocumentUtils:
 
     @staticmethod
     def _svg_conica_str(lato, altezza_mm, lunghezza_mm, lunghezza_tela, nome_xml, rect_h_cm=0.8):
-        """Genera SVG per la conica nell'ODT.
-        Disegna un rettangolo identico al normale con solo una diagonale nell'angolo di conicità.
-        """
+        """Genera SVG per la conica nell'ODT: rettangolo identico al normale + diagonale nell'angolo."""
         W = 115
         H = max(4, round(W * rect_h_cm / 11.5))
         font_sz = max(2, round(H * 0.50))
 
-        L = max(lunghezza_tela, 1)
-        lt = lunghezza_mm
-
-        lt_px = round(lt / L * W, 2)
-        alt_px = min(H, lt_px)  # altezza triangolo proporzionale alla lunghezza
+        d = round(W * 0.14)  # dimensione diagonale (~14% della larghezza)
 
         elements = []
         # Rettangolo identico al normale
         elements.append(f'<rect x="0" y="0" width="{W}" height="{H}" fill="white" stroke="black" stroke-width="1"/>')
 
-        # Triangolo(i) nell'angolo - segue le linee del rettangolo
-        tri_fill = 'rgba(200,50,50,0.5)'
-        tri_stroke = 'red'
-        sw = '0.5'
-
+        # Solo una linea diagonale nell'angolo (non un poligono riempito)
         if lato in ('sinistra', 'entrambi'):
-            pts = f'0,{H - alt_px} {lt_px},{H} 0,{H}'
-            elements.append(f'<polygon points="{pts}" fill="{tri_fill}" stroke="{tri_stroke}" stroke-width="{sw}"/>')
+            elements.append(f'<line x1="0" y1="0" x2="{d}" y2="{H}" stroke="red" stroke-width="1"/>')
         if lato in ('destra', 'entrambi'):
-            pts = f'{W},{H - alt_px} {W - lt_px},{H} {W},{H}'
-            elements.append(f'<polygon points="{pts}" fill="{tri_fill}" stroke="{tri_stroke}" stroke-width="{sw}"/>')
+            elements.append(f'<line x1="{W}" y1="0" x2="{W-d}" y2="{H}" stroke="red" stroke-width="1"/>')
 
-        # Testo materiale centrato (identico al normale)
+        # Testo centrato identico al normale
         cy = H / 2
         elements.append(
             f'<text x="{W/2}" y="{cy + font_sz * 0.35}" text-anchor="middle"'
@@ -764,37 +752,33 @@ class DocumentUtils:
 
     @staticmethod
     def _genera_figura_conica(lato, altezza_mm, lunghezza_mm, lunghezza_tela, s, nome):
-        """Genera un div identico al rettangolo normale con solo una diagonale nell'angolo di conicità."""
-        L = max(lunghezza_tela, 1)
-        lt = lunghezza_mm
-
-        # ViewBox: 80 x 20 (stesse proporzioni del rettangolo normale)
-        W, H = 80, 20
-        lt_px = round(lt / L * W, 2)
-        # La diagonale parte dal bordo superiore dell'angolo e scende al bordo inferiore
-        # Per sinistra: da (0,0) a (lt_px, H) oppure angolo in basso: (0, H-alt_px) -> (lt_px, H) -> (0, H)
-        # Usiamo proporzione fissa: l'altezza del taglio è proporzionale alla lunghezza
-        alt_px = min(H, lt_px)  # altezza triangolo proporzionale
-
-        triangles = []
+        """Rettangolo identico al normale con una diagonale nell'angolo di conicità."""
+        # Diagonale fissa nell'angolo: occupa circa 20% della larghezza e tutta l'altezza
+        d = 16  # dimensione diagonale in unità viewBox (su 80 di larghezza)
+        lines = []
         if lato in ('sinistra', 'entrambi'):
-            # Triangolo angolo basso-sinistra: segue il bordo sinistro e il bordo inferiore
-            pts = f'0,{H - alt_px} {lt_px},{H} 0,{H}'
-            triangles.append(f'<polygon points="{pts}" fill="rgba(200,50,50,0.5)" stroke="red" stroke-width="0.5"/>')
+            lines.append(f'<line x1="0" y1="0" x2="{d}" y2="20" stroke="red" stroke-width="1.2"/>')
         if lato in ('destra', 'entrambi'):
-            # Triangolo angolo basso-destra: segue il bordo destro e il bordo inferiore
-            pts = f'{W},{H - alt_px} {W - lt_px},{H} {W},{H}'
-            triangles.append(f'<polygon points="{pts}" fill="rgba(200,50,50,0.5)" stroke="red" stroke-width="0.5"/>')
+            lines.append(f'<line x1="80" y1="0" x2="{80-d}" y2="20" stroke="red" stroke-width="1.2"/>')
 
-        return f"""<div style="width: 80mm; height: {s['rect_height']}; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative; flex-shrink: 0; overflow: hidden;">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}"
-                 preserveAspectRatio="none"
-                 style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;">
-                {''.join(triangles)}
-            </svg>
-            <input type="text" placeholder="Orient." style="width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; position: relative; z-index: 1;">
-            <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; transform: translateX(-50%); z-index: 1;">{nome}</strong>
-        </div>"""
+        diag_svg = (
+            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 20" preserveAspectRatio="none" '
+            f'style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;">'
+            + ''.join(lines) +
+            '</svg>'
+        )
+
+        return (
+            f'<div style="width: 80mm; height: {s["rect_height"]}; border: 2px solid #000; display: flex; '
+            f'align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; '
+            f'position: relative; flex-shrink: 0; overflow: hidden;">'
+            + diag_svg +
+            f'<input type="text" placeholder="Orient." style="width: {s["orient_width"]}; border: none; '
+            f'font-size: {s["orient_font"]}; background: transparent; position: relative; z-index: 1;">'
+            f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 50%; '
+            f'transform: translateX(-50%); z-index: 1;">{nome}</strong>'
+            f'</div>'
+        )
 
     @staticmethod
     def _genera_html_template_specifico(preventivo, dati_cliente):
