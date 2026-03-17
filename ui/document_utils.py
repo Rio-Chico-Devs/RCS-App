@@ -646,10 +646,7 @@ class DocumentUtils:
         alt_px = round(alt / H * H, 2) if H > 0 else 0
 
         elements = []
-        # Rettangolo principale
-        elements.append(f'<rect x="0" y="0" width="{W}" height="{H}" fill="white" stroke="black" stroke-width="1.5"/>')
-
-        # Triangolo(i) scarto in rosa
+        # Triangolo(i) scarto in rosa (nessun rettangolo di sfondo)
         tri_fill = 'rgba(255,150,150,0.6)'
         tri_stroke = 'red'
         sw = '0.8'
@@ -805,7 +802,6 @@ class DocumentUtils:
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}"
                  preserveAspectRatio="none"
                  style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-                <rect x="0" y="0" width="{W}" height="{H}" fill="#fff" stroke="#000" stroke-width="1.5"/>
                 {''.join(triangles)}
             </svg>
             <input type="text" placeholder="Orient." style="position: relative; z-index: 1; width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; margin-top: auto; margin-bottom: auto;">
