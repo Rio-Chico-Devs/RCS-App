@@ -77,12 +77,16 @@ class Preventivo:
 
     def ricalcola_tutto(self):
         """Ricalcola tutti i valori del preventivo"""
-        self.ricalcola_costo_totale_materiali()
-        self.ricalcola_scarto_totale()
-        self.calcola_tot_mano_opera()
-        self.calcola_subtotale()
-        self.calcola_maggiorazione_25()
-        self.calcola_preventivo_finale()
+        try:
+            self.ricalcola_costo_totale_materiali()
+            self.ricalcola_scarto_totale()
+            self.calcola_tot_mano_opera()
+            self.calcola_subtotale()
+            self.calcola_maggiorazione_25()
+            self.calcola_preventivo_finale()
+        except Exception as e:
+            import sys
+            print(f"[Preventivo.ricalcola_tutto] errore di calcolo: {e}", file=sys.stderr)
     
     def to_dict(self):
         """Converte il preventivo in dizionario per il salvataggio"""

@@ -93,11 +93,15 @@ class MaterialeCalcolato:
 
     def ricalcola_tutto(self):
         """Ricalcola tutti i valori derivati"""
-        self.calcola_diametro_finale()
-        self.calcola_sviluppo()
-        self.calcola_lunghezza_utilizzata()
-        self.calcola_costo_totale()
-        self.calcola_maggiorazione()
+        try:
+            self.calcola_diametro_finale()
+            self.calcola_sviluppo()
+            self.calcola_lunghezza_utilizzata()
+            self.calcola_costo_totale()
+            self.calcola_maggiorazione()
+        except Exception as e:
+            import sys
+            print(f"[MaterialeCalcolato.ricalcola_tutto] errore di calcolo: {e}", file=sys.stderr)
 
     def to_dict(self):
         """Converte l'oggetto in dizionario per il salvataggio"""

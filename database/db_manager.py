@@ -140,8 +140,8 @@ class DatabaseManager:
             if column_name not in columns:
                 try:
                     cursor.execute(f"ALTER TABLE preventivi ADD COLUMN {column_name} {column_def}")
-                except sqlite3.OperationalError:
-                    pass
+                except sqlite3.OperationalError as e:
+                    print(f"[DB migrazione] preventivi.{column_name}: {e}", file=sys.stderr)
 
         # Migrazione tabella materiali - nuovi campi magazzino
         cursor.execute("PRAGMA table_info(materiali)")
@@ -158,8 +158,8 @@ class DatabaseManager:
             if column_name not in materiali_columns:
                 try:
                     cursor.execute(f"ALTER TABLE materiali ADD COLUMN {column_name} {column_def}")
-                except sqlite3.OperationalError:
-                    pass
+                except sqlite3.OperationalError as e:
+                    print(f"[DB migrazione] materiali.{column_name}: {e}", file=sys.stderr)
 
         # Tabella categorie materiale
         cursor.execute("""
@@ -179,8 +179,8 @@ class DatabaseManager:
         if 'categoria_id' not in mat_cols:
             try:
                 cursor.execute("ALTER TABLE materiali ADD COLUMN categoria_id INTEGER REFERENCES categorie_materiale(id)")
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[DB migrazione] materiali.categoria_id: {e}", file=sys.stderr)
 
         # Tabella categorie materiale
         cursor.execute("""
@@ -194,14 +194,14 @@ class DatabaseManager:
             )
         """)
 
-        # Migrazione: aggiungi categoria_id ai materiali se non esiste
+        # Migrazione: aggiungi categoria_id ai materiali se non esiste (secondo controllo)
         cursor.execute("PRAGMA table_info(materiali)")
         mat_cols = [c[1] for c in cursor.fetchall()]
         if 'categoria_id' not in mat_cols:
             try:
                 cursor.execute("ALTER TABLE materiali ADD COLUMN categoria_id INTEGER REFERENCES categorie_materiale(id)")
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[DB migrazione] materiali.categoria_id (2): {e}", file=sys.stderr)
 
         # Tabella movimenti magazzino
         cursor.execute("""
@@ -223,8 +223,8 @@ class DatabaseManager:
         if 'fornitore_nome' not in mov_cols:
             try:
                 cursor.execute("ALTER TABLE movimenti_magazzino ADD COLUMN fornitore_nome TEXT DEFAULT ''")
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"[DB migrazione] movimenti_magazzino.fornitore_nome: {e}", file=sys.stderr)
 
         # Tabella multi-fornitore per materiale
         cursor.execute("""
@@ -257,8 +257,8 @@ class DatabaseManager:
                         (materiale_id, fornitore_nome, prezzo_fornitore, scorta_massima, giacenza)
                         VALUES (?, ?, ?, ?, ?)
                     """, (mat_id, forn, prezzo_forn, cap_mag, giac))
-                except Exception:
-                    pass
+                except Exception as e:
+                    print(f"[DB migrazione] copia fornitore materiale_id={mat_id}: {e}", file=sys.stderr)
 
         # Tabella fornitori
         cursor.execute("""
@@ -1089,13 +1089,14 @@ class DatabaseManager:
             return cursor.fetchall()
 
     def delete_preventivo_e_revisioni(self, preventivo_id):
-        """NUOVO: Elimina un preventivo e tutte le sue revisioni"""
+        """Elimina un preventivo e tutte le sue revisioni se è l'originale,
+        oppure solo la revisione se viene passato l'ID di una revisione."""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
-            # Trova l'ID originale del preventivo
+            # Controlla se è un originale o una revisione
             cursor.execute("""
-                SELECT COALESCE(preventivo_originale_id, id) as gruppo_id
+                SELECT preventivo_originale_id
                 FROM preventivi WHERE id = ?
             """, (preventivo_id,))
 
@@ -1103,13 +1104,19 @@ class DatabaseManager:
             if not result:
                 return False
 
-            gruppo_id = result[0]
+            preventivo_originale_id = result[0]
 
-            # Elimina tutte le revisioni del gruppo
-            cursor.execute("""
-                DELETE FROM preventivi
-                WHERE preventivo_originale_id = ? OR id = ?
-            """, (gruppo_id, gruppo_id))
+            if preventivo_originale_id is None:
+                # È un originale: elimina originale + tutte le sue revisioni
+                cursor.execute("""
+                    DELETE FROM preventivi
+                    WHERE preventivo_originale_id = ? OR id = ?
+                """, (preventivo_id, preventivo_id))
+            else:
+                # È una revisione: elimina solo questa revisione
+                cursor.execute("""
+                    DELETE FROM preventivi WHERE id = ?
+                """, (preventivo_id,))
 
             conn.commit()
             return cursor.rowcount > 0

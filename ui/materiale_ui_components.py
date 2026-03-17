@@ -718,4 +718,5 @@ class MaterialeUIComponents:
             if hasattr(window_instance, 'lbl_maggiorazione'):
                 window_instance.lbl_maggiorazione.setText(f"€{window_instance.materiale_calcolato.maggiorazione:.2f}")
         except Exception as e:
-            pass
+            import sys
+            print(f"[aggiorna_display] errore aggiornamento interfaccia: {e}", file=sys.stderr)

@@ -22,6 +22,7 @@ v1.1.0 (25/09/2025):
 # pyright: reportUnknownArgumentType=false, reportAttributeAccessIssue=false
 # pyright: reportUnusedVariable=false
 
+import sys
 from PyQt5.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QTextEdit, QDialogButtonBox, QLabel, QListWidgetItem
 from PyQt5.QtCore import Qt
 from ui.preventivo_window import PreventivoWindow
@@ -264,198 +265,97 @@ class MainWindowBusinessLogic:
     
     @staticmethod
     def genera_documento_preventivo(window_instance):
-        """NUOVO: Genera documento di produzione dal preventivo selezionato"""
+        """Genera documento di produzione dal preventivo selezionato"""
         current_item = window_instance.lista_preventivi.currentItem()
         if not current_item:
-            QMessageBox.warning(window_instance, "Attenzione", 
+            QMessageBox.warning(window_instance, "Attenzione",
                               "Seleziona un preventivo dalla lista per generare il documento.")
             return
-        
+
         try:
             preventivo_id = current_item.data(Qt.UserRole)
-            print(f"DEBUG: Generando documento per preventivo ID {preventivo_id}")
-            
-            # DEBUG: Mostra tutti i metodi disponibili nel DatabaseManager
-            print("DEBUG: Metodi disponibili in DatabaseManager:")
-            metodi_db = [method for method in dir(window_instance.db_manager) if not method.startswith('_')]
-            for metodo in sorted(metodi_db):
-                print(f"  - {metodo}")
-            
-            # Proviamo con alcuni nomi comuni per caricare preventivo
+
+            # Carica dati preventivo
             preventivo_data = None
-            metodi_da_provare = [
-                'get_preventivo_by_id',
-                'load_preventivo', 
-                'fetch_preventivo',
-                'get_preventivo_data',
-                'select_preventivo'
-            ]
-            
-            for metodo_name in metodi_da_provare:
+            for metodo_name in ['get_preventivo_by_id', 'load_preventivo', 'fetch_preventivo']:
                 if hasattr(window_instance.db_manager, metodo_name):
-                    print(f"DEBUG: Trovato metodo {metodo_name}, provo a usarlo")
-                    metodo = getattr(window_instance.db_manager, metodo_name)
                     try:
-                        preventivo_data = metodo(preventivo_id)
-                        print(f"DEBUG: Successo con {metodo_name}")
+                        preventivo_data = getattr(window_instance.db_manager, metodo_name)(preventivo_id)
                         break
                     except Exception as e:
-                        print(f"DEBUG: {metodo_name} ha dato errore: {e}")
+                        print(f"[genera_documento] {metodo_name}({preventivo_id}) fallito: {e}", file=sys.stderr)
                         continue
-            
-            # Se nessun metodo ha funzionato, usa i dati dalla lista
-            if not preventivo_data:
-                print("DEBUG: Nessun metodo di caricamento trovato, uso dati dalla lista")
-                # Estrai informazioni dal testo dell'item della lista
-                testo_item = current_item.text()
-                print(f"DEBUG: Testo item lista: {testo_item}")
-                
-                # Parsing basic dal testo dell'item
-                linee = testo_item.split('\n')
-                prima_linea = linee[0] if linee else ""
-                
-                # Estrai codice preventivo dal testo (formato: "#022 [Originale] - 2025-09-22 - Cliente")
+
+            if preventivo_data is None:
+                QMessageBox.critical(window_instance, "Errore",
+                                     "Impossibile caricare i dati del preventivo selezionato.")
+                return
+
+            # Estrai dati cliente e materiali
+            if isinstance(preventivo_data, dict):
+                dati_cliente = {
+                    'nome_cliente': preventivo_data.get('nome_cliente', ''),
+                    'numero_ordine': preventivo_data.get('numero_ordine', ''),
+                    'oggetto_preventivo': preventivo_data.get('descrizione', ''),
+                    'codice': preventivo_data.get('codice', f"PREV_{preventivo_id:03d}"),
+                    'misura': preventivo_data.get('misura', ''),
+                    'finitura': preventivo_data.get('finitura', '')
+                }
+                materiali = (preventivo_data.get('materiali_utilizzati')
+                             or preventivo_data.get('materiali')
+                             or preventivo_data.get('materiali_calcolati')
+                             or [])
+            elif isinstance(preventivo_data, (list, tuple)) and len(preventivo_data) >= 8:
+                dati_cliente = {
+                    'nome_cliente': preventivo_data[4] if len(preventivo_data) > 4 else '',
+                    'numero_ordine': preventivo_data[5] if len(preventivo_data) > 5 else '',
+                    'oggetto_preventivo': preventivo_data[6] if len(preventivo_data) > 6 else '',
+                    'codice': preventivo_data[7] if len(preventivo_data) > 7 else f"PREV_{preventivo_id:03d}",
+                    'misura': '',
+                    'finitura': ''
+                }
+                materiali = []
+            else:
                 import re
+                testo_item = current_item.text()
+                prima_linea = testo_item.split('\n')[0] if testo_item else ""
                 match = re.search(r'#(\d+)', prima_linea)
                 codice = f"PREV_{match.group(1) if match else preventivo_id:03d}"
-                
-                # Dati cliente base
                 dati_cliente = {
-                    'nome_cliente': 'Cliente da lista preventivi',
+                    'nome_cliente': '',
                     'numero_ordine': '',
-                    'oggetto_preventivo': 'Oggetto da completare',
+                    'oggetto_preventivo': '',
                     'codice': codice,
                     'misura': '',
                     'finitura': ''
                 }
-                
-                print(f"DEBUG: Usando dati base: {dati_cliente}")
-                
-                # Materiali vuoti per ora
                 materiali = []
-                
-            else:
-                print(f"DEBUG: Dati preventivo caricati: {type(preventivo_data)}")
-                
-                # Estrai dati dal preventivo caricato
-                if isinstance(preventivo_data, dict):
-                    dati_cliente = {
-                        'nome_cliente': preventivo_data.get('nome_cliente', ''),
-                        'numero_ordine': preventivo_data.get('numero_ordine', ''),
-                        'oggetto_preventivo': preventivo_data.get('descrizione', ''),
-                        'codice': preventivo_data.get('codice', f"PREV_{preventivo_id:03d}"),
-                        'misura': preventivo_data.get('misura', ''),
-                        'finitura': preventivo_data.get('finitura', '')
-                    }
-                    
-                    print(f"DEBUG: Chiavi disponibili nel preventivo: {list(preventivo_data.keys())}")
-                    print(f"DEBUG: Contenuto completo preventivo: {preventivo_data}")
-                    
-                    # Prova a estrarre materiali direttamente dal preventivo
-                    materiali = preventivo_data.get('materiali_utilizzati', [])
-                    if not materiali:
-                        materiali = preventivo_data.get('materiali', [])
-                    if not materiali:
-                        materiali = preventivo_data.get('materiali_calcolati', [])
-                        
-                    print(f"DEBUG: Materiali trovati nel preventivo: {len(materiali)}")
-                    if materiali:
-                        print(f"DEBUG: Primo materiale esempio: {materiali[0] if len(materiali) > 0 else 'Nessuno'}")
-                        # Mostra struttura di tutti i materiali
-                        for idx, mat in enumerate(materiali):
-                            print(f"DEBUG: Materiale {idx}: {mat}")
-                    else:
-                        print(f"DEBUG: Nessun materiale nelle chiavi: materiali_utilizzati, materiali, materiali_calcolati")
-                        
-                elif isinstance(preventivo_data, (list, tuple)) and len(preventivo_data) >= 8:
-                    dati_cliente = {
-                        'nome_cliente': preventivo_data[4] if len(preventivo_data) > 4 else '',
-                        'numero_ordine': preventivo_data[5] if len(preventivo_data) > 5 else '',
-                        'oggetto_preventivo': preventivo_data[6] if len(preventivo_data) > 6 else '',
-                        'codice': preventivo_data[7] if len(preventivo_data) > 7 else f"PREV_{preventivo_id:03d}",
-                        'misura': '',
-                        'finitura': ''
-                    }
-                    materiali = []  # Tuple/list non contiene materiali
-                else:
-                    dati_cliente = {
-                        'nome_cliente': 'Cliente non specificato',
-                        'numero_ordine': '',
-                        'oggetto_preventivo': 'Descrizione non disponibile',
-                        'codice': f"PREV_{preventivo_id:03d}",
-                        'misura': '',
-                        'finitura': ''
-                    }
-                    materiali = []
-                
-                # Se non abbiamo materiali dal preventivo, proviamo approccio alternativo
-                if not materiali:
-                    print("DEBUG: Nessun materiale nel preventivo, provo approccio alternativo")
-                    
-                    # Prova con get_all_materiali e filtra per questo preventivo
-                    if hasattr(window_instance.db_manager, 'get_all_materiali'):
-                        try:
-                            tutti_materiali = window_instance.db_manager.get_all_materiali()
-                            print(f"DEBUG: Caricati {len(tutti_materiali)} materiali totali")
-                            
-                            # Qui dovremmo filtrare per preventivo_id, ma potrebbe non essere disponibile
-                            # Per ora usiamo tutti i materiali come esempio
-                            if tutti_materiali:
-                                print("DEBUG: Usando primi 5 materiali come esempio per il documento")
-                                materiali = tutti_materiali[:5]  # Prendi primi 5 come esempio
-                                
-                        except Exception as e:
-                            print(f"DEBUG: Errore nel caricare tutti i materiali: {e}")
-                            materiali = []
-                    
-                    # Se ancora non abbiamo materiali, creiamo materiali di esempio per il documento
-                    if not materiali:
-                        print("DEBUG: Creando materiali di esempio per il documento")
-                        materiali = [
-                            {"nome": "Materiale 1", "giri": 1, "lunghezza": 2150, "sviluppo": 135},
-                            {"nome": "Materiale 2", "giri": 3, "lunghezza": 2150, "sviluppo": 405},
-                            {"nome": "Materiale 3", "giri": 1, "lunghezza": 2150, "sviluppo": 145},
-                            {"nome": "Materiale 4", "giri": 2, "lunghezza": 1800, "sviluppo": 250},
-                            {"nome": "Materiale 5", "giri": 1, "lunghezza": 2000, "sviluppo": 180}
-                        ]
-            
-            print(f"DEBUG: Dati cliente finali: {dati_cliente}")
-            
-            # Crea oggetto preventivo compatibile con DocumentUtils
+
             class PreventivoData:
                 def __init__(self, codice, materiali_list):
                     self.codice_preventivo = codice
                     self.materiali = materiali_list or []
-                    
+
             preventivo_obj = PreventivoData(dati_cliente['codice'], materiali)
-            
+
             # Mostra dialog per scegliere formato
             formato = DocumentUtils.mostra_dialog_formato(window_instance)
             if not formato:
-                return  # Utente ha annullato
-            
-            print(f"DEBUG: Formato scelto: {formato}")
-            
+                return
+
             # Genera documento nel formato scelto
             if formato == 'html':
                 file_path = DocumentUtils.genera_documento_html(preventivo_obj, dati_cliente, window_instance)
             elif formato == 'odt':
                 file_path = DocumentUtils.genera_documento_odt(preventivo_obj, dati_cliente, window_instance)
             else:
-                print(f"DEBUG: Formato non riconosciuto: {formato}")
                 return
-            
+
             if file_path:
-                print(f"DEBUG: Documento generato con successo: {file_path}")
                 QMessageBox.information(window_instance, "Successo", f"Documento generato:\n{file_path}")
-            else:
-                print("DEBUG: Generazione documento annullata o fallita")
-            
+
         except Exception as e:
-            print(f"DEBUG: Errore generazione documento: {str(e)}")
-            import traceback
-            print(f"DEBUG: Traceback completo: {traceback.format_exc()}")
-            QMessageBox.critical(window_instance, "Errore", 
+            QMessageBox.critical(window_instance, "Errore",
                                f"Errore durante la generazione del documento:\n{str(e)}")
     
     @staticmethod
@@ -477,8 +377,14 @@ class MainWindowBusinessLogic:
                     try:
                         preventivo_data = getattr(window_instance.db_manager, metodo_name)(preventivo_id)
                         break
-                    except Exception:
+                    except Exception as e:
+                        print(f"[anteprima_documento] {metodo_name}({preventivo_id}) fallito: {e}", file=sys.stderr)
                         continue
+
+            if preventivo_data is None:
+                QMessageBox.critical(window_instance, "Errore",
+                                     "Impossibile caricare i dati del preventivo selezionato.")
+                return
 
             # Prepara dati cliente e materiali
             if isinstance(preventivo_data, dict):
@@ -525,8 +431,6 @@ class MainWindowBusinessLogic:
             DocumentUtils.anteprima_html(preventivo_obj, dati_cliente, window_instance)
 
         except Exception as e:
-            import traceback
-            print(f"DEBUG: Errore anteprima: {traceback.format_exc()}")
             QMessageBox.critical(window_instance, "Errore",
                                  f"Errore durante la generazione dell'anteprima:\n{e}")
 
@@ -598,10 +502,30 @@ class MainWindowBusinessLogic:
             QMessageBox.warning(window_instance, "Attenzione", "Seleziona un preventivo da eliminare.")
             return
         
+        preventivo_id = current_item.data(Qt.UserRole)
+
+        # Determina se è una revisione o l'originale per mostrare il messaggio corretto
+        prev_data = window_instance.db_manager.get_preventivo_by_id(preventivo_id)
+        is_revisione = prev_data is not None and prev_data.get('preventivo_originale_id') is not None
+
+        if is_revisione:
+            testo_conferma = "Sei sicuro di voler eliminare questa revisione?\n\nSolo questa revisione verrà eliminata. Il preventivo originale e le altre revisioni rimarranno invariati."
+            testo_successo = "Revisione eliminata con successo."
+        else:
+            revisioni = window_instance.db_manager.get_revisioni_preventivo(preventivo_id)
+            # get_revisioni_preventivo restituisce originale + revisioni, quindi le revisioni sono len-1
+            n_revisioni = max(0, len(revisioni) - 1)
+            if n_revisioni > 0:
+                avviso = f"\n\nAttenzione: questo preventivo ha {n_revisioni} revision{'e' if n_revisioni == 1 else 'i'} collegate che verranno eliminate insieme ad esso."
+            else:
+                avviso = ""
+            testo_conferma = f"Sei sicuro di voler eliminare questo preventivo?{avviso}\n\nQuesta azione non può essere annullata."
+            testo_successo = "Preventivo e tutte le sue revisioni sono stati eliminati con successo." if n_revisioni > 0 else "Preventivo eliminato con successo."
+
         # Dialog di conferma con stile unificato
         dialog = QMessageBox(window_instance)
         dialog.setWindowTitle("Conferma Eliminazione")
-        dialog.setText("Sei sicuro di voler eliminare questo preventivo?\n\nQuesta azione eliminerà anche tutte le sue revisioni e non può essere annullata.")
+        dialog.setText(testo_conferma)
         dialog.setIcon(QMessageBox.Question)
         dialog.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
         dialog.setDefaultButton(QMessageBox.No)
@@ -639,19 +563,16 @@ class MainWindowBusinessLogic:
                 background-color: #edf2f7;
             }
         """)
-        
+
         risposta = dialog.exec_()
-        
+
         if risposta == QMessageBox.Yes:
-            preventivo_id = current_item.data(Qt.UserRole)
-            
-            # Usa il metodo per eliminare preventivo e revisioni
+            # Usa il metodo per eliminare preventivo e revisioni (o solo la revisione)
             if window_instance.db_manager.delete_preventivo_e_revisioni(preventivo_id):
-                QMessageBox.information(window_instance, "Successo", 
-                                      "Preventivo e tutte le sue revisioni sono stati eliminati con successo.")
+                QMessageBox.information(window_instance, "Successo", testo_successo)
                 MainWindowBusinessLogic.load_preventivi(window_instance)
             else:
-                QMessageBox.critical(window_instance, "Errore", 
+                QMessageBox.critical(window_instance, "Errore",
                                 "Errore durante l'eliminazione del preventivo.")
     
     @staticmethod
