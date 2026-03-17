@@ -482,6 +482,10 @@ class DocumentUtils:
             f'<style:table-properties style:width="16cm" table:align="center" fo:margin-top="{margin_mat}" fo:margin-bottom="0cm"/></style:style>'
             f'<style:style style:name="TO" style:family="table">'
             f'<style:table-properties style:width="17.7cm" table:align="margins"/></style:style>'
+            f'<style:style style:name="DiagLine" style:family="graphic">'
+            f'<style:graphic-properties draw:stroke="solid" svg:stroke-color="#000000" svg:stroke-width="0.04cm"'
+            f' draw:fill="none" fo:wrap="run-through" style:run-through="foreground"'
+            f' draw:wrap-influence-on-position="once-concurrent"/></style:style>'
             f'{ops_col_styles}'
             f'</office:automatic-styles>'
         )
@@ -542,19 +546,29 @@ class DocumentUtils:
                     is_conica=False; con_lato='sinistra'; con_alt=0.0; con_lung=0.0
 
                 if is_conica and con_lung > 0:
-                    svg_path = f'Pictures/conica_{i}.svg'
-                    svg_content = DocumentUtils._svg_conica_str(
-                        con_lato, con_alt, con_lung, lunghezza, nome, rect_h_cm)
-                    if svg_files is not None:
-                        svg_files.append((svg_path, svg_content))
+                    # Linea diagonale ODF nativa (rispetta dark/light mode come il testo normale)
+                    # Cella identica al normale, con draw:line sovrapposta nell'angolo
+                    d_cm = 1.5   # larghezza orizzontale della diagonale
+                    cw_cm = 11.7  # larghezza contenuto cella (12cm - padding)
+                    lines_xml = ''
+                    if con_lato in ('sinistra', 'entrambi'):
+                        lines_xml += (
+                            f'<draw:line draw:style-name="DiagLine" text:anchor-type="paragraph"'
+                            f' svg:x1="0cm" svg:y1="0cm" svg:x2="{d_cm}cm" svg:y2="{rect_h}"'
+                            f' draw:z-index="{i * 2}"><text:p/></draw:line>'
+                        )
+                    if con_lato in ('destra', 'entrambi'):
+                        lines_xml += (
+                            f'<draw:line draw:style-name="DiagLine" text:anchor-type="paragraph"'
+                            f' svg:x1="{cw_cm - d_cm:.1f}cm" svg:y1="0cm"'
+                            f' svg:x2="{cw_cm}cm" svg:y2="{rect_h}"'
+                            f' draw:z-index="{i * 2 + 1}"><text:p/></draw:line>'
+                        )
                     center_cell = (
                         f'<table:table-cell table:style-name="CMB">'
                         f'<text:p text:style-name="PC">'
-                        f'<draw:frame text:anchor-type="as-char"'
-                        f' svg:width="11.5cm" svg:height="{rect_h}" draw:z-index="{i}">'
-                        f'<draw:image xlink:href="{svg_path}"'
-                        f' xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>'
-                        f'</draw:frame>'
+                        + lines_xml +
+                        f'==          {nome}'
                         f'</text:p>'
                         f'</table:table-cell>'
                     )
@@ -626,37 +640,6 @@ class DocumentUtils:
             f'{ops_table}'
             '</office:text></office:body>'
             '</office:document-content>'
-        )
-
-    @staticmethod
-    def _svg_conica_str(lato, altezza_mm, lunghezza_mm, lunghezza_tela, nome_xml, rect_h_cm=0.8):
-        """Genera SVG per la conica nell'ODT: rettangolo identico al normale + diagonale nell'angolo."""
-        W = 115
-        H = max(4, round(W * rect_h_cm / 11.5))
-        font_sz = max(2, round(H * 0.50))
-
-        d = round(W * 0.14)  # dimensione diagonale (~14% della larghezza)
-
-        elements = []
-        # Solo una linea diagonale nell'angolo (nessun rettangolo: bordo e sfondo vengono dalla cella ODT)
-        if lato in ('sinistra', 'entrambi'):
-            elements.append(f'<line x1="0" y1="0" x2="{d}" y2="{H}" stroke="red" stroke-width="1"/>')
-        if lato in ('destra', 'entrambi'):
-            elements.append(f'<line x1="{W}" y1="0" x2="{W-d}" y2="{H}" stroke="red" stroke-width="1"/>')
-
-        # Testo centrato identico al normale
-        cy = H / 2
-        elements.append(
-            f'<text x="{W/2}" y="{cy + font_sz * 0.35}" text-anchor="middle"'
-            f' font-size="{font_sz}" font-weight="bold" font-family="Arial,sans-serif">{nome_xml}</text>'
-        )
-
-        return (
-            '<?xml version="1.0" encoding="UTF-8"?>'
-            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}"'
-            f' preserveAspectRatio="xMidYMid meet">'
-            + ''.join(elements) +
-            f'</svg>'
         )
 
     @staticmethod
@@ -787,9 +770,9 @@ class DocumentUtils:
                     d = 16
                     lines = []
                     if con_lato in ('sinistra', 'entrambi'):
-                        lines.append(f'<line x1="0" y1="0" x2="{d}" y2="20" stroke="red" stroke-width="1.2"/>')
+                        lines.append(f'<line x1="0" y1="0" x2="{d}" y2="20" stroke="currentColor" stroke-width="1.2"/>')
                     if con_lato in ('destra', 'entrambi'):
-                        lines.append(f'<line x1="80" y1="0" x2="{80-d}" y2="20" stroke="red" stroke-width="1.2"/>')
+                        lines.append(f'<line x1="80" y1="0" x2="{80-d}" y2="20" stroke="currentColor" stroke-width="1.2"/>')
                     diag_svg = (
                         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 20" preserveAspectRatio="none" '
                         'style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;">'
