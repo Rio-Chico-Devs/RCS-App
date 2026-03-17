@@ -631,7 +631,7 @@ class DocumentUtils:
     @staticmethod
     def _svg_conica_str(lato, altezza_mm, lunghezza_mm, lunghezza_tela, nome_xml, rect_h_cm=0.8):
         """Genera SVG per la conica nell'ODT.
-        Disegna un rettangolo con triangolo(i) di scarto e indicazione della sbiegatura.
+        Disegna un rettangolo identico al normale con solo una diagonale nell'angolo di conicità.
         """
         W = 115
         H = max(4, round(W * rect_h_cm / 11.5))
@@ -639,37 +639,27 @@ class DocumentUtils:
 
         L = max(lunghezza_tela, 1)
         lt = lunghezza_mm
-        alt = altezza_mm
 
-        # Calcola proporzioni in pixel
         lt_px = round(lt / L * W, 2)
-        alt_px = round(alt / H * H, 2) if H > 0 else 0
+        alt_px = min(H, lt_px)  # altezza triangolo proporzionale alla lunghezza
 
         elements = []
-        # Triangolo(i) scarto in rosa (nessun rettangolo di sfondo)
-        tri_fill = 'rgba(255,150,150,0.6)'
+        # Rettangolo identico al normale
+        elements.append(f'<rect x="0" y="0" width="{W}" height="{H}" fill="white" stroke="black" stroke-width="1"/>')
+
+        # Triangolo(i) nell'angolo - segue le linee del rettangolo
+        tri_fill = 'rgba(200,50,50,0.5)'
         tri_stroke = 'red'
-        sw = '0.8'
+        sw = '0.5'
 
-        def triangolo_sx():
-            # (0, alt_px), (lt_px, H), (0, H)
-            pts = f'0,{alt_px} {lt_px},{H} 0,{H}'
-            return (f'<polygon points="{pts}" fill="{tri_fill}" stroke="{tri_stroke}" stroke-width="{sw}"/>')
+        if lato in ('sinistra', 'entrambi'):
+            pts = f'0,{H - alt_px} {lt_px},{H} 0,{H}'
+            elements.append(f'<polygon points="{pts}" fill="{tri_fill}" stroke="{tri_stroke}" stroke-width="{sw}"/>')
+        if lato in ('destra', 'entrambi'):
+            pts = f'{W},{H - alt_px} {W - lt_px},{H} {W},{H}'
+            elements.append(f'<polygon points="{pts}" fill="{tri_fill}" stroke="{tri_stroke}" stroke-width="{sw}"/>')
 
-        def triangolo_dx():
-            # (W, alt_px), (W-lt_px, H), (W, H)
-            pts = f'{W},{alt_px} {W-lt_px},{H} {W},{H}'
-            return (f'<polygon points="{pts}" fill="{tri_fill}" stroke="{tri_stroke}" stroke-width="{sw}"/>')
-
-        if lato == 'sinistra':
-            elements.append(triangolo_sx())
-        elif lato == 'destra':
-            elements.append(triangolo_dx())
-        else:
-            elements.append(triangolo_sx())
-            elements.append(triangolo_dx())
-
-        # Testo materiale centrato
+        # Testo materiale centrato (identico al normale)
         cy = H / 2
         elements.append(
             f'<text x="{W/2}" y="{cy + font_sz * 0.35}" text-anchor="middle"'
@@ -774,39 +764,36 @@ class DocumentUtils:
 
     @staticmethod
     def _genera_figura_conica(lato, altezza_mm, lunghezza_mm, lunghezza_tela, s, nome):
-        """Genera un div con SVG rettangolo + triangolo(i) di sbiegatura per la scheda HTML.
-        Mostra chiaramente da quale lato e a quale distanza viene eseguita la sbiegatura."""
+        """Genera un div identico al rettangolo normale con solo una diagonale nell'angolo di conicità."""
         L = max(lunghezza_tela, 1)
         lt = lunghezza_mm
-        alt = altezza_mm
 
-        # ViewBox: 80 x 20
+        # ViewBox: 80 x 20 (stesse proporzioni del rettangolo normale)
         W, H = 80, 20
         lt_px = round(lt / L * W, 2)
-        alt_px = round(alt / H * H, 2)
-
-        tri_fill = 'rgba(255,150,150,0.7)'
+        # La diagonale parte dal bordo superiore dell'angolo e scende al bordo inferiore
+        # Per sinistra: da (0,0) a (lt_px, H) oppure angolo in basso: (0, H-alt_px) -> (lt_px, H) -> (0, H)
+        # Usiamo proporzione fissa: l'altezza del taglio è proporzionale alla lunghezza
+        alt_px = min(H, lt_px)  # altezza triangolo proporzionale
 
         triangles = []
         if lato in ('sinistra', 'entrambi'):
-            pts = f'0,{alt_px} {lt_px},{H} 0,{H}'
-            triangles.append(f'<polygon points="{pts}" fill="{tri_fill}" stroke="red" stroke-width="0.8"/>')
+            # Triangolo angolo basso-sinistra: segue il bordo sinistro e il bordo inferiore
+            pts = f'0,{H - alt_px} {lt_px},{H} 0,{H}'
+            triangles.append(f'<polygon points="{pts}" fill="rgba(200,50,50,0.5)" stroke="red" stroke-width="0.5"/>')
         if lato in ('destra', 'entrambi'):
-            pts = f'{W},{alt_px} {W-lt_px},{H} {W},{H}'
-            triangles.append(f'<polygon points="{pts}" fill="{tri_fill}" stroke="red" stroke-width="0.8"/>')
+            # Triangolo angolo basso-destra: segue il bordo destro e il bordo inferiore
+            pts = f'{W},{H - alt_px} {W - lt_px},{H} {W},{H}'
+            triangles.append(f'<polygon points="{pts}" fill="rgba(200,50,50,0.5)" stroke="red" stroke-width="0.5"/>')
 
-        lato_txt = {'sinistra': 'SX', 'destra': 'DX', 'entrambi': 'SX+DX'}.get(lato, lato)
-        sbieg_label = f'Sbieg. {lato_txt}: {lt:.0f}mm'
-
-        return f"""<div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; position: relative;">
+        return f"""<div style="width: 80mm; height: {s['rect_height']}; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative; flex-shrink: 0; overflow: hidden;">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}"
                  preserveAspectRatio="none"
-                 style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
+                 style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0;">
                 {''.join(triangles)}
             </svg>
-            <input type="text" placeholder="Orient." style="position: relative; z-index: 1; width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; margin-top: auto; margin-bottom: auto;">
-            <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 1;">{nome}</strong>
-            <span style="font-size: {s['orient_font']}; position: absolute; bottom: 1px; right: 2px; color: red; z-index: 1;">{sbieg_label}</span>
+            <input type="text" placeholder="Orient." style="width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; position: relative; z-index: 1;">
+            <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; transform: translateX(-50%); z-index: 1;">{nome}</strong>
         </div>"""
 
     @staticmethod
