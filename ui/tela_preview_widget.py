@@ -161,26 +161,28 @@ class TelaPreviewWidget(QWidget):
 
     def _disegna_cilindrica(self, painter):
         """Rettangolo per tela cilindrica.
-        Orientamento: X = sviluppo (larghezza tela), Y = lunghezza.
+        Orientamento: X = lunghezza (larghezza), Y = sviluppo (altezza).
         """
         w = self.width()
         h = self.height()
-        margine = 60
-        quota_spazio = 40
+        margine_sx = 75
+        margine_dx = 20
+        margine_top = 55
+        margine_bot = 30
 
-        avail_w = w - 2 * margine
-        avail_h = h - 2 * margine - 2 * quota_spazio
+        avail_w = w - margine_sx - margine_dx
+        avail_h = h - margine_top - margine_bot
 
         if avail_w <= 0 or avail_h <= 0:
             return
 
-        # X = sviluppo, Y = lunghezza (come visto sul tavolo)
-        scala = min(avail_w / self._sviluppo, avail_h / self._lunghezza)
-        draw_w = self._sviluppo * scala
-        draw_h = self._lunghezza * scala
+        # X = lunghezza (orizzontale), Y = sviluppo (verticale)
+        scala = min(avail_w / self._lunghezza, avail_h / self._sviluppo)
+        draw_w = self._lunghezza * scala
+        draw_h = self._sviluppo * scala
 
-        draw_x = margine + (avail_w - draw_w) / 2
-        draw_y = margine + quota_spazio + (avail_h - draw_h) / 2
+        draw_x = margine_sx + (avail_w - draw_w) / 2
+        draw_y = margine_top + (avail_h - draw_h) / 2
 
         pen = QPen(self._tela_border, 2)
         painter.setPen(pen)
@@ -192,16 +194,19 @@ class TelaPreviewWidget(QWidget):
         painter.setFont(font_quota)
         painter.setPen(QPen(self._dim_color, 1))
 
-        # Quota superiore: sviluppo (larghezza)
-        sv_text = f"Sviluppo: {self._sviluppo:.1f} mm"
-        painter.drawText(QRectF(draw_x, draw_y - 30, draw_w, 25), Qt.AlignCenter, sv_text)
+        # Quota superiore: lunghezza
+        lun_text = f"Lunghezza: {self._lunghezza:.0f} mm"
+        painter.drawText(QRectF(draw_x, draw_y - 32, draw_w, 22),
+                         Qt.AlignCenter | Qt.TextDontClip, lun_text)
         self._disegna_quota_orizzontale(painter, draw_x, draw_x + draw_w, draw_y - 12)
 
-        # Quota laterale: lunghezza
+        # Quota laterale: sviluppo
         painter.save()
-        painter.translate(draw_x - 15, draw_y + draw_h / 2)
+        painter.translate(draw_x - 18, draw_y + draw_h / 2)
         painter.rotate(-90)
-        painter.drawText(QRectF(-50, -15, 100, 25), Qt.AlignCenter, f"{self._lunghezza:.0f} mm")
+        painter.drawText(QRectF(-70, -15, 140, 25),
+                         Qt.AlignCenter | Qt.TextDontClip,
+                         f"Sviluppo: {self._sviluppo:.1f} mm")
         painter.restore()
         self._disegna_quota_verticale(painter, draw_y, draw_y + draw_h, draw_x - 8)
 
@@ -224,10 +229,10 @@ class TelaPreviewWidget(QWidget):
         """
         w = self.width()
         h = self.height()
-        margine_sx = 70
+        margine_sx = 80
         margine_dx = 30
-        margine_top = 50
-        margine_bot = 60
+        margine_top = 55
+        margine_bot = 65
 
         draw_w = w - margine_sx - margine_dx
         draw_h = h - margine_top - margine_bot
@@ -322,15 +327,16 @@ class TelaPreviewWidget(QWidget):
             painter.setFont(font_sc)
             painter.setPen(QPen(QColor(200, 80, 80), 1))
             if lato == 'sinistra':
-                lbl_x = px(lt / 3)
-                lbl_y = py(S) - 10
+                scarto_cx = (rect_left + min(px(lt), rect_left + rect_w * 0.4)) / 2
+                scarto_cy = (rect_bot + py(alt)) / 2
             elif lato == 'destra':
-                lbl_x = px(L - lt / 3) - 40
-                lbl_y = py(S) - 10
+                scarto_cx = (max(px(L - lt), rect_left + rect_w * 0.6) + rect_right) / 2
+                scarto_cy = (rect_bot + py(alt)) / 2
             else:
-                lbl_x = px(lt / 3)
-                lbl_y = py(S) - 10
-            painter.drawText(QRectF(lbl_x - 20, lbl_y - 8, 55, 16), Qt.AlignCenter, "SCARTO")
+                scarto_cx = (rect_left + min(px(lt), rect_left + rect_w * 0.3)) / 2
+                scarto_cy = (rect_bot + py(alt)) / 2
+            painter.drawText(QRectF(scarto_cx - 30, scarto_cy - 8, 60, 16),
+                             Qt.AlignCenter | Qt.TextDontClip, "SCARTO")
 
         # --- 6. Quote dimensioni ---
         font_q = QFont("system-ui", 9)
@@ -339,15 +345,16 @@ class TelaPreviewWidget(QWidget):
         painter.setPen(QPen(self._dim_color, 1))
 
         # Lunghezza totale (sopra)
-        painter.drawText(QRectF(rect_left, rect_top - 30, rect_w, 20),
-                         Qt.AlignCenter, f"Lunghezza totale: {L:.0f} mm")
-        self._disegna_quota_orizzontale(painter, rect_left, rect_right, rect_top - 12)
+        painter.drawText(QRectF(rect_left, rect_top - 34, rect_w, 22),
+                         Qt.AlignCenter | Qt.TextDontClip, f"Lunghezza totale: {L:.0f} mm")
+        self._disegna_quota_orizzontale(painter, rect_left, rect_right, rect_top - 14)
 
         # Sviluppo (a sinistra, verticale)
         painter.save()
-        painter.translate(rect_left - 18, rect_top + rect_h / 2)
+        painter.translate(rect_left - 20, rect_top + rect_h / 2)
         painter.rotate(-90)
-        painter.drawText(QRectF(-55, -12, 110, 20), Qt.AlignCenter,
+        painter.drawText(QRectF(-65, -12, 130, 22),
+                         Qt.AlignCenter | Qt.TextDontClip,
                          f"Sviluppo: {S:.1f} mm")
         painter.restore()
         self._disegna_quota_verticale(painter, rect_top, rect_bot, rect_left - 8)
@@ -358,22 +365,22 @@ class TelaPreviewWidget(QWidget):
         painter.setPen(QPen(self._quota_color, 1))
         if lato in ('sinistra', 'entrambi') and lt > 0:
             mid_lt = (rect_left + px(lt)) / 2
-            painter.drawText(QRectF(mid_lt - 30, rect_bot + 8, 60, 16),
-                             Qt.AlignCenter, f"{lt:.0f} mm")
-            self._disegna_quota_orizzontale(painter, rect_left, px(lt), rect_bot + 5)
+            painter.drawText(QRectF(mid_lt - 30, rect_bot + 6, 60, 18),
+                             Qt.AlignCenter | Qt.TextDontClip, f"{lt:.0f} mm")
+            self._disegna_quota_orizzontale(painter, rect_left, px(lt), rect_bot + 4)
         if lato in ('destra', 'entrambi') and lt > 0:
             mid_lt = (px(L - lt) + rect_right) / 2
-            painter.drawText(QRectF(mid_lt - 30, rect_bot + 8, 60, 16),
-                             Qt.AlignCenter, f"{lt:.0f} mm")
-            self._disegna_quota_orizzontale(painter, px(L - lt), rect_right, rect_bot + 5)
+            painter.drawText(QRectF(mid_lt - 30, rect_bot + 6, 60, 18),
+                             Qt.AlignCenter | Qt.TextDontClip, f"{lt:.0f} mm")
+            self._disegna_quota_orizzontale(painter, px(L - lt), rect_right, rect_bot + 4)
 
-        # Quota altezza inizio (se > 0, sulla sinistra)
+        # Quota altezza inizio (se > 0, sulla destra)
         if alt > 0:
             painter.setPen(QPen(self._quota_color, 1))
-            painter.drawText(QRectF(rect_right + 5, rect_top, 60, py(alt) - rect_top),
-                             Qt.AlignLeft | Qt.AlignVCenter, f"{alt:.0f}")
+            painter.drawText(QRectF(rect_right + 5, rect_top, 55, max(py(alt) - rect_top, 18)),
+                             Qt.AlignLeft | Qt.AlignVCenter | Qt.TextDontClip, f"{alt:.0f}")
 
-        # Info taglio (in basso)
+        # Info taglio (in basso) — rettangolo che usa l'intera larghezza widget
         lato_txt = {'sinistra': 'Sinistra', 'destra': 'Destra', 'entrambi': 'Entrambi'}.get(lato, lato)
         font_info = QFont("system-ui", 8)
         font_info.setItalic(True)
@@ -382,8 +389,8 @@ class TelaPreviewWidget(QWidget):
         info = f"Sbiegatura {lato_txt}: {lt:.0f} mm"
         if alt > 0:
             info += f"  (da {alt:.0f} mm)"
-        painter.drawText(QRectF(margine_sx, h - 25, draw_w + margine_sx, 18),
-                         Qt.AlignRight, info)
+        painter.drawText(QRectF(5, h - 30, w - 10, 24),
+                         Qt.AlignRight | Qt.TextDontClip, info)
 
     # ── Helpers per quotature ─────────────────────────────────────
 

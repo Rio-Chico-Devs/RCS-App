@@ -1005,9 +1005,9 @@ class PreventivoWindow(QMainWindow):
             diametro_iniziale = ultimo_materiale.diametro_finale
         
         materiale_window = MaterialeWindow(
-            self.db_manager, 
+            self.db_manager,
             diametro_iniziale=diametro_iniziale,
-            parent=self
+            parent=None
         )
         materiale_window.materiale_confermato.connect(self.materiale_aggiunto)
         materiale_window.show()
@@ -1236,11 +1236,11 @@ class PreventivoWindow(QMainWindow):
             diametro_iniziale = materiale_precedente.diametro_finale
         
         materiale_window = MaterialeWindow(
-            self.db_manager, 
+            self.db_manager,
             diametro_iniziale=diametro_iniziale,
             materiale_esistente=materiale_esistente,
             indice_modifica=indice,
-            parent=self
+            parent=None
         )
         materiale_window.materiale_confermato.connect(self.materiale_aggiunto)
         materiale_window.show()
