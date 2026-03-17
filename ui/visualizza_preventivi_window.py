@@ -98,11 +98,15 @@ class VisualizzaPreventiviWindow(QMainWindow):
                 border: none;
             }
             QTableWidget::item:hover {
-                background-color: #f7fafc;
+                background-color: #ebf4ff;
             }
             QTableWidget::item:selected {
-                background-color: #edf2f7;
-                color: #2d3748;
+                background-color: #3b82f6;
+                color: #ffffff;
+            }
+            QTableWidget::item:selected:hover {
+                background-color: #2563eb;
+                color: #ffffff;
             }
             QHeaderView::section {
                 background-color: #f7fafc;
@@ -322,7 +326,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         self.lista_preventivi.setSelectionMode(QAbstractItemView.SingleSelection)
         self.lista_preventivi.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.lista_preventivi.verticalHeader().setVisible(False)
-        self.lista_preventivi.setShowGrid(True)
+        self.lista_preventivi.setShowGrid(False)          # niente griglia → riga = blocco unico
         self.lista_preventivi.setAlternatingRowColors(True)
         self.lista_preventivi.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.lista_preventivi.setMinimumHeight(220)
@@ -330,13 +334,17 @@ class VisualizzaPreventiviWindow(QMainWindow):
         hdr = self.lista_preventivi.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)   # #
         hdr.setSectionResizeMode(1, QHeaderView.ResizeToContents)   # Tipo
-        hdr.setSectionResizeMode(2, QHeaderView.Interactive)        # Cliente
+        hdr.setSectionResizeMode(2, QHeaderView.Stretch)            # Cliente (prende spazio)
         hdr.setSectionResizeMode(3, QHeaderView.ResizeToContents)   # Misura
         hdr.setSectionResizeMode(4, QHeaderView.Interactive)        # Categoria
         hdr.setSectionResizeMode(5, QHeaderView.Interactive)        # Sottocategoria
-        hdr.setSectionResizeMode(6, QHeaderView.Stretch)            # Descrizione (prende spazio rimanente)
+        hdr.setSectionResizeMode(6, QHeaderView.Interactive)        # Descrizione (più corta)
         hdr.setSectionResizeMode(7, QHeaderView.ResizeToContents)   # Prev €
         hdr.setSectionResizeMode(8, QHeaderView.ResizeToContents)   # Prezzo €
+        # Larghezze iniziali per Interactive columns
+        self.lista_preventivi.setColumnWidth(4, 130)   # Categoria
+        self.lista_preventivi.setColumnWidth(5, 140)   # Sottocategoria
+        self.lista_preventivi.setColumnWidth(6, 160)   # Descrizione
 
         self.lista_preventivi.doubleClicked.connect(self.visualizza_preventivo)
         self.lista_preventivi.currentItemChanged.connect(self._on_selezione_cambiata)
