@@ -101,15 +101,12 @@ class DocumentUtils:
             with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
                 
-            print(f"DEBUG: Documento HTML generato: {file_path}")
-            
             # Apri automaticamente
             os.startfile(file_path)
             
             return file_path
             
         except Exception as e:
-            print(f"DEBUG: Errore generazione HTML: {e}")
             if parent:
                 QMessageBox.warning(parent, "Errore", f"Errore nella generazione HTML: {e}")
             return None
@@ -133,7 +130,6 @@ class DocumentUtils:
             webbrowser.open(f'file://{temp_path}')
 
         except Exception as e:
-            print(f"DEBUG: Errore anteprima HTML: {e}")
             if parent:
                 QMessageBox.warning(parent, "Errore", f"Errore nella generazione anteprima:\n{e}")
 
@@ -333,17 +329,13 @@ class DocumentUtils:
             
             # Salva documento
             doc.save(file_path)
-            print(f"DEBUG: Documento DOCX generato: {file_path}")
-            
+
             # Apri automaticamente
             os.startfile(file_path)
             
             return file_path
             
         except Exception as e:
-            print(f"DEBUG: Errore generazione DOCX: {e}")
-            import traceback
-            traceback.print_exc()
             if parent:
                 QMessageBox.warning(parent, "Errore", f"Errore nella generazione DOCX: {e}")
             return None
@@ -490,6 +482,10 @@ class DocumentUtils:
             f'<style:table-properties style:width="16cm" table:align="center" fo:margin-top="{margin_mat}" fo:margin-bottom="0cm"/></style:style>'
             f'<style:style style:name="TO" style:family="table">'
             f'<style:table-properties style:width="17.7cm" table:align="margins"/></style:style>'
+            f'<style:style style:name="DiagLine" style:family="graphic">'
+            f'<style:graphic-properties draw:stroke="solid" svg:stroke-color="#000000" svg:stroke-width="0.04cm"'
+            f' draw:fill="none" fo:wrap="run-through" style:run-through="foreground"'
+            f' draw:wrap-influence-on-position="once-concurrent"/></style:style>'
             f'{ops_col_styles}'
             f'</office:automatic-styles>'
         )
@@ -550,19 +546,29 @@ class DocumentUtils:
                     is_conica=False; con_lato='sinistra'; con_alt=0.0; con_lung=0.0
 
                 if is_conica and con_lung > 0:
-                    svg_path = f'Pictures/conica_{i}.svg'
-                    svg_content = DocumentUtils._svg_conica_str(
-                        con_lato, con_alt, con_lung, lunghezza, nome, rect_h_cm)
-                    if svg_files is not None:
-                        svg_files.append((svg_path, svg_content))
+                    # Linea diagonale ODF nativa (rispetta dark/light mode come il testo normale)
+                    # Cella identica al normale, con draw:line sovrapposta nell'angolo
+                    d_cm = 1.5   # larghezza orizzontale della diagonale
+                    cw_cm = 11.7  # larghezza contenuto cella (12cm - padding)
+                    lines_xml = ''
+                    if con_lato in ('sinistra', 'entrambi'):
+                        lines_xml += (
+                            f'<draw:line draw:style-name="DiagLine" text:anchor-type="paragraph"'
+                            f' svg:x1="0cm" svg:y1="0cm" svg:x2="{d_cm}cm" svg:y2="{rect_h}"'
+                            f' draw:z-index="{i * 2}"><text:p/></draw:line>'
+                        )
+                    if con_lato in ('destra', 'entrambi'):
+                        lines_xml += (
+                            f'<draw:line draw:style-name="DiagLine" text:anchor-type="paragraph"'
+                            f' svg:x1="{cw_cm - d_cm:.1f}cm" svg:y1="0cm"'
+                            f' svg:x2="{cw_cm}cm" svg:y2="{rect_h}"'
+                            f' draw:z-index="{i * 2 + 1}"><text:p/></draw:line>'
+                        )
                     center_cell = (
                         f'<table:table-cell table:style-name="CMB">'
                         f'<text:p text:style-name="PC">'
-                        f'<draw:frame text:anchor-type="as-char"'
-                        f' svg:width="11.5cm" svg:height="{rect_h}" draw:z-index="{i}">'
-                        f'<draw:image xlink:href="{svg_path}"'
-                        f' xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>'
-                        f'</draw:frame>'
+                        + lines_xml +
+                        f'==          {nome}'
                         f'</text:p>'
                         f'</table:table-cell>'
                     )
@@ -637,65 +643,6 @@ class DocumentUtils:
         )
 
     @staticmethod
-    def _svg_conica_str(lato, altezza_mm, lunghezza_mm, lunghezza_tela, nome_xml, rect_h_cm=0.8):
-        """Genera SVG per la conica nell'ODT.
-        Disegna un rettangolo con triangolo(i) di scarto e indicazione della sbiegatura.
-        """
-        W = 115
-        H = max(4, round(W * rect_h_cm / 11.5))
-        font_sz = max(2, round(H * 0.50))
-
-        L = max(lunghezza_tela, 1)
-        lt = lunghezza_mm
-        alt = altezza_mm
-
-        # Calcola proporzioni in pixel
-        lt_px = round(lt / L * W, 2)
-        alt_px = round(alt / H * H, 2) if H > 0 else 0
-
-        elements = []
-        # Rettangolo principale
-        elements.append(f'<rect x="0" y="0" width="{W}" height="{H}" fill="white" stroke="black" stroke-width="1.5"/>')
-
-        # Triangolo(i) scarto in rosa
-        tri_fill = 'rgba(255,150,150,0.6)'
-        tri_stroke = 'red'
-        sw = '0.8'
-
-        def triangolo_sx():
-            # (0, alt_px), (lt_px, H), (0, H)
-            pts = f'0,{alt_px} {lt_px},{H} 0,{H}'
-            return (f'<polygon points="{pts}" fill="{tri_fill}" stroke="{tri_stroke}" stroke-width="{sw}"/>')
-
-        def triangolo_dx():
-            # (W, alt_px), (W-lt_px, H), (W, H)
-            pts = f'{W},{alt_px} {W-lt_px},{H} {W},{H}'
-            return (f'<polygon points="{pts}" fill="{tri_fill}" stroke="{tri_stroke}" stroke-width="{sw}"/>')
-
-        if lato == 'sinistra':
-            elements.append(triangolo_sx())
-        elif lato == 'destra':
-            elements.append(triangolo_dx())
-        else:
-            elements.append(triangolo_sx())
-            elements.append(triangolo_dx())
-
-        # Testo materiale centrato
-        cy = H / 2
-        elements.append(
-            f'<text x="{W/2}" y="{cy + font_sz * 0.35}" text-anchor="middle"'
-            f' font-size="{font_sz}" font-weight="bold" font-family="Arial,sans-serif">{nome_xml}</text>'
-        )
-
-        return (
-            '<?xml version="1.0" encoding="UTF-8"?>'
-            f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}"'
-            f' preserveAspectRatio="xMidYMid meet">'
-            + ''.join(elements) +
-            f'</svg>'
-        )
-
-    @staticmethod
     def genera_documento_odt(preventivo, dati_cliente, parent=None):
         """Genera documento ODT per OpenOffice/LibreOffice (senza dipendenze esterne)"""
         try:
@@ -729,7 +676,6 @@ class DocumentUtils:
                 for svg_path, svg_content in svg_files:
                     zf.writestr(svg_path, svg_content)
 
-            print(f"DEBUG: Documento ODT generato: {file_path}")
             try:
                 import sys
                 import subprocess
@@ -743,9 +689,6 @@ class DocumentUtils:
             return file_path
 
         except Exception as e:
-            print(f"DEBUG: Errore generazione ODT: {e}")
-            import traceback
-            traceback.print_exc()
             if parent:
                 QMessageBox.warning(parent, "Errore", f"Errore nella generazione ODT: {e}")
             return None
@@ -788,44 +731,6 @@ class DocumentUtils:
             }
 
     @staticmethod
-    def _genera_figura_conica(lato, altezza_mm, lunghezza_mm, lunghezza_tela, s, nome):
-        """Genera un div con SVG rettangolo + triangolo(i) di sbiegatura per la scheda HTML.
-        Mostra chiaramente da quale lato e a quale distanza viene eseguita la sbiegatura."""
-        L = max(lunghezza_tela, 1)
-        lt = lunghezza_mm
-        alt = altezza_mm
-
-        # ViewBox: 80 x 20
-        W, H = 80, 20
-        lt_px = round(lt / L * W, 2)
-        alt_px = round(alt / H * H, 2)
-
-        tri_fill = 'rgba(255,150,150,0.7)'
-
-        triangles = []
-        if lato in ('sinistra', 'entrambi'):
-            pts = f'0,{alt_px} {lt_px},{H} 0,{H}'
-            triangles.append(f'<polygon points="{pts}" fill="{tri_fill}" stroke="red" stroke-width="0.8"/>')
-        if lato in ('destra', 'entrambi'):
-            pts = f'{W},{alt_px} {W-lt_px},{H} {W},{H}'
-            triangles.append(f'<polygon points="{pts}" fill="{tri_fill}" stroke="red" stroke-width="0.8"/>')
-
-        lato_txt = {'sinistra': 'SX', 'destra': 'DX', 'entrambi': 'SX+DX'}.get(lato, lato)
-        sbieg_label = f'Sbieg. {lato_txt}: {lt:.0f}mm'
-
-        return f"""<div style="width: 80mm; height: {s['rect_height']}; margin: 0 auto; position: relative;">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}"
-                 preserveAspectRatio="none"
-                 style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;">
-                <rect x="0" y="0" width="{W}" height="{H}" fill="#fff" stroke="#000" stroke-width="1.5"/>
-                {''.join(triangles)}
-            </svg>
-            <input type="text" placeholder="Orient." style="position: relative; z-index: 1; width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; margin-top: auto; margin-bottom: auto;">
-            <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); z-index: 1;">{nome}</strong>
-            <span style="font-size: {s['orient_font']}; position: absolute; bottom: 1px; right: 2px; color: red; z-index: 1;">{sbieg_label}</span>
-        </div>"""
-
-    @staticmethod
     def _genera_html_template_specifico(preventivo, dati_cliente):
         """Template HTML scalabile - adatta il layout al numero di materiali (1-25)"""
 
@@ -859,15 +764,32 @@ class DocumentUtils:
                     nome = f'Materiale {i+1}'
                     is_conica = False; con_lato = 'sinistra'; con_alt = 0.0; con_lung = 0.0
 
-                # Genera la figura: rettangolo con triangolo sbiegatura o rettangolo normale
+                # Diagonale per tela conica (solo una linea nell'angolo, nient'altro)
+                diag_svg = ''
                 if is_conica and con_lung > 0:
-                    figura_html = DocumentUtils._genera_figura_conica(
-                        con_lato, con_alt, con_lung, lunghezza, s, nome)
-                else:
-                    figura_html = f"""<div style="width: 80mm; height: {s['rect_height']}; border: 2px solid #000; display: flex; align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; position: relative; flex-shrink: 0;">
-                        <input type="text" placeholder="Orient." style="width: {s['orient_width']}; border: none; font-size: {s['orient_font']}; background: transparent; position: relative; z-index: 1;">
-                        <strong style="font-size: {s['font_nome']}; position: absolute; left: 50%; transform: translateX(-50%); z-index: 1;">{nome}</strong>
-                    </div>"""
+                    d = 16
+                    lines = []
+                    if con_lato in ('sinistra', 'entrambi'):
+                        lines.append(f'<line x1="0" y1="0" x2="{d}" y2="20" stroke="currentColor" stroke-width="1.2"/>')
+                    if con_lato in ('destra', 'entrambi'):
+                        lines.append(f'<line x1="80" y1="0" x2="{80-d}" y2="20" stroke="currentColor" stroke-width="1.2"/>')
+                    diag_svg = (
+                        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 20" preserveAspectRatio="none" '
+                        'style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;">'
+                        + ''.join(lines) + '</svg>'
+                    )
+
+                figura_html = (
+                    f'<div style="width: 80mm; height: {s["rect_height"]}; border: 2px solid #000; display: flex; '
+                    f'align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; '
+                    f'position: relative; flex-shrink: 0; overflow: hidden;">'
+                    + diag_svg +
+                    f'<input type="text" placeholder="Orient." style="width: {s["orient_width"]}; border: none; '
+                    f'font-size: {s["orient_font"]}; background: transparent; position: relative; z-index: 1;">'
+                    f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 50%; '
+                    f'transform: translateX(-50%); z-index: 1;">{nome}</strong>'
+                    f'</div>'
+                )
 
                 # Larghezze colonne layout: [campo] [G] [tela 80mm] [H]
                 w_campo = '28mm'
