@@ -434,6 +434,22 @@ class DatabaseManager:
             r = cursor.fetchone()
             return r[0] if r else 0.0
 
+    def get_giacenza_scorta_fornitore(self, materiale_id, fornitore_nome):
+        """Restituisce (giacenza, scorta_massima) per un materiale/fornitore specifico."""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT giacenza, scorta_massima FROM materiale_fornitori
+                WHERE materiale_id = ? AND fornitore_nome = ?
+            """, (materiale_id, fornitore_nome))
+            row = cursor.fetchone()
+            if row:
+                return float(row[0] or 0), float(row[1] or 0)
+            # fallback legacy
+            cursor.execute("SELECT giacenza, capacita_magazzino FROM materiali WHERE id = ?", (materiale_id,))
+            r = cursor.fetchone()
+            return (float(r[0] or 0), float(r[1] or 0)) if r else (0.0, 0.0)
+
     # =================== METODI MAGAZZINO ===================
 
     def registra_movimento(self, materiale_id, tipo, quantita, note="", preventivo_id=None, fornitore_nome=""):
