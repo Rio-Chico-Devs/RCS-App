@@ -930,6 +930,29 @@ class MagazzinoWindow(QMainWindow):
                 QMessageBox.warning(dialog, "Attenzione", "Inserisci una quantità valida.")
                 return
 
+            giacenza_attuale, scorta_massima = self.db_manager.get_giacenza_scorta_fornitore(mat_id, forn_nome)
+
+            if tipo == 'scarico' and quantita > giacenza_attuale:
+                QMessageBox.warning(
+                    dialog, "Quantità insufficiente",
+                    f"Non è possibile scaricare {quantita:.2f} m².\n"
+                    f"Giacenza disponibile per {forn_nome}: {giacenza_attuale:.2f} m²."
+                )
+                return
+
+            if tipo == 'carico' and scorta_massima > 0:
+                giacenza_dopo = giacenza_attuale + quantita
+                if giacenza_dopo > scorta_massima:
+                    risposta = QMessageBox.question(
+                        dialog, "Capacità superata",
+                        f"Il carico porterà la giacenza a {giacenza_dopo:.2f} m²,\n"
+                        f"superiore alla scorta massima ({scorta_massima:.2f} m²).\n\n"
+                        f"Vuoi procedere comunque?",
+                        QMessageBox.Yes | QMessageBox.No
+                    )
+                    if risposta == QMessageBox.No:
+                        return
+
             self.db_manager.registra_movimento(mat_id, tipo, quantita, note, fornitore_nome=forn_nome)
             verbo = "caricato" if tipo == 'carico' else "scaricato"
             QMessageBox.information(dialog, "Successo",
@@ -1234,7 +1257,7 @@ class MagazzinoWindow(QMainWindow):
             cont_layout.setSpacing(8)
 
             for mat_id, nome, giacenza, capacita, fornitore, prezzo_fornitore in scorte:
-                card = self._crea_card_scorta(mat_id, nome, giacenza, capacita, fornitore, prezzo_fornitore)
+                card = self._crea_card_scorta(mat_id, nome, giacenza, capacita, 1, prezzo_fornitore)
                 cont_layout.addWidget(card)
 
             cont_layout.addStretch()
