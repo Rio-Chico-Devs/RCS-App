@@ -1182,8 +1182,8 @@ class PreventivoWindow(QMainWindow):
 
         indice = checked[0]
         materiale_da_modificare = self.preventivo.materiali_calcolati[indice]
+        self._dialog_materiali.accept()
         self.apri_finestra_modifica_materiale(indice, materiale_da_modificare)
-        self._aggiorna_lista_materiali_dialog()
 
     def elimina_materiali_selezionati(self):
         """Elimina uno o più materiali flaggati"""
