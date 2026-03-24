@@ -547,6 +547,14 @@ class DocumentUtils:
                     giri=1; lunghezza=1000; sviluppo=100; nome=f'Materiale {i+1}'
                     is_conica=False; con_lato='sinistra'; con_alt=0.0; con_lung=0.0
 
+                # Calcola taglio_info (misure conica) da mostrare PRIMA della lunghezza
+                taglio_info = ''
+                if is_conica and con_lung > 0:
+                    taglio_info = f'L:{con_lung:.0f}'
+                    if con_alt > 0:
+                        taglio_info += f' / A:{con_alt:.0f}'
+                    taglio_info += ' mm'
+
                 if is_conica and con_lung > 0:
                     # Linea diagonale ODF nativa con y1/y2 corretti per toccare i bordi del rettangolo
                     d_cm = 1.5   # larghezza orizzontale della diagonale
@@ -569,16 +577,11 @@ class DocumentUtils:
                             f' svg:x2="{cw_cm}cm" svg:y2="{diag_y2}"'
                             f' draw:z-index="{i * 2 + 1}"><text:p/></draw:line>'
                         )
-                    # Info taglio all'interno del rettangolo
-                    taglio_info = f'L:{con_lung:.0f}'
-                    if con_alt > 0:
-                        taglio_info += f' / A:{con_alt:.0f}'
-                    taglio_info += ' mm'
                     center_cell = (
                         f'<table:table-cell table:style-name="CMB">'
                         f'<text:p text:style-name="PC">'
                         + lines_xml +
-                        f'==   {nome}   ({taglio_info})'
+                        f'==   {nome}'
                         f'</text:p>'
                         f'</table:table-cell>'
                     )
@@ -589,13 +592,14 @@ class DocumentUtils:
                         f'</table:table-cell>'
                     )
 
+                # header_line: prima cella = misure taglio (se conica), seconda = lunghezza
                 header_line = (
                     f'<table:table table:name="HL{i}" table:style-name="THL">'
                     f'<table:table-column table:style-name="TCFI"/>'
                     f'<table:table-column table:style-name="TCHL_L"/>'
                     f'<table:table-row table:style-name="RFI">'
                     f'<table:table-cell table:style-name="CFI">'
-                    f'<text:p text:style-name="PN"></text:p>'
+                    f'<text:p text:style-name="PN">{taglio_info}</text:p>'
                     f'</table:table-cell>'
                     f'<table:table-cell table:style-name="CNB">'
                     f'<text:p text:style-name="PC">{int(lunghezza)} mm</text:p>'
@@ -789,6 +793,14 @@ class DocumentUtils:
                         + ''.join(lines) + '</svg>'
                     )
 
+                # Calcola taglio_info (misure conica) da mostrare PRIMA della lunghezza
+                taglio_info_html = ''
+                if is_conica and con_lung > 0:
+                    taglio_info_html = f'L:{con_lung:.0f}'
+                    if con_alt > 0:
+                        taglio_info_html += f' / A:{con_alt:.0f}'
+                    taglio_info_html += ' mm'
+
                 figura_html = (
                     f'<div style="width: 80mm; height: {s["rect_height"]}; border: 2px solid #000; display: flex; '
                     f'align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; '
@@ -801,6 +813,12 @@ class DocumentUtils:
                     f'</div>'
                 )
 
+                # Riga 1 sinistra: misure taglio (conica) o campo compilabile (normale)
+                if taglio_info_html:
+                    left_area_html = f'<strong style="font-size: {s["font_info"]};">{taglio_info_html}</strong>'
+                else:
+                    left_area_html = f'<input type="text" placeholder="" style="width: 100%; height: 5mm; border: 1.5px solid #000; background: #fff; color: #000; font-size: {s["font_info"]}; padding: 0 1mm; box-sizing: border-box;">'
+
                 # Larghezze colonne layout: [campo] [G] [tela 80mm] [H]
                 w_campo = '28mm'
                 w_g     = '8mm'
@@ -808,10 +826,10 @@ class DocumentUtils:
 
                 materiali_html += f"""
                 <div style="margin: {s['margin_mat']} auto 0; page-break-inside: avoid; width: fit-content;">
-                    <!-- Riga 1: campo compilabile a sinistra + lunghezza centrata sulla tela -->
+                    <!-- Riga 1: misure taglio (o campo compilabile) a sinistra + lunghezza centrata sulla tela -->
                     <div style="display: flex; align-items: center; margin-bottom: 0;">
                         <div style="width: {w_campo}; flex-shrink: 0;">
-                            <input type="text" placeholder="" style="width: 100%; height: 5mm; border: 1.5px solid #000; background: #fff; color: #000; font-size: {s['font_info']}; padding: 0 1mm; box-sizing: border-box;">
+                            {left_area_html}
                         </div>
                         <div style="width: {w_g}; flex-shrink: 0;"></div>
                         <div style="width: 80mm; text-align: center; font-size: {s['font_info']}; flex-shrink: 0;">
