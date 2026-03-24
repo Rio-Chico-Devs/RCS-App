@@ -115,6 +115,10 @@ class PreventivoWindow(QMainWindow):
                 # Dati conici
                 materiale.is_conica = mat_data.get('is_conica', False)
                 materiale.sezioni_coniche = mat_data.get('sezioni_coniche', [])
+                materiale.conicita_lato = mat_data.get('conicita_lato', 'sinistra')
+                materiale.conicita_altezza_mm = mat_data.get('conicita_altezza_mm', 0.0)
+                materiale.conicita_lunghezza_mm = mat_data.get('conicita_lunghezza_mm', 0.0)
+                materiale.scarto_mm2 = mat_data.get('scarto_mm2', 0.0)
                 materiale.orientamento = mat_data.get('orientamento', {'rotation': 0, 'flip_h': False, 'flip_v': False})
 
                 self.preventivo.materiali_calcolati.append(materiale)

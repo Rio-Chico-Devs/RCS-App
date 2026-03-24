@@ -374,16 +374,27 @@ class TelaPreviewWidget(QWidget):
                              Qt.AlignCenter | Qt.TextDontClip, f"{lt:.0f} mm")
             self._disegna_quota_orizzontale(painter, px(L - lt), rect_right, rect_bot + 4)
 
-        # Quota altezza inizio (se > 0, dal lato della conicità)
+        # Quota altezza inizio (se > 0): indicatore verticale DENTRO il rettangolo,
+        # sul lato della conicità — così non si sovrappone mai alle etichette esterne
         if alt > 0:
+            font_alt = QFont("system-ui", 7)
+            painter.setFont(font_alt)
             painter.setPen(QPen(self._quota_color, 1))
-            label_h = max(py(alt) - rect_top, 18)
             if lato == 'destra':
-                painter.drawText(QRectF(rect_right + 5, rect_top, 55, label_h),
-                                 Qt.AlignLeft | Qt.AlignVCenter | Qt.TextDontClip, f"{alt:.0f}")
-            else:  # sinistra o entrambi: quota sul bordo sinistro
-                painter.drawText(QRectF(rect_left - 55, rect_top, 50, label_h),
-                                 Qt.AlignRight | Qt.AlignVCenter | Qt.TextDontClip, f"{alt:.0f}")
+                x_dim = rect_right - 7       # 7 px dal bordo destro, dentro il rect
+                text_x = rect_right - 54
+                text_w = 44
+                text_align = Qt.AlignRight | Qt.AlignVCenter | Qt.TextDontClip
+            else:  # sinistra o entrambi
+                x_dim = rect_left + 7        # 7 px dal bordo sinistro, dentro il rect
+                text_x = rect_left + 10
+                text_w = 44
+                text_align = Qt.AlignLeft | Qt.AlignVCenter | Qt.TextDontClip
+            self._disegna_quota_verticale(painter, rect_top, py(alt), x_dim)
+            cy = (rect_top + py(alt)) / 2
+            if py(alt) - rect_top >= 14:
+                painter.drawText(QRectF(text_x, cy - 8, text_w, 16),
+                                 text_align, f"{alt:.0f}")
 
         # Info taglio (in basso) — rettangolo che usa l'intera larghezza widget
         lato_txt = {'sinistra': 'Sinistra', 'destra': 'Destra', 'entrambi': 'Entrambi'}.get(lato, lato)
