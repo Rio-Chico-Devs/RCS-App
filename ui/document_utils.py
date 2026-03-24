@@ -442,6 +442,11 @@ class DocumentUtils:
             f'<style:style style:name="PL" style:family="paragraph">'
             f'<style:paragraph-properties fo:text-align="center" fo:margin-top="{margin_mat}" fo:margin-bottom="0cm"/>'
             f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
+            f'<style:style style:name="PLR" style:family="paragraph">'
+            f'<style:paragraph-properties fo:margin-top="0cm" fo:margin-bottom="0cm">'
+            f'<style:tab-stops><style:tab-stop style:position="12.3cm" style:type="right"/></style:tab-stops>'
+            f'</style:paragraph-properties>'
+            f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
             f'<style:style style:name="TI" style:family="table">'
             f'<style:table-properties style:width="17.7cm" table:align="margins"/></style:style>'
             f'<style:style style:name="TCI" style:family="table-column">'
@@ -592,17 +597,25 @@ class DocumentUtils:
                         f'</table:table-cell>'
                     )
 
-                # header_line: prima cella = misure taglio (se conica), seconda = lunghezza
+                # header_line: TCFI vuota (campo editabile), TCHL_L = misure taglio (sx) + lunghezza (dx)
+                if taglio_info:
+                    lun_cell_xml = (
+                        f'<text:p text:style-name="PLR">'
+                        f'{taglio_info}<text:tab/>{int(lunghezza)} mm'
+                        f'</text:p>'
+                    )
+                else:
+                    lun_cell_xml = f'<text:p text:style-name="PC">{int(lunghezza)} mm</text:p>'
                 header_line = (
                     f'<table:table table:name="HL{i}" table:style-name="THL">'
                     f'<table:table-column table:style-name="TCFI"/>'
                     f'<table:table-column table:style-name="TCHL_L"/>'
                     f'<table:table-row table:style-name="RFI">'
                     f'<table:table-cell table:style-name="CFI">'
-                    f'<text:p text:style-name="PN">{taglio_info}</text:p>'
+                    f'<text:p text:style-name="PN"></text:p>'
                     f'</table:table-cell>'
                     f'<table:table-cell table:style-name="CNB">'
-                    f'<text:p text:style-name="PC">{int(lunghezza)} mm</text:p>'
+                    + lun_cell_xml +
                     f'</table:table-cell>'
                     f'</table:table-row></table:table>'
                 )
