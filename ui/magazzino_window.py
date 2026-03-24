@@ -1222,23 +1222,23 @@ class MagazzinoWindow(QMainWindow):
         return card
 
     def mostra_scorte_fornitore(self, nome_fornitore):
-        """Mostra le scorte dei materiali di un fornitore in un dialog"""
+        """Mostra le scorte dei materiali di un fornitore in una tabella compatta"""
         scorte = self.db_manager.get_scorte_per_fornitore(nome_fornitore)
 
         dialog = QDialog(self)
         dialog.setWindowTitle(f"Scorte - {nome_fornitore}")
-        dialog.setMinimumSize(700, 500)
+        dialog.setMinimumSize(750, 420)
         dialog.setStyleSheet("""
-            QDialog { background-color: #fafbfc; }
-            QLabel { color: #2d3748; font-family: system-ui, -apple-system, sans-serif; }
+            QDialog { background-color: #fafbfc; font-family: system-ui, -apple-system, sans-serif; }
+            QLabel { color: #2d3748; }
         """)
 
         layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(25, 25, 25, 25)
-        layout.setSpacing(16)
+        layout.setContentsMargins(20, 20, 20, 16)
+        layout.setSpacing(12)
 
-        title = QLabel(f"Materiali forniti da: {nome_fornitore}")
-        title.setStyleSheet("font-size: 18px; font-weight: 700;")
+        title = QLabel(f"Scorte — {nome_fornitore}")
+        title.setStyleSheet("font-size: 17px; font-weight: 700; color: #1a202c;")
         layout.addWidget(title)
 
         if not scorte:
@@ -1247,26 +1247,97 @@ class MagazzinoWindow(QMainWindow):
             lbl_vuoto.setAlignment(Qt.AlignCenter)
             layout.addWidget(lbl_vuoto)
         else:
-            scroll = QScrollArea()
-            scroll.setWidgetResizable(True)
-            scroll.setStyleSheet("QScrollArea { border: none; }")
+            colonne = ["Materiale", "Giacenza (m²)", "Min (m²)", "Max (m²)", "Stato", "Prezzo/m²"]
+            table = QTableWidget(len(scorte), len(colonne))
+            table.setHorizontalHeaderLabels(colonne)
+            table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            table.setSelectionBehavior(QAbstractItemView.SelectRows)
+            table.setAlternatingRowColors(True)
+            table.verticalHeader().setVisible(False)
+            table.setShowGrid(False)
+            table.setStyleSheet("""
+                QTableWidget {
+                    background-color: #ffffff;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    font-size: 13px;
+                    color: #2d3748;
+                }
+                QTableWidget::item { padding: 6px 10px; border: none; }
+                QTableWidget::item:selected { background-color: #ebf8ff; color: #2b6cb0; }
+                QTableWidget::item:alternate { background-color: #f7fafc; }
+                QHeaderView::section {
+                    background-color: #edf2f7;
+                    color: #4a5568;
+                    font-weight: 600;
+                    font-size: 12px;
+                    padding: 6px 10px;
+                    border: none;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+            """)
 
-            container = QWidget()
-            cont_layout = QVBoxLayout(container)
-            cont_layout.setContentsMargins(0, 0, 0, 0)
-            cont_layout.setSpacing(8)
+            for row_idx, row_data in enumerate(scorte):
+                mat_id, nome, giacenza, capacita, fornitore, prezzo, scorta_min = row_data
 
-            for mat_id, nome, giacenza, capacita, fornitore, prezzo_fornitore in scorte:
-                card = self._crea_card_scorta(mat_id, nome, giacenza, capacita, 1, prezzo_fornitore)
-                cont_layout.addWidget(card)
+                # Materiale
+                item_nome = QTableWidgetItem(nome)
+                item_nome.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+                item_nome.setFont(item_nome.font())
+                table.setItem(row_idx, 0, item_nome)
 
-            cont_layout.addStretch()
-            scroll.setWidget(container)
-            layout.addWidget(scroll)
+                # Giacenza
+                item_giac = QTableWidgetItem(f"{giacenza:.2f}")
+                item_giac.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+                table.setItem(row_idx, 1, item_giac)
+
+                # Min
+                item_min = QTableWidgetItem(f"{scorta_min:.2f}" if scorta_min else "—")
+                item_min.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+                item_min.setForeground(QColor("#718096"))
+                table.setItem(row_idx, 2, item_min)
+
+                # Max
+                item_max = QTableWidgetItem(f"{capacita:.2f}" if capacita else "—")
+                item_max.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+                item_max.setForeground(QColor("#718096"))
+                table.setItem(row_idx, 3, item_max)
+
+                # Stato (etichetta colorata)
+                if capacita and capacita > 0:
+                    pct = giacenza / capacita
+                    if pct >= 0.6:
+                        stato, colore_bg, colore_txt = "OK", "#c6f6d5", "#276749"
+                    elif pct >= 0.25:
+                        stato, colore_bg, colore_txt = "Bassa", "#fefcbf", "#744210"
+                    else:
+                        stato, colore_bg, colore_txt = "Critica", "#fed7d7", "#9b2c2c"
+                else:
+                    stato, colore_bg, colore_txt = "N/D", "#edf2f7", "#718096"
+                item_stato = QTableWidgetItem(stato)
+                item_stato.setTextAlignment(Qt.AlignVCenter | Qt.AlignCenter)
+                item_stato.setBackground(QColor(colore_bg))
+                item_stato.setForeground(QColor(colore_txt))
+                table.setItem(row_idx, 4, item_stato)
+
+                # Prezzo
+                item_prezzo = QTableWidgetItem(f"€ {prezzo:.2f}" if prezzo else "—")
+                item_prezzo.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+                table.setItem(row_idx, 5, item_prezzo)
+
+            header = table.horizontalHeader()
+            header.setSectionResizeMode(0, QHeaderView.Stretch)
+            for col in range(1, len(colonne)):
+                header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+            table.setRowHeight(0, 36)
+            for row_idx in range(len(scorte)):
+                table.setRowHeight(row_idx, 36)
+
+            layout.addWidget(table)
 
         btn_chiudi = QPushButton("Chiudi")
         btn_chiudi.setStyleSheet("""
-            QPushButton { background-color: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; min-height: 36px; min-width: 120px; }
+            QPushButton { background-color: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; min-height: 34px; min-width: 100px; border-radius: 6px; }
             QPushButton:hover { background-color: #edf2f7; }
         """)
         btn_chiudi.clicked.connect(dialog.accept)

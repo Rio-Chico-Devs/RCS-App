@@ -1018,7 +1018,8 @@ class DatabaseManager:
                     COALESCE(mf.giacenza, m.giacenza) as giacenza,
                     COALESCE(mf.scorta_massima, m.capacita_magazzino) as capacita_magazzino,
                     ? as fornitore,
-                    COALESCE(mf.prezzo_fornitore, m.prezzo_fornitore) as prezzo_fornitore
+                    COALESCE(mf.prezzo_fornitore, m.prezzo_fornitore) as prezzo_fornitore,
+                    COALESCE(mf.scorta_minima, 0) as scorta_minima
                 FROM materiali m
                 LEFT JOIN materiale_fornitori mf
                     ON mf.materiale_id = m.id AND mf.fornitore_nome = ?
