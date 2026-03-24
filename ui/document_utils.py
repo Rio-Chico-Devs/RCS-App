@@ -406,6 +406,27 @@ class DocumentUtils:
         cpad = '0.2cm'  if num_mat <= 10 else ('0.12cm' if num_mat <= 17 else '0.08cm')
         npad = '0.1cm'  if num_mat <= 10 else ('0.05cm' if num_mat <= 17 else '0.02cm')
 
+        # Pre-calcola altezze riga per materiali conici (proporzionali all'angolo reale del taglio)
+        pad_cm_val = float(pad.replace('cm', ''))
+        conical_row_h = {}  # {i: float cm}
+        if hasattr(preventivo, 'materiali') and preventivo.materiali:
+            for _i, _m in enumerate(preventivo.materiali):
+                if hasattr(_m, 'giri'):
+                    _is_c  = getattr(_m, 'is_conica', False)
+                    _c_lung = getattr(_m, 'conicita_lunghezza_mm', 0.0)
+                    _c_alt  = getattr(_m, 'conicita_altezza_mm', 0.0)
+                    _c_svil = getattr(_m, 'sviluppo', 0)
+                elif isinstance(_m, dict):
+                    _is_c  = _m.get('is_conica', False)
+                    _c_lung = _m.get('conicita_lunghezza_mm', 0.0)
+                    _c_alt  = _m.get('conicita_altezza_mm', 0.0)
+                    _c_svil = _m.get('sviluppo', 0)
+                else:
+                    _is_c = False; _c_lung = 0; _c_alt = 0; _c_svil = 0
+                if _is_c and _c_lung > 0:
+                    _h = max(0.30, min(0.55, 0.5 * (_c_svil - _c_alt) / _c_lung))
+                    conical_row_h[_i] = round(_h, 2)
+
         NS = (
             'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
             'xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" '
@@ -487,6 +508,12 @@ class DocumentUtils:
             f' draw:fill="none" fo:wrap="run-through" style:run-through="foreground"'
             f' draw:wrap-influence-on-position="once-concurrent"/></style:style>'
             f'{ops_col_styles}'
+            + ''.join(
+                f'<style:style style:name="RHC{_i}" style:family="table-row">'
+                f'<style:table-row-properties style:row-height="{_h:.2f}cm"'
+                f' style:use-optimal-row-height="false"/></style:style>'
+                for _i, _h in conical_row_h.items()
+            ) +
             f'</office:automatic-styles>'
         )
 
@@ -546,29 +573,37 @@ class DocumentUtils:
                     is_conica=False; con_lato='sinistra'; con_alt=0.0; con_lung=0.0
 
                 if is_conica and con_lung > 0:
-                    # Linea diagonale ODF nativa (rispetta dark/light mode come il testo normale)
-                    # Cella identica al normale, con draw:line sovrapposta nell'angolo
+                    # Linea diagonale ODF nativa con y1/y2 corretti per toccare i bordi del rettangolo
                     d_cm = 1.5   # larghezza orizzontale della diagonale
                     cw_cm = 11.7  # larghezza contenuto cella (12cm - padding)
+                    h_i = conical_row_h.get(i, rect_h_cm)
+                    # y1 negativo per toccare il bordo superiore, y2 per toccare il bordo inferiore
+                    diag_y1 = f'-{pad_cm_val:.2f}cm'
+                    diag_y2 = f'{h_i - pad_cm_val:.2f}cm'
                     lines_xml = ''
                     if con_lato in ('sinistra', 'entrambi'):
                         lines_xml += (
                             f'<draw:line draw:style-name="DiagLine" text:anchor-type="paragraph"'
-                            f' svg:x1="0cm" svg:y1="0cm" svg:x2="{d_cm}cm" svg:y2="{rect_h}"'
+                            f' svg:x1="0cm" svg:y1="{diag_y1}" svg:x2="{d_cm}cm" svg:y2="{diag_y2}"'
                             f' draw:z-index="{i * 2}"><text:p/></draw:line>'
                         )
                     if con_lato in ('destra', 'entrambi'):
                         lines_xml += (
                             f'<draw:line draw:style-name="DiagLine" text:anchor-type="paragraph"'
-                            f' svg:x1="{cw_cm - d_cm:.1f}cm" svg:y1="0cm"'
-                            f' svg:x2="{cw_cm}cm" svg:y2="{rect_h}"'
+                            f' svg:x1="{cw_cm - d_cm:.1f}cm" svg:y1="{diag_y1}"'
+                            f' svg:x2="{cw_cm}cm" svg:y2="{diag_y2}"'
                             f' draw:z-index="{i * 2 + 1}"><text:p/></draw:line>'
                         )
+                    # Info taglio all'interno del rettangolo
+                    taglio_info = f'L:{con_lung:.0f}'
+                    if con_alt > 0:
+                        taglio_info += f' / A:{con_alt:.0f}'
+                    taglio_info += ' mm'
                     center_cell = (
                         f'<table:table-cell table:style-name="CMB">'
                         f'<text:p text:style-name="PC">'
                         + lines_xml +
-                        f'==          {nome}'
+                        f'==   {nome}   ({taglio_info})'
                         f'</text:p>'
                         f'</table:table-cell>'
                     )
@@ -598,7 +633,7 @@ class DocumentUtils:
                     f'<table:table-column table:style-name="TCN"/>'
                     f'<table:table-column table:style-name="TCW"/>'
                     f'<table:table-column table:style-name="TCN"/>'
-                    f'<table:table-row table:style-name="RH">'
+                    f'<table:table-row table:style-name="{"RHC" + str(i) if i in conical_row_h else "RH"}">'
                     f'<table:table-cell table:style-name="CNB">'
                     f'<text:p text:style-name="PR">G{giri}</text:p></table:table-cell>'
                     + center_cell +

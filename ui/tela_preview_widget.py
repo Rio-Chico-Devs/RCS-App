@@ -374,11 +374,16 @@ class TelaPreviewWidget(QWidget):
                              Qt.AlignCenter | Qt.TextDontClip, f"{lt:.0f} mm")
             self._disegna_quota_orizzontale(painter, px(L - lt), rect_right, rect_bot + 4)
 
-        # Quota altezza inizio (se > 0, sulla destra)
+        # Quota altezza inizio (se > 0, dal lato della conicità)
         if alt > 0:
             painter.setPen(QPen(self._quota_color, 1))
-            painter.drawText(QRectF(rect_right + 5, rect_top, 55, max(py(alt) - rect_top, 18)),
-                             Qt.AlignLeft | Qt.AlignVCenter | Qt.TextDontClip, f"{alt:.0f}")
+            label_h = max(py(alt) - rect_top, 18)
+            if lato == 'destra':
+                painter.drawText(QRectF(rect_right + 5, rect_top, 55, label_h),
+                                 Qt.AlignLeft | Qt.AlignVCenter | Qt.TextDontClip, f"{alt:.0f}")
+            else:  # sinistra o entrambi: quota sul bordo sinistro
+                painter.drawText(QRectF(rect_left - 55, rect_top, 50, label_h),
+                                 Qt.AlignRight | Qt.AlignVCenter | Qt.TextDontClip, f"{alt:.0f}")
 
         # Info taglio (in basso) — rettangolo che usa l'intera larghezza widget
         lato_txt = {'sinistra': 'Sinistra', 'destra': 'Destra', 'entrambi': 'Entrambi'}.get(lato, lato)
