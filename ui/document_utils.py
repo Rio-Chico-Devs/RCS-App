@@ -813,11 +813,22 @@ class DocumentUtils:
                     f'</div>'
                 )
 
-                # Riga 1 sinistra: misure taglio (conica) o campo compilabile (normale)
+                # Riga 1 sopra rettangolo: per conica mostra misure taglio a sinistra e lunghezza a destra,
+                # entrambe come testo libero fuori da qualsiasi casella. Per normale: lunghezza centrata.
                 if taglio_info_html:
-                    left_area_html = f'<strong style="font-size: {s["font_info"]};">{taglio_info_html}</strong>'
+                    sopra_rettangolo_html = (
+                        f'<div style="width: 80mm; display: flex; justify-content: space-between; '
+                        f'align-items: center; font-size: {s["font_info"]}; flex-shrink: 0;">'
+                        f'<strong>{taglio_info_html}</strong>'
+                        f'<strong>{lunghezza}mm</strong>'
+                        f'</div>'
+                    )
                 else:
-                    left_area_html = f'<input type="text" placeholder="" style="width: 100%; height: 5mm; border: 1.5px solid #000; background: #fff; color: #000; font-size: {s["font_info"]}; padding: 0 1mm; box-sizing: border-box;">'
+                    sopra_rettangolo_html = (
+                        f'<div style="width: 80mm; text-align: center; font-size: {s["font_info"]}; flex-shrink: 0;">'
+                        f'<strong>{lunghezza}mm</strong>'
+                        f'</div>'
+                    )
 
                 # Larghezze colonne layout: [campo] [G] [tela 80mm] [H]
                 w_campo = '28mm'
@@ -826,15 +837,13 @@ class DocumentUtils:
 
                 materiali_html += f"""
                 <div style="margin: {s['margin_mat']} auto 0; page-break-inside: avoid; width: fit-content;">
-                    <!-- Riga 1: misure taglio (o campo compilabile) a sinistra + lunghezza centrata sulla tela -->
+                    <!-- Riga 1: (conica) misure taglio a sx + lunghezza a dx sopra il rettangolo; (normale) lunghezza centrata -->
                     <div style="display: flex; align-items: center; margin-bottom: 0;">
                         <div style="width: {w_campo}; flex-shrink: 0;">
-                            {left_area_html}
+                            <input type="text" placeholder="" style="width: 100%; height: 5mm; border: 1.5px solid #000; background: #fff; color: #000; font-size: {s['font_info']}; padding: 0 1mm; box-sizing: border-box;">
                         </div>
                         <div style="width: {w_g}; flex-shrink: 0;"></div>
-                        <div style="width: 80mm; text-align: center; font-size: {s['font_info']}; flex-shrink: 0;">
-                            <strong>{lunghezza}mm</strong>
-                        </div>
+                        {sopra_rettangolo_html}
                         <div style="width: {w_h}; flex-shrink: 0;"></div>
                     </div>
                     <!-- Riga 2: spazio campo + G + tela + H -->
