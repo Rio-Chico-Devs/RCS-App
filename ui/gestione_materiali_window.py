@@ -622,16 +622,15 @@ class GestioneMaterialiWindow(QMainWindow):
         self.lista_materiali.clear()
         self.materiali_data = self.db_manager.get_all_materiali()
         cat_map = {c[0]: c[1] for c in self.db_manager.get_all_categorie()}
+        forn_counts = self.db_manager.get_fornitori_counts()
 
         for mat in self.materiali_data:
             id_mat, nome, spessore, prezzo = mat[:4]
-            fornitore = mat[4] if len(mat) > 4 else ""
             categoria_id = mat[8] if len(mat) > 8 else None
-            testo = f"{nome} • {spessore}mm • €{prezzo:.2f}"
-            if fornitore:
-                testo += f" • {fornitore}"
+            n_forn = forn_counts.get(id_mat, 0)
+            testo = f"{nome} | {spessore}mm | €{prezzo:.2f} | {n_forn} fornitore/i"
             if categoria_id and categoria_id in cat_map:
-                testo += f" • [{cat_map[categoria_id]}]"
+                testo += f" | [{cat_map[categoria_id]}]"
 
             item = QListWidgetItem(testo)
             item.setData(Qt.UserRole, mat)

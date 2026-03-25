@@ -381,6 +381,13 @@ class DatabaseManager:
             """, (materiale_id,))
             return cursor.fetchall()
 
+    def get_fornitori_counts(self):
+        """Restituisce dict {materiale_id: n_fornitori} per tutti i materiali"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT materiale_id, COUNT(*) FROM materiale_fornitori GROUP BY materiale_id")
+            return {row[0]: row[1] for row in cursor.fetchall()}
+
     def add_fornitore_a_materiale(self, materiale_id, fornitore_nome, prezzo_fornitore=0.0, scorta_minima=0.0, scorta_massima=0.0):
         """Aggiunge un fornitore a un materiale"""
         with sqlite3.connect(self.db_path) as conn:
