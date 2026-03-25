@@ -331,18 +331,15 @@ class GestioneMaterialiWindow(QMainWindow):
         back_row.addStretch()
         layout.addLayout(back_row)
 
-        # Area scrollabile per form + fornitori
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
-        scroll_content = QWidget()
-        scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setSpacing(14)
-        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        # Layout a due colonne 50/50: sinistra = form, destra = fornitori
+        columns = QHBoxLayout()
+        columns.setSpacing(20)
+        columns.setContentsMargins(0, 0, 0, 0)
 
-        # --- Gruppo: dati base materiale ---
+        # ── Colonna sinistra: form dettagli ──────────────────────────
         form_group = QGroupBox("Dettagli Materiale")
         form_group.setGraphicsEffect(_make_shadow())
+        form_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         form_inner = QVBoxLayout(form_group)
         form_inner.setContentsMargins(20, 28, 20, 15)
         form_inner.setSpacing(10)
@@ -440,12 +437,14 @@ class GestioneMaterialiWindow(QMainWindow):
         form_btns.addStretch()
         form_btns.addWidget(self.btn_reset)
         form_inner.addLayout(form_btns)
+        form_inner.addStretch()
 
-        scroll_layout.addWidget(form_group)
+        columns.addWidget(form_group, 1)
 
-        # --- Gruppo: fornitori del materiale ---
+        # ── Colonna destra: fornitori ─────────────────────────────────
         self.fornitori_group = QGroupBox("Fornitori del Materiale")
         self.fornitori_group.setGraphicsEffect(_make_shadow())
+        self.fornitori_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         forn_inner = QVBoxLayout(self.fornitori_group)
         forn_inner.setContentsMargins(20, 28, 20, 15)
         forn_inner.setSpacing(10)
@@ -465,7 +464,7 @@ class GestioneMaterialiWindow(QMainWindow):
         self.tabella_fornitori_mat.verticalHeader().setVisible(False)
         self.tabella_fornitori_mat.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabella_fornitori_mat.setSelectionBehavior(QTableWidget.SelectRows)
-        forn_inner.addWidget(self.tabella_fornitori_mat)
+        forn_inner.addWidget(self.tabella_fornitori_mat, 1)
 
         btn_aggiungi_forn = QPushButton("+ Aggiungi Fornitore")
         btn_aggiungi_forn.setStyleSheet("""
@@ -475,11 +474,9 @@ class GestioneMaterialiWindow(QMainWindow):
         btn_aggiungi_forn.clicked.connect(self._aggiungi_fornitore_materiale)
         forn_inner.addWidget(btn_aggiungi_forn, alignment=Qt.AlignLeft)
 
-        scroll_layout.addWidget(self.fornitori_group)
-        scroll_layout.addStretch()
+        columns.addWidget(self.fornitori_group, 1)
 
-        scroll.setWidget(scroll_content)
-        layout.addWidget(scroll, 1)
+        layout.addLayout(columns, 1)
 
     # ------------------------------------------------------------------
     # Tab: Categorie  (grandi pulsanti + tabella dettaglio)
