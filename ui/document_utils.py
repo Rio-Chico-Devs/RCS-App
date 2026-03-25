@@ -447,6 +447,9 @@ class DocumentUtils:
             f'<style:tab-stops><style:tab-stop style:position="4.5cm" style:type="center"/></style:tab-stops>'
             f'</style:paragraph-properties>'
             f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
+            f'<style:style style:name="PCL" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="start" fo:margin-left="{6.0 - pad_cm_val:.2f}cm" fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
+            f'<style:text-properties fo:font-size="{ft_nome}" fo:font-weight="bold"/></style:style>'
             f'<style:style style:name="TI" style:family="table">'
             f'<style:table-properties style:width="17.7cm" table:align="margins"/></style:style>'
             f'<style:style style:name="TCI" style:family="table-column">'
@@ -584,16 +587,16 @@ class DocumentUtils:
                         )
                     center_cell = (
                         f'<table:table-cell table:style-name="CMB">'
-                        f'<text:p text:style-name="PC">'
+                        f'<text:p text:style-name="PCL">'
                         + lines_xml +
-                        f'==   {nome}'
+                        f'== {nome}'
                         f'</text:p>'
                         f'</table:table-cell>'
                     )
                 else:
                     center_cell = (
                         f'<table:table-cell table:style-name="CMB">'
-                        f'<text:p text:style-name="PC">==          {nome}</text:p>'
+                        f'<text:p text:style-name="PCL">== {nome}</text:p>'
                         f'</table:table-cell>'
                     )
 
@@ -821,7 +824,7 @@ class DocumentUtils:
                     + diag_svg +
                     f'<input type="text" placeholder="Orient." style="width: {s["orient_width"]}; border: none; '
                     f'font-size: {s["orient_font"]}; background: transparent; position: relative; z-index: 1;">'
-                    f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 50%; z-index: 1;">{nome}</strong>'
+                    f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 50%; z-index: 1;">== {nome}</strong>'
                     f'</div>'
                 )
 
