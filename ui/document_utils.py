@@ -557,7 +557,7 @@ class DocumentUtils:
                 if is_conica and con_lung > 0:
                     taglio_info = f'L:{con_lung:.0f}'
                     if con_alt > 0:
-                        taglio_info += f' / A:{con_alt:.0f}'
+                        taglio_info += f' / h:{con_alt:.0f}'
                     taglio_info += ' mm'
 
                 if is_conica and con_lung > 0:
@@ -811,7 +811,7 @@ class DocumentUtils:
                 if is_conica and con_lung > 0:
                     taglio_info_html = f'L:{con_lung:.0f}'
                     if con_alt > 0:
-                        taglio_info_html += f' / A:{con_alt:.0f}'
+                        taglio_info_html += f' / h:{con_alt:.0f}'
                     taglio_info_html += ' mm'
 
                 figura_html = (
@@ -861,7 +861,7 @@ class DocumentUtils:
                     <!-- Riga 2: spazio campo + G + tela + H -->
                     <div style="display: flex; align-items: center;">
                         <div style="width: {w_campo}; flex-shrink: 0;"></div>
-                        <div style="width: {w_g}; text-align: right; font-size: {s['font_giri']}; flex-shrink: 0; padding-right: 1mm;">
+                        <div style="width: {w_g}; text-align: right; font-size: {s['font_giri']}; flex-shrink: 0; padding-right: 1mm; box-sizing: border-box;">
                             <strong>G{giri}</strong>
                         </div>
                         {figura_html}
