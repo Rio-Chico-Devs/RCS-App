@@ -430,6 +430,9 @@ class DocumentUtils:
             f'<office:automatic-styles>'
             f'<style:style style:name="PN" style:family="paragraph">'
             f'<style:text-properties fo:font-size="{ft_info}"/></style:style>'
+            f'<style:style style:name="PKN" style:family="paragraph">'
+            f'<style:paragraph-properties fo:keep-with-next="always" fo:margin-top="0cm" fo:margin-bottom="0cm" fo:line-height="0.01cm"/>'
+            f'<style:text-properties fo:font-size="1pt"/></style:style>'
             f'<style:style style:name="PT" style:family="paragraph">'
             f'<style:paragraph-properties fo:text-align="center" fo:margin-bottom="0.3cm"/>'
             f'<style:text-properties fo:font-size="14pt" fo:font-weight="bold"/></style:style>'
@@ -493,7 +496,7 @@ class DocumentUtils:
             f'<style:style style:name="CFI" style:family="table-cell">'
             f'<style:table-cell-properties fo:border="none" fo:padding="0.05cm"/></style:style>'
             f'<style:style style:name="THL" style:family="table">'
-            f'<style:table-properties style:width="16cm" table:align="center" fo:margin-top="{margin_mat}" fo:margin-bottom="0cm" table:keep-with-next-paragraph-on-same-page="true"/></style:style>'
+            f'<style:table-properties style:width="16cm" table:align="center" fo:margin-top="{margin_mat}" fo:margin-bottom="0cm"/></style:style>'
             f'<style:style style:name="TO" style:family="table">'
             f'<style:table-properties style:width="17.7cm" table:align="margins"/></style:style>'
             f'<style:style style:name="DiagLine" style:family="graphic">'
@@ -628,6 +631,7 @@ class DocumentUtils:
                 )
                 mat_parts.append(
                     header_line +
+                    f'<text:p text:style-name="PKN"/>' +
                     f'<table:table table:name="M{i}" table:style-name="TM">'
                     f'<table:table-column table:style-name="TCN"/>'
                     f'<table:table-column table:style-name="TCW"/>'
