@@ -470,6 +470,8 @@ class DocumentUtils:
             f'<style:table-cell-properties fo:border="1.5pt solid #000000" fo:padding="{pad}"/></style:style>'
             f'<style:style style:name="CNB" style:family="table-cell">'
             f'<style:table-cell-properties fo:border="none" fo:padding="{npad}"/></style:style>'
+            f'<style:style style:name="CNBb" style:family="table-cell">'
+            f'<style:table-cell-properties fo:border="none" fo:padding-top="{npad}" fo:padding-left="{npad}" fo:padding-right="{npad}" fo:padding-bottom="0cm" fo:vertical-align="bottom"/></style:style>'
             f'<style:style style:name="CMB_WL" style:family="table-cell">'
             f'<style:table-cell-properties '
             f'fo:border-left="3.5pt solid #000000" fo:border-right="0.75pt solid #000000" '
@@ -487,7 +489,7 @@ class DocumentUtils:
             f'<style:style style:name="TCHL_L" style:family="table-column">'
             f'<style:table-column-properties style:column-width="12.5cm"/></style:style>'
             f'<style:style style:name="RFI" style:family="table-row">'
-            f'<style:table-row-properties style:row-height="0.5cm" style:use-optimal-row-height="false"/></style:style>'
+            f'<style:table-row-properties style:row-height="0.35cm" style:use-optimal-row-height="false"/></style:style>'
             f'<style:style style:name="CFI" style:family="table-cell">'
             f'<style:table-cell-properties fo:border="none" fo:padding="0.05cm"/></style:style>'
             f'<style:style style:name="THL" style:family="table">'
@@ -610,7 +612,7 @@ class DocumentUtils:
                         f'</text:p>'
                     )
                 else:
-                    lun_cell_xml = f'<text:p text:style-name="PC">{int(lunghezza)} mm</text:p>'
+                    lun_cell_xml = f'<text:p text:style-name="PLR"><text:tab/>{int(lunghezza)} mm</text:p>'
                 header_line = (
                     f'<table:table table:name="HL{i}" table:style-name="THL">'
                     f'<table:table-column table:style-name="TCFI"/>'
@@ -619,7 +621,7 @@ class DocumentUtils:
                     f'<table:table-cell table:style-name="CFI">'
                     f'<text:p text:style-name="PN"></text:p>'
                     f'</table:table-cell>'
-                    f'<table:table-cell table:style-name="CNB">'
+                    f'<table:table-cell table:style-name="CNBb">'
                     + lun_cell_xml +
                     f'</table:table-cell>'
                     f'</table:table-row></table:table>'
@@ -857,7 +859,7 @@ class DocumentUtils:
                 materiali_html += f"""
                 <div style="margin: {s['margin_mat']} auto 0; page-break-inside: avoid; width: fit-content;">
                     <!-- Riga 1: (conica) misure taglio a sx + lunghezza a dx sopra il rettangolo; (normale) lunghezza centrata -->
-                    <div style="display: flex; align-items: center; margin-bottom: 0;">
+                    <div style="display: flex; align-items: flex-end; margin-bottom: 0;">
                         <div style="width: {w_campo}; flex-shrink: 0;">
                             <input type="text" placeholder="" style="width: 100%; height: 5mm; border: 1.5px solid #000; background: #fff; color: #000; font-size: {s['font_info']}; padding: 0 1mm; box-sizing: border-box;">
                         </div>
