@@ -444,7 +444,7 @@ class DocumentUtils:
             f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
             f'<style:style style:name="PLR" style:family="paragraph">'
             f'<style:paragraph-properties fo:margin-top="0cm" fo:margin-bottom="0cm">'
-            f'<style:tab-stops><style:tab-stop style:position="8cm" style:type="center"/></style:tab-stops>'
+            f'<style:tab-stops><style:tab-stop style:position="4.5cm" style:type="center"/></style:tab-stops>'
             f'</style:paragraph-properties>'
             f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
             f'<style:style style:name="TI" style:family="table">'
