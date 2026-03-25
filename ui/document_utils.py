@@ -449,7 +449,7 @@ class DocumentUtils:
             f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
             f'<style:style style:name="PCL" style:family="paragraph">'
             f'<style:paragraph-properties fo:text-align="start" fo:margin-top="0cm" fo:margin-bottom="0cm">'
-            f'<style:tab-stops><style:tab-stop style:position="{(12.0 - 2*pad_cm_val) / 2:.3f}cm" style:type="left"/></style:tab-stops>'
+            f'<style:tab-stops><style:tab-stop style:position="{(12.0 - 2*pad_cm_val) * 0.43:.3f}cm" style:type="left"/></style:tab-stops>'
             f'</style:paragraph-properties>'
             f'<style:text-properties fo:font-size="{ft_nome}" fo:font-weight="bold"/></style:style>'
             f'<style:style style:name="TI" style:family="table">'
@@ -826,7 +826,7 @@ class DocumentUtils:
                     + diag_svg +
                     f'<input type="text" placeholder="Orient." style="width: {s["orient_width"]}; border: none; '
                     f'font-size: {s["orient_font"]}; background: transparent; position: relative; z-index: 1;">'
-                    f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 50%; z-index: 1;">== {nome}</strong>'
+                    f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 43%; z-index: 1;">== {nome}</strong>'
                     f'</div>'
                 )
 
