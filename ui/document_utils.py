@@ -444,7 +444,7 @@ class DocumentUtils:
             f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
             f'<style:style style:name="PLR" style:family="paragraph">'
             f'<style:paragraph-properties fo:margin-top="0cm" fo:margin-bottom="0cm">'
-            f'<style:tab-stops><style:tab-stop style:position="12.3cm" style:type="right"/></style:tab-stops>'
+            f'<style:tab-stops><style:tab-stop style:position="8cm" style:type="center"/></style:tab-stops>'
             f'</style:paragraph-properties>'
             f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
             f'<style:style style:name="TI" style:family="table">'
@@ -826,14 +826,15 @@ class DocumentUtils:
                     f'</div>'
                 )
 
-                # Riga 1 sopra rettangolo: per conica mostra misure taglio a sinistra e lunghezza a destra,
-                # entrambe come testo libero fuori da qualsiasi casella. Per normale: lunghezza centrata.
+                # Riga 1 sopra rettangolo: per conica taglio_info a sinistra e lunghezza centrata (abs);
+                # per normale solo lunghezza centrata. Entrambe testo libero fuori da qualsiasi casella.
                 if taglio_info_html:
                     sopra_rettangolo_html = (
-                        f'<div style="width: 80mm; display: flex; justify-content: space-between; '
-                        f'align-items: center; font-size: {s["font_info"]}; flex-shrink: 0;">'
-                        f'<strong>{taglio_info_html}</strong>'
-                        f'<strong>{lunghezza}mm</strong>'
+                        f'<div style="width: 80mm; position: relative; font-size: {s["font_info"]}; '
+                        f'flex-shrink: 0; height: 5mm; display: flex; align-items: center;">'
+                        f'<strong style="position: relative; z-index: 1;">{taglio_info_html}</strong>'
+                        f'<strong style="position: absolute; left: 50%; transform: translateX(-50%); '
+                        f'z-index: 1;">{lunghezza}mm</strong>'
                         f'</div>'
                     )
                 else:
