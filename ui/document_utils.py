@@ -493,7 +493,7 @@ class DocumentUtils:
             f'<style:style style:name="CFI" style:family="table-cell">'
             f'<style:table-cell-properties fo:border="none" fo:padding="0.05cm"/></style:style>'
             f'<style:style style:name="THL" style:family="table">'
-            f'<style:table-properties style:width="16cm" table:align="center" fo:margin-top="{margin_mat}" fo:margin-bottom="0cm"/></style:style>'
+            f'<style:table-properties style:width="16cm" table:align="center" fo:margin-top="{margin_mat}" fo:margin-bottom="0cm" table:keep-with-next-paragraph-on-same-page="true"/></style:style>'
             f'<style:style style:name="TO" style:family="table">'
             f'<style:table-properties style:width="17.7cm" table:align="margins"/></style:style>'
             f'<style:style style:name="DiagLine" style:family="graphic">'
@@ -857,7 +857,7 @@ class DocumentUtils:
                 w_h     = '18mm'
 
                 materiali_html += f"""
-                <div style="margin: {s['margin_mat']} auto 0; page-break-inside: avoid; width: fit-content;">
+                <div style="margin: {s['margin_mat']} auto 0; page-break-inside: avoid; break-inside: avoid; width: fit-content;">
                     <!-- Riga 1: (conica) misure taglio a sx + lunghezza a dx sopra il rettangolo; (normale) lunghezza centrata -->
                     <div style="display: flex; align-items: flex-end; margin-bottom: 0;">
                         <div style="width: {w_campo}; flex-shrink: 0;">
