@@ -448,7 +448,9 @@ class DocumentUtils:
             f'</style:paragraph-properties>'
             f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
             f'<style:style style:name="PCL" style:family="paragraph">'
-            f'<style:paragraph-properties fo:text-align="start" fo:margin-left="{6.0 - pad_cm_val:.2f}cm" fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
+            f'<style:paragraph-properties fo:text-align="start" fo:margin-top="0cm" fo:margin-bottom="0cm">'
+            f'<style:tab-stops><style:tab-stop style:position="{(12.0 - 2*pad_cm_val) / 2:.3f}cm" style:type="left"/></style:tab-stops>'
+            f'</style:paragraph-properties>'
             f'<style:text-properties fo:font-size="{ft_nome}" fo:font-weight="bold"/></style:style>'
             f'<style:style style:name="TI" style:family="table">'
             f'<style:table-properties style:width="17.7cm" table:align="margins"/></style:style>'
@@ -589,14 +591,14 @@ class DocumentUtils:
                         f'<table:table-cell table:style-name="CMB">'
                         f'<text:p text:style-name="PCL">'
                         + lines_xml +
-                        f'== {nome}'
+                        f'<text:tab/>== {nome}'
                         f'</text:p>'
                         f'</table:table-cell>'
                     )
                 else:
                     center_cell = (
                         f'<table:table-cell table:style-name="CMB">'
-                        f'<text:p text:style-name="PCL">== {nome}</text:p>'
+                        f'<text:p text:style-name="PCL"><text:tab/>== {nome}</text:p>'
                         f'</table:table-cell>'
                     )
 
