@@ -830,11 +830,10 @@ class DocumentUtils:
                 # per normale solo lunghezza centrata. Entrambe testo libero fuori da qualsiasi casella.
                 if taglio_info_html:
                     sopra_rettangolo_html = (
-                        f'<div style="width: 80mm; position: relative; font-size: {s["font_info"]}; '
-                        f'flex-shrink: 0; height: 5mm; display: flex; align-items: center;">'
-                        f'<strong style="position: relative; z-index: 1;">{taglio_info_html}</strong>'
-                        f'<strong style="position: absolute; left: 50%; transform: translateX(-50%); '
-                        f'z-index: 1;">{lunghezza}mm</strong>'
+                        f'<div style="width: 80mm; position: relative; text-align: center; '
+                        f'font-size: {s["font_info"]}; flex-shrink: 0;">'
+                        f'<strong style="position: absolute; left: 0;">{taglio_info_html}</strong>'
+                        f'<strong>{lunghezza}mm</strong>'
                         f'</div>'
                     )
                 else:
