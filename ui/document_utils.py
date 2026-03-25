@@ -821,7 +821,7 @@ class DocumentUtils:
                     + diag_svg +
                     f'<input type="text" placeholder="Orient." style="width: {s["orient_width"]}; border: none; '
                     f'font-size: {s["orient_font"]}; background: transparent; position: relative; z-index: 1;">'
-                    f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 50%; '
+                    f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: calc(50% - 3mm); '
                     f'transform: translateX(-50%); z-index: 1;">{nome}</strong>'
                     f'</div>'
                 )
