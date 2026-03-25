@@ -489,7 +489,7 @@ class DocumentUtils:
             f'<style:style style:name="RFI" style:family="table-row">'
             f'<style:table-row-properties style:row-height="0.5cm" style:use-optimal-row-height="false"/></style:style>'
             f'<style:style style:name="CFI" style:family="table-cell">'
-            f'<style:table-cell-properties fo:border="1pt solid #000000" fo:padding="0.05cm"/></style:style>'
+            f'<style:table-cell-properties fo:border="none" fo:padding="0.05cm"/></style:style>'
             f'<style:style style:name="THL" style:family="table">'
             f'<style:table-properties style:width="16cm" table:align="center" fo:margin-top="{margin_mat}" fo:margin-bottom="0cm"/></style:style>'
             f'<style:style style:name="TO" style:family="table">'
@@ -583,8 +583,8 @@ class DocumentUtils:
                     if con_lato in ('destra', 'entrambi'):
                         lines_xml += (
                             f'<draw:line draw:style-name="DiagLine" text:anchor-type="paragraph"'
-                            f' svg:x1="{cw_cm - d_cm:.1f}cm" svg:y1="{diag_y1}"'
-                            f' svg:x2="{cw_cm}cm" svg:y2="{diag_y2}"'
+                            f' svg:x1="{cw_cm - d_cm:.1f}cm" svg:y1="{diag_y2}"'
+                            f' svg:x2="{cw_cm}cm" svg:y2="{diag_y1}"'
                             f' draw:z-index="{i * 2 + 1}"><text:p/></draw:line>'
                         )
                     center_cell = (
@@ -804,7 +804,7 @@ class DocumentUtils:
                     if con_lato in ('sinistra', 'entrambi'):
                         lines.append(f'<line x1="0" y1="0" x2="{d}" y2="20" stroke="currentColor" stroke-width="1.2"/>')
                     if con_lato in ('destra', 'entrambi'):
-                        lines.append(f'<line x1="80" y1="0" x2="{80-d}" y2="20" stroke="currentColor" stroke-width="1.2"/>')
+                        lines.append(f'<line x1="80" y1="20" x2="{80-d}" y2="0" stroke="currentColor" stroke-width="1.2"/>')
                     diag_svg = (
                         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 20" preserveAspectRatio="none" '
                         'style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;">'
