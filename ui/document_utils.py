@@ -830,16 +830,19 @@ class DocumentUtils:
 
                 # Riga 1 sopra rettangolo: per conica taglio_info a sinistra e lunghezza centrata (abs);
                 # per normale solo lunghezza centrata. Entrambe testo libero fuori da qualsiasi casella.
+                # Stesse proprietà box del rettangolo (border 2px + padding 0 3mm)
+                # così text-align:center produce lo stesso centro di left:50% nel rettangolo
+                _box = 'width: 80mm; border: 2px solid transparent; padding: 0 3mm; flex-shrink: 0; font-size: {fi}; box-sizing: content-box;'.format(fi=s['font_info'])
                 if taglio_info_html:
                     sopra_rettangolo_html = (
-                        f'<div style="width: 80mm; position: relative; flex-shrink: 0; font-size: {s["font_info"]};">'
+                        f'<div style="{_box} position: relative;">'
                         f'<div style="position: absolute; left: 0; top: 0;"><strong>{taglio_info_html}</strong></div>'
                         f'<div style="text-align: center;"><strong>{lunghezza}mm</strong></div>'
                         f'</div>'
                     )
                 else:
                     sopra_rettangolo_html = (
-                        f'<div style="width: 80mm; text-align: center; font-size: {s["font_info"]}; flex-shrink: 0;">'
+                        f'<div style="{_box} text-align: center;">'
                         f'<strong>{lunghezza}mm</strong>'
                         f'</div>'
                     )
