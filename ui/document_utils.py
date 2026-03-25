@@ -810,7 +810,7 @@ class DocumentUtils:
                     if con_lato in ('sinistra', 'entrambi'):
                         lines.append(f'<line x1="0" y1="0" x2="{d}" y2="20" stroke="currentColor" stroke-width="1.2"/>')
                     if con_lato in ('destra', 'entrambi'):
-                        lines.append(f'<line x1="80" y1="20" x2="{80-d}" y2="0" stroke="currentColor" stroke-width="1.2"/>')
+                        lines.append(f'<line x1="80" y1="0" x2="{80-d}" y2="20" stroke="currentColor" stroke-width="1.2"/>')
                     diag_svg = (
                         '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 20" preserveAspectRatio="none" '
                         'style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;">'
