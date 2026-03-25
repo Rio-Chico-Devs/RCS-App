@@ -294,6 +294,30 @@ class MagazzinoWindow(QMainWindow):
         """)
         btn_scarico.clicked.connect(self.apri_dialog_scarico)
 
+        # Search field
+        self.search_scorte = QLineEdit()
+        self.search_scorte.setPlaceholderText("Cerca materiale...")
+        self.search_scorte.setFixedWidth(200)
+        self.search_scorte.setStyleSheet("""
+            QLineEdit { border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 12px;
+                        font-size: 13px; background-color: #ffffff; min-height: 22px; }
+            QLineEdit:focus { border-color: #718096; }
+        """)
+        self.search_scorte.textChanged.connect(self.carica_scorte)
+
+        lbl_filtro = QLabel("Mostra:")
+        lbl_filtro.setStyleSheet("font-weight: 600;")
+        self.combo_filtro_scorte = QComboBox()
+        self.combo_filtro_scorte.addItem("Tutte le scorte", "tutte")
+        self.combo_filtro_scorte.addItem("Scorte basse", "basse")
+        self.combo_filtro_scorte.addItem("Scorte alte", "alte")
+        self.combo_filtro_scorte.currentIndexChanged.connect(self.carica_scorte)
+
+        top_layout.addSpacing(8)
+        top_layout.addWidget(self.search_scorte)
+        top_layout.addSpacing(8)
+        top_layout.addWidget(lbl_filtro)
+        top_layout.addWidget(self.combo_filtro_scorte)
         top_layout.addStretch()
         top_layout.addWidget(lbl_ordina)
         top_layout.addWidget(self.combo_ordinamento)
@@ -344,6 +368,19 @@ class MagazzinoWindow(QMainWindow):
         """Visualizza le scorte dei materiali (aggregate per materiale)"""
         ordina_per = self.combo_ordinamento.currentData() or 'giacenza_asc'
         scorte = self.db_manager.get_scorte(ordina_per)
+
+        # Applica filtro testo e filtro scorte
+        search_text = getattr(self, 'search_scorte', None)
+        search_text = search_text.text().lower() if search_text else ''
+        filtro = getattr(self, 'combo_filtro_scorte', None)
+        filtro_val = filtro.currentData() if filtro else 'tutte'
+
+        if search_text:
+            scorte = [m for m in scorte if search_text in m[1].lower()]
+        if filtro_val == 'basse':
+            scorte = [m for m in scorte if m[3] > 0 and m[2] < m[3] * 0.3]
+        elif filtro_val == 'alte':
+            scorte = [m for m in scorte if m[3] == 0 or m[2] >= m[3] * 0.7]
 
         if not scorte:
             lbl_vuoto = QLabel("Nessun materiale presente in magazzino.")

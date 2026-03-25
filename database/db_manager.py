@@ -156,6 +156,8 @@ class DatabaseManager:
             ("prezzo_fornitore", "REAL NOT NULL DEFAULT 0.0"),
             ("capacita_magazzino", "REAL NOT NULL DEFAULT 0.0"),
             ("giacenza", "REAL NOT NULL DEFAULT 0.0"),
+            ("scorta_minima", "REAL NOT NULL DEFAULT 0.0"),
+            ("scorta_massima", "REAL NOT NULL DEFAULT 0.0"),
         ]
 
         for column_name, column_def in materiali_new_columns:
@@ -287,21 +289,21 @@ class DatabaseManager:
         """Restituisce tutti i materiali disponibili"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id FROM materiali ORDER BY nome")
+            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id, scorta_minima, scorta_massima FROM materiali ORDER BY nome")
             return cursor.fetchall()
 
     def get_materiale_by_id(self, materiale_id):
         """Restituisce un materiale specifico tramite ID"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id FROM materiali WHERE id = ?", (materiale_id,))
+            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id, scorta_minima, scorta_massima FROM materiali WHERE id = ?", (materiale_id,))
             return cursor.fetchone()
 
     def get_materiale_by_nome(self, nome):
         """Restituisce un materiale specifico tramite nome"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id FROM materiali WHERE nome = ?", (nome,))
+            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id, scorta_minima, scorta_massima FROM materiali WHERE nome = ?", (nome,))
             return cursor.fetchone()
 
     def add_materiale(self, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0, categoria_id=None):
@@ -331,6 +333,17 @@ class DatabaseManager:
                 return cursor.rowcount > 0
             except sqlite3.IntegrityError:
                 return False
+
+    def update_materiale_scorte(self, materiale_id, scorta_minima, scorta_massima):
+        """Aggiorna le scorte aggregate (min/max) di un materiale"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE materiali SET scorta_minima = ?, scorta_massima = ? WHERE id = ?",
+                (scorta_minima, scorta_massima, materiale_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
 
     def update_materiale(self, materiale_id, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0, categoria_id=None):
         """Aggiorna un materiale esistente"""

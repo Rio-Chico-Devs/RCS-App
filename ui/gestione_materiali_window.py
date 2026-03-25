@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
                              QLineEdit, QDoubleSpinBox, QFormLayout, QDialog, QGridLayout,
                              QComboBox, QTabWidget, QTextEdit, QAbstractItemView,
                              QCheckBox, QScrollArea, QTableWidget, QTableWidgetItem,
-                             QHeaderView, QAbstractScrollArea)
+                             QHeaderView, QAbstractScrollArea, QStackedWidget)
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 from PyQt5.QtGui import QFont, QColor, QPainter, QBrush, QPen
 from ui.materiale_ui_components import NoScrollDoubleSpinBox
@@ -240,15 +240,31 @@ class GestioneMaterialiWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def _build_tab_materiali(self, parent):
-        layout = QHBoxLayout(parent)
-        layout.setSpacing(20)
+        layout = QVBoxLayout(parent)
+        layout.setSpacing(0)
         layout.setContentsMargins(0, 12, 0, 0)
 
-        # ── Left: lista + filtri ──────────────────────────────────────
-        left = QWidget()
-        left.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        left_layout = QVBoxLayout(left)
-        left_layout.setSpacing(20)
+        self.stack_materiali = QStackedWidget()
+        layout.addWidget(self.stack_materiali)
+
+        # Pagina 0: lista materiali (fullscreen)
+        page_list = QWidget()
+        self._build_page_list(page_list)
+        self.stack_materiali.addWidget(page_list)
+
+        # Pagina 1: dettaglio materiale
+        page_detail = QWidget()
+        self._build_page_detail(page_detail)
+        self.stack_materiali.addWidget(page_detail)
+
+        self.abilita_form(False)
+        self.abilita_pulsanti_form(False)
+
+    def _build_page_list(self, parent):
+        """Pagina 0: lista materiali a tutto schermo con solo ricerca"""
+        layout = QVBoxLayout(parent)
+        layout.setSpacing(16)
+        layout.setContentsMargins(0, 0, 0, 0)
 
         lista_group = QGroupBox("Materiali Disponibili")
         lista_group.setGraphicsEffect(_make_shadow())
@@ -256,56 +272,18 @@ class GestioneMaterialiWindow(QMainWindow):
         lista_inner.setContentsMargins(20, 28, 20, 15)
         lista_inner.setSpacing(10)
 
-        # Filtri
-        filtri_frame = QFrame()
-        filtri_frame.setStyleSheet("""
-            QFrame { background-color: #f7fafc; border: 1px solid #e2e8f0;
-                     border-radius: 8px; padding: 10px; }
-        """)
-        filtri_layout = QVBoxLayout(filtri_frame)
-        filtri_layout.setContentsMargins(10, 8, 10, 8)
-        filtri_layout.setSpacing(8)
-
-        # Riga 1: ricerca testo
-        riga1 = QHBoxLayout()
-        riga1.addWidget(QLabel("Cerca:"))
+        # Barra ricerca
+        search_row = QHBoxLayout()
+        search_row.addWidget(QLabel("Cerca:"))
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText("Inserisci nome materiale...")
         self.search_edit.textChanged.connect(self._applica_filtri)
-        riga1.addWidget(self.search_edit)
-        filtri_layout.addLayout(riga1)
-
-        # Riga 2: checkbox + combo scorte
-        riga2 = QHBoxLayout()
-        riga2.setSpacing(16)
-
-        self.chk_fornitore = QCheckBox("Ordina per fornitore")
-        self.chk_fornitore.stateChanged.connect(self._applica_filtri)
-        riga2.addWidget(self.chk_fornitore)
-
-        self.chk_alfabetico = QCheckBox("Ordina A-Z")
-        self.chk_alfabetico.stateChanged.connect(self._applica_filtri)
-        riga2.addWidget(self.chk_alfabetico)
-
-        riga2.addStretch()
-
-        lbl_scorte = QLabel("Scorte:")
-        lbl_scorte.setStyleSheet("QLabel { font-size: 13px; }")
-        riga2.addWidget(lbl_scorte)
-        self.combo_scorte = QComboBox()
-        self.combo_scorte.setFixedWidth(160)
-        self.combo_scorte.addItem("Tutte", "tutte")
-        self.combo_scorte.addItem("Scorte basse prima", "basse")
-        self.combo_scorte.addItem("Scorte alte prima", "alte")
-        self.combo_scorte.currentIndexChanged.connect(self._applica_filtri)
-        riga2.addWidget(self.combo_scorte)
-
-        filtri_layout.addLayout(riga2)
-        lista_inner.addWidget(filtri_frame)
+        search_row.addWidget(self.search_edit)
+        lista_inner.addLayout(search_row)
 
         self.lista_materiali = QListWidget()
         self.lista_materiali.itemSelectionChanged.connect(self.on_materiale_selezionato)
-        lista_inner.addWidget(self.lista_materiali)
+        lista_inner.addWidget(self.lista_materiali, 1)
 
         self.lbl_conteggio = QLabel("0 materiali caricati")
         self.lbl_conteggio.setStyleSheet("QLabel { color: #718096; font-size: 13px; font-weight: 500; }")
@@ -332,14 +310,35 @@ class GestioneMaterialiWindow(QMainWindow):
         list_btns.addStretch()
         lista_inner.addLayout(list_btns)
 
-        left_layout.addWidget(lista_group)
-        layout.addWidget(left)
+        layout.addWidget(lista_group, 1)
 
-        # ── Right: form dettagli + fornitori ─────────────────────────
-        right = QWidget()
-        right.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        right_layout = QVBoxLayout(right)
-        right_layout.setSpacing(14)
+    def _build_page_detail(self, parent):
+        """Pagina 1: dettaglio materiale con form + scorte aggregate + fornitori"""
+        layout = QVBoxLayout(parent)
+        layout.setSpacing(14)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Pulsante Indietro
+        back_row = QHBoxLayout()
+        btn_back = QPushButton("◀  Torna alla lista")
+        btn_back.setStyleSheet("""
+            QPushButton { background-color: #f7fafc; color: #4a5568;
+                          border: 1px solid #e2e8f0; min-height: 36px; padding: 6px 18px; }
+            QPushButton:hover { background-color: #edf2f7; }
+        """)
+        btn_back.clicked.connect(self._torna_alla_lista)
+        back_row.addWidget(btn_back)
+        back_row.addStretch()
+        layout.addLayout(back_row)
+
+        # Area scrollabile per form + fornitori
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setSpacing(14)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
 
         # --- Gruppo: dati base materiale ---
         form_group = QGroupBox("Dettagli Materiale")
@@ -386,10 +385,26 @@ class GestioneMaterialiWindow(QMainWindow):
         self.combo_categoria.setMinimumHeight(36)
         self.combo_categoria.setToolTip("Categoria opzionale per raggruppare materiali simili")
 
+        self.edit_scorta_min_mat = NoScrollDoubleSpinBox()
+        self.edit_scorta_min_mat.setDecimals(2)
+        self.edit_scorta_min_mat.setMaximum(99999.99)
+        self.edit_scorta_min_mat.setSuffix(" m²")
+        self.edit_scorta_min_mat.setMinimumHeight(36)
+        self.edit_scorta_min_mat.setToolTip("Scorta minima aggregata del materiale (indipendente dai fornitori)")
+
+        self.edit_scorta_max_mat = NoScrollDoubleSpinBox()
+        self.edit_scorta_max_mat.setDecimals(2)
+        self.edit_scorta_max_mat.setMaximum(99999.99)
+        self.edit_scorta_max_mat.setSuffix(" m²")
+        self.edit_scorta_max_mat.setMinimumHeight(36)
+        self.edit_scorta_max_mat.setToolTip("Scorta massima aggregata del materiale (indipendente dai fornitori)")
+
         form_fields.addRow(_std_label("Nome Materiale:"), self.edit_nome)
         form_fields.addRow(_std_label("Spessore:"), self.edit_spessore)
         form_fields.addRow(_std_label("Prezzo (Preventivo):"), self.edit_prezzo)
         form_fields.addRow(_std_label("Categoria (opzionale):"), self.combo_categoria)
+        form_fields.addRow(_std_label("Scorta Min (aggregata):"), self.edit_scorta_min_mat)
+        form_fields.addRow(_std_label("Scorta Max (aggregata):"), self.edit_scorta_max_mat)
 
         form_inner.addLayout(form_fields)
 
@@ -426,17 +441,15 @@ class GestioneMaterialiWindow(QMainWindow):
         form_btns.addWidget(self.btn_reset)
         form_inner.addLayout(form_btns)
 
-        right_layout.addWidget(form_group)
+        scroll_layout.addWidget(form_group)
 
         # --- Gruppo: fornitori del materiale ---
         self.fornitori_group = QGroupBox("Fornitori del Materiale")
         self.fornitori_group.setGraphicsEffect(_make_shadow())
-        self.fornitori_group.setVisible(False)
         forn_inner = QVBoxLayout(self.fornitori_group)
         forn_inner.setContentsMargins(20, 28, 20, 15)
         forn_inner.setSpacing(10)
 
-        # Tabella fornitori
         self.tabella_fornitori_mat = QTableWidget()
         self.tabella_fornitori_mat.setColumnCount(6)
         self.tabella_fornitori_mat.setHorizontalHeaderLabels(
@@ -452,7 +465,6 @@ class GestioneMaterialiWindow(QMainWindow):
         self.tabella_fornitori_mat.verticalHeader().setVisible(False)
         self.tabella_fornitori_mat.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabella_fornitori_mat.setSelectionBehavior(QTableWidget.SelectRows)
-        self.tabella_fornitori_mat.setMaximumHeight(220)
         forn_inner.addWidget(self.tabella_fornitori_mat)
 
         btn_aggiungi_forn = QPushButton("+ Aggiungi Fornitore")
@@ -463,12 +475,11 @@ class GestioneMaterialiWindow(QMainWindow):
         btn_aggiungi_forn.clicked.connect(self._aggiungi_fornitore_materiale)
         forn_inner.addWidget(btn_aggiungi_forn, alignment=Qt.AlignLeft)
 
-        right_layout.addWidget(self.fornitori_group)
-        right_layout.addStretch()
-        layout.addWidget(right)
+        scroll_layout.addWidget(self.fornitori_group)
+        scroll_layout.addStretch()
 
-        self.abilita_form(False)
-        self.abilita_pulsanti_form(False)
+        scroll.setWidget(scroll_content)
+        layout.addWidget(scroll, 1)
 
     # ------------------------------------------------------------------
     # Tab: Categorie  (grandi pulsanti + tabella dettaglio)
@@ -640,66 +651,25 @@ class GestioneMaterialiWindow(QMainWindow):
         self._applica_filtri()
 
     def _applica_filtri(self):
-        """Applica ricerca, ordinamento fornitore/alfabetico e filtro scorte."""
+        """Applica filtro di ricerca per nome."""
         search_text = self.search_edit.text().lower()
-        ordina_fornitore = self.chk_fornitore.isChecked()
-        ordina_az = self.chk_alfabetico.isChecked()
-        filtro_scorte = self.combo_scorte.currentData()
-
-        items = []
         for i in range(self.lista_materiali.count()):
             item = self.lista_materiali.item(i)
             mat = item.data(Qt.UserRole)
             nome = mat[1].lower()
-            fornitore = mat[4].lower() if len(mat) > 4 else ""
-            scorta_massima = mat[6] if len(mat) > 6 else 0.0
-            scorta_minima = mat[7] if len(mat) > 7 else 0.0
-
-            # Visibilità per ricerca testo
-            visibile = search_text in nome or search_text in fornitore
-            item.setHidden(not visibile)
-
-            if visibile:
-                # Calcola ratio per ordinamento scorte
-                ratio = (scorta_minima / scorta_massima) if scorta_massima > 0 else 0.0
-                items.append((i, mat, ratio))
-
-        # Ordinamento
-        if ordina_fornitore and ordina_az:
-            items.sort(key=lambda x: (x[1][4] if len(x[1]) > 4 else "", x[1][1]))
-        elif ordina_fornitore:
-            items.sort(key=lambda x: (x[1][4] if len(x[1]) > 4 else ""))
-        elif ordina_az:
-            items.sort(key=lambda x: x[1][1])
-
-        if filtro_scorte == "basse":
-            items.sort(key=lambda x: x[2])
-        elif filtro_scorte == "alte":
-            items.sort(key=lambda x: x[2], reverse=True)
-
-        # Riapplica ordine visivo nella lista
-        if ordina_fornitore or ordina_az or filtro_scorte != "tutte":
-            self.lista_materiali.blockSignals(True)
-            for rank, (orig_idx, mat, ratio) in enumerate(items):
-                item = self.lista_materiali.item(orig_idx)
-                # Aggiunge un prefisso numerico temporaneo per simulare riordino visivo
-                # Alternativa: takeItem/insertItem (più pesante ma più precisa)
-            self.lista_materiali.blockSignals(False)
+            item.setHidden(search_text not in nome)
 
     def on_materiale_selezionato(self):
         current_item = self.lista_materiali.currentItem()
         if not current_item:
-            self.abilita_form(False)
-            self.abilita_pulsanti_form(False)
-            self.lbl_selezione.setText("Seleziona un materiale per modificarlo")
-            self.lbl_info_materiale.setText("")
-            self.fornitori_group.setVisible(False)
             return
 
         mat = current_item.data(Qt.UserRole)
         self.materiale_corrente = mat
         id_mat, nome, spessore, prezzo = mat[:4]
         categoria_id = mat[8] if len(mat) > 8 else None
+        scorta_min = mat[9] if len(mat) > 9 else 0.0
+        scorta_max = mat[10] if len(mat) > 10 else 0.0
 
         fornitori = self.db_manager.get_fornitori_per_materiale(id_mat)
         n_forn = len(fornitori)
@@ -709,6 +679,8 @@ class GestioneMaterialiWindow(QMainWindow):
         self.edit_nome.setText(nome)
         self.edit_spessore.setValue(spessore)
         self.edit_prezzo.setValue(prezzo)
+        self.edit_scorta_min_mat.setValue(scorta_min)
+        self.edit_scorta_max_mat.setValue(scorta_max)
 
         idx = self.combo_categoria.findData(categoria_id)
         self.combo_categoria.setCurrentIndex(idx if idx >= 0 else 0)
@@ -716,7 +688,14 @@ class GestioneMaterialiWindow(QMainWindow):
         self.abilita_form(True)
         self.abilita_pulsanti_form(True)
         self._carica_tabella_fornitori(id_mat)
-        self.fornitori_group.setVisible(True)
+
+        # Naviga alla pagina dettaglio
+        self.stack_materiali.setCurrentIndex(1)
+
+    def _torna_alla_lista(self):
+        """Torna alla pagina lista e deseleziona il materiale."""
+        self.lista_materiali.clearSelection()
+        self.stack_materiali.setCurrentIndex(0)
 
     def _carica_tabella_fornitori(self, materiale_id):
         """Ricarica la tabella dei fornitori per il materiale selezionato"""
@@ -818,7 +797,8 @@ class GestioneMaterialiWindow(QMainWindow):
             self._carica_tabella_fornitori(mat_id)
 
     def abilita_form(self, enabled):
-        for w in [self.edit_nome, self.edit_spessore, self.edit_prezzo, self.combo_categoria]:
+        for w in [self.edit_nome, self.edit_spessore, self.edit_prezzo,
+                  self.combo_categoria, self.edit_scorta_min_mat, self.edit_scorta_max_mat]:
             w.setEnabled(enabled)
 
     def abilita_pulsanti_form(self, enabled):
@@ -833,6 +813,8 @@ class GestioneMaterialiWindow(QMainWindow):
             self.edit_spessore.setValue(0.0)
             self.edit_prezzo.setValue(0.0)
             self.combo_categoria.setCurrentIndex(0)
+            self.edit_scorta_min_mat.setValue(0.0)
+            self.edit_scorta_max_mat.setValue(0.0)
 
     def nuovo_materiale(self):
         dialog = NuovoMaterialeDialog(self.db_manager, self)
@@ -862,10 +844,13 @@ class GestioneMaterialiWindow(QMainWindow):
 
         try:
             categoria_id = self.combo_categoria.currentData()
+            scorta_min = self.edit_scorta_min_mat.value()
+            scorta_max = self.edit_scorta_max_mat.value()
             success = self.db_manager.update_materiale_base(
                 self.materiale_corrente[0], nome, spessore, prezzo, categoria_id
             )
             if success:
+                self.db_manager.update_materiale_scorte(self.materiale_corrente[0], scorta_min, scorta_max)
                 self.carica_materiali()
                 self.materiali_modificati.emit()
             else:
@@ -895,6 +880,7 @@ class GestioneMaterialiWindow(QMainWindow):
                     self.abilita_form(False)
                     self.abilita_pulsanti_form(False)
                     self.materiali_modificati.emit()
+                    self.stack_materiali.setCurrentIndex(0)
                 else:
                     QMessageBox.critical(self, "Errore", "Errore durante l'eliminazione del materiale.")
             except Exception as e:
