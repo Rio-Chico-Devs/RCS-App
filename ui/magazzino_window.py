@@ -305,14 +305,6 @@ class MagazzinoWindow(QMainWindow):
         self.combo_filtro_scorte.addItem("Scorte alte", "alte")
         self.combo_filtro_scorte.currentIndexChanged.connect(self.carica_scorte)
 
-        lbl_ordina = QLabel("Ordina:")
-        lbl_ordina.setStyleSheet("font-weight: 600;")
-        self.combo_ordina_mat = QComboBox()
-        self.combo_ordina_mat.addItem("Nome A-Z", "nome")
-        self.combo_ordina_mat.addItem("Più fornitori", "n_fornitori_desc")
-        self.combo_ordina_mat.addItem("Meno fornitori", "n_fornitori_asc")
-        self.combo_ordina_mat.currentIndexChanged.connect(self.carica_scorte)
-
         lbl_fornitore = QLabel("Fornitore:")
         lbl_fornitore.setStyleSheet("font-weight: 600;")
         self.combo_fornitore_filtro = QComboBox()
@@ -329,9 +321,6 @@ class MagazzinoWindow(QMainWindow):
         top_layout.addSpacing(8)
         top_layout.addWidget(lbl_fornitore)
         top_layout.addWidget(self.combo_fornitore_filtro)
-        top_layout.addSpacing(8)
-        top_layout.addWidget(lbl_ordina)
-        top_layout.addWidget(self.combo_ordina_mat)
         top_layout.addStretch()
         top_layout.addWidget(btn_carico)
         top_layout.addSpacing(8)
@@ -377,7 +366,7 @@ class MagazzinoWindow(QMainWindow):
 
     def _carica_scorte_singoli(self):
         """Visualizza le scorte dei materiali (aggregate per materiale)"""
-        ordina_per = self.combo_ordina_mat.currentData() or 'nome'
+        ordina_per = 'nome'
         scorte = self.db_manager.get_scorte(ordina_per)
 
         # Applica filtri
@@ -413,7 +402,7 @@ class MagazzinoWindow(QMainWindow):
 
     def _carica_scorte_categorie(self):
         """Visualizza le scorte aggregate per categoria"""
-        ordina_per = self.combo_ordina_mat.currentData() or 'nome'
+        ordina_per = 'nome'
         # Per la vista categorie usa solo nome/giacenza
         if ordina_per not in ('nome', 'giacenza_asc', 'giacenza_desc'):
             ordina_per = 'nome'
