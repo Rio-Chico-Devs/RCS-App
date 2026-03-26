@@ -262,14 +262,9 @@ class MagazzinoWindow(QMainWindow):
         self.btn_vista_singoli.setStyleSheet(_toggle_style_active)
         self.btn_vista_singoli.clicked.connect(self._vista_singoli)
 
-        self.btn_vista_categorie = QPushButton("Per Categoria")
-        self.btn_vista_categorie.setStyleSheet(_toggle_style_inactive)
-        self.btn_vista_categorie.clicked.connect(self._vista_categorie)
-
-        self._scorte_vista = 'singoli'  # 'singoli' | 'categorie'
+        self._scorte_vista = 'singoli'
 
         top_layout.addWidget(self.btn_vista_singoli)
-        top_layout.addWidget(self.btn_vista_categorie)
         top_layout.addSpacing(16)
 
         btn_carico = QPushButton("Carico Materiale")
@@ -341,28 +336,17 @@ class MagazzinoWindow(QMainWindow):
     def _vista_singoli(self):
         self._scorte_vista = 'singoli'
         self.btn_vista_singoli.setStyleSheet(self._toggle_style_active)
-        self.btn_vista_categorie.setStyleSheet(self._toggle_style_inactive)
-        self.carica_scorte()
-
-    def _vista_categorie(self):
-        self._scorte_vista = 'categorie'
-        self.btn_vista_categorie.setStyleSheet(self._toggle_style_active)
-        self.btn_vista_singoli.setStyleSheet(self._toggle_style_inactive)
         self.carica_scorte()
 
     def carica_scorte(self):
-        """Carica e visualizza le scorte nella vista corrente (singoli o categorie)"""
+        """Carica e visualizza le scorte nella vista corrente"""
         # Pulisci layout
         while self.scorte_layout.count():
             child = self.scorte_layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
 
-        vista = getattr(self, '_scorte_vista', 'singoli')
-        if vista == 'categorie':
-            self._carica_scorte_categorie()
-        else:
-            self._carica_scorte_singoli()
+        self._carica_scorte_singoli()
 
     def _carica_scorte_singoli(self):
         """Visualizza le scorte dei materiali (aggregate per materiale)"""
@@ -399,222 +383,6 @@ class MagazzinoWindow(QMainWindow):
             self.scorte_layout.addWidget(card)
 
         self.scorte_layout.addStretch()
-
-    def _carica_scorte_categorie(self):
-        """Visualizza le scorte aggregate per categoria"""
-        ordina_per = 'nome'
-        # Per la vista categorie usa solo nome/giacenza
-        if ordina_per not in ('nome', 'giacenza_asc', 'giacenza_desc'):
-            ordina_per = 'nome'
-        categorie = self.db_manager.get_scorte_per_categoria(ordina_per)
-
-        if not categorie:
-            lbl_vuoto = QLabel("Nessuna categoria definita. Aggiungile da Gestione Materiali → Categorie.")
-            lbl_vuoto.setAlignment(Qt.AlignCenter)
-            lbl_vuoto.setWordWrap(True)
-            lbl_vuoto.setStyleSheet("color: #718096; font-size: 16px; padding: 40px;")
-            self.scorte_layout.addWidget(lbl_vuoto)
-            self.scorte_layout.addStretch()
-            return
-
-        for cat in categorie:
-            cat_id, nome, giacenza_totale, capacita, giacenza_minima, giacenza_desiderata, num_materiali, note = cat
-            card = self._crea_card_categoria(
-                cat_id, nome, giacenza_totale or 0.0, capacita or 0.0,
-                giacenza_minima or 0.0, giacenza_desiderata or 0.0,
-                num_materiali or 0
-            )
-            self.scorte_layout.addWidget(card)
-
-        self.scorte_layout.addStretch()
-
-    def _crea_card_categoria(self, cat_id, nome, giacenza_totale, capacita,
-                              giacenza_minima, giacenza_desiderata, num_materiali):
-        """Crea una card per una categoria con barra gradiente e informazioni aggregate"""
-        card = QFrame()
-
-        # Determine alert color based on thresholds
-        border_color = "#e2e8f0"
-        if giacenza_minima > 0 and giacenza_totale < giacenza_minima:
-            border_color = "#fc8181"  # red – below minimum
-        elif giacenza_desiderata > 0 and giacenza_totale < giacenza_desiderata:
-            border_color = "#f6ad55"  # orange – below desired
-
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: #ffffff;
-                border: 1px solid {border_color};
-                border-radius: 10px;
-            }}
-            QFrame:hover {{
-                border-color: #a0aec0;
-            }}
-        """)
-
-        card_layout = QHBoxLayout(card)
-        card_layout.setContentsMargins(20, 14, 20, 14)
-        card_layout.setSpacing(20)
-
-        # Info categoria
-        info_layout = QVBoxLayout()
-        info_layout.setSpacing(2)
-
-        lbl_nome = QLabel(nome)
-        lbl_nome.setStyleSheet("font-size: 16px; font-weight: 700; color: #2d3748;")
-
-        dettagli = f"Giacenza totale: {giacenza_totale:.2f} m²"
-        if capacita > 0:
-            dettagli += f" / {capacita:.2f} m²"
-        dettagli += f"  |  {num_materiali} materiali"
-        if giacenza_minima > 0:
-            dettagli += f"  |  Min: {giacenza_minima:.1f} m²"
-        if giacenza_desiderata > 0:
-            dettagli += f"  |  Desiderata: {giacenza_desiderata:.1f} m²"
-
-        lbl_dettagli = QLabel(dettagli)
-        lbl_dettagli.setStyleSheet("font-size: 12px; color: #718096;")
-
-        # Alert label
-        if giacenza_minima > 0 and giacenza_totale < giacenza_minima:
-            lbl_alert = QLabel("⚠ Scorta sotto il minimo!")
-            lbl_alert.setStyleSheet("font-size: 11px; color: #c53030; font-weight: 700;")
-            info_layout.addWidget(lbl_alert)
-        elif giacenza_desiderata > 0 and giacenza_totale < giacenza_desiderata:
-            lbl_alert = QLabel("Scorta sotto il livello desiderato")
-            lbl_alert.setStyleSheet("font-size: 11px; color: #c05621; font-weight: 600;")
-            info_layout.addWidget(lbl_alert)
-
-        info_layout.addWidget(lbl_nome)
-        info_layout.addWidget(lbl_dettagli)
-
-        card_layout.addLayout(info_layout)
-
-        # Barra scorta (basata su capacità se presente, altrimenti su desiderata)
-        ref_capacity = capacita if capacita > 0 else giacenza_desiderata
-        percentuale = (giacenza_totale / ref_capacity * 100) if ref_capacity > 0 else 0
-        barra = BarraScorta(percentuale)
-        card_layout.addWidget(barra)
-
-        # Bottone mostra materiali
-        btn_dettagli = QPushButton("Materiali")
-        btn_dettagli.setStyleSheet("""
-            QPushButton {
-                background-color: #f7fafc; color: #4a5568;
-                border: 1px solid #e2e8f0; min-height: 30px;
-                padding: 4px 12px; font-size: 12px;
-            }
-            QPushButton:hover { background-color: #edf2f7; }
-        """)
-        btn_dettagli.clicked.connect(
-            lambda checked, cid=cat_id, cn=nome: self._mostra_materiali_categoria(cid, cn)
-        )
-        card_layout.addWidget(btn_dettagli)
-
-        return card
-
-    def _mostra_materiali_categoria(self, categoria_id, nome_categoria):
-        """Mostra i materiali di una categoria con giacenza aggregata e barre scorte per fornitore"""
-        mats = self.db_manager.get_materiali_per_categoria_con_fornitori(categoria_id)
-
-        dialog = QDialog(self)
-        dialog.setWindowTitle(f"Materiali – {nome_categoria}")
-        dialog.setMinimumSize(760, 480)
-        dialog.setStyleSheet("""
-            QDialog { background-color: #fafbfc; }
-            QLabel { color: #2d3748; font-family: system-ui, -apple-system, sans-serif; }
-            QScrollArea { border: none; background: transparent; }
-        """)
-
-        dlg_layout = QVBoxLayout(dialog)
-        dlg_layout.setContentsMargins(25, 25, 25, 25)
-        dlg_layout.setSpacing(12)
-
-        title = QLabel(f"Categoria: {nome_categoria}")
-        title.setStyleSheet("font-size: 16px; font-weight: 700;")
-        dlg_layout.addWidget(title)
-
-        if not mats:
-            lbl = QLabel("Nessun materiale assegnato a questa categoria.")
-            lbl.setStyleSheet("color: #718096;")
-            dlg_layout.addWidget(lbl)
-        else:
-            scroll = QScrollArea()
-            scroll.setWidgetResizable(True)
-            container = QWidget()
-            cont_layout = QVBoxLayout(container)
-            cont_layout.setSpacing(8)
-            cont_layout.setContentsMargins(0, 0, 0, 0)
-
-            totale = 0.0
-            for mat in mats:
-                # get_materiali_per_categoria_con_fornitori: id, nome, giacenza_totale, scorta_massima, n_fornitori
-                mat_id, nome, giacenza_totale, scorta_massima, n_fornitori = mat
-                totale += giacenza_totale
-
-                # Riga materiale (card collassabile)
-                mat_frame = QFrame()
-                mat_frame.setStyleSheet("""
-                    QFrame { background-color: #ffffff; border: 1px solid #e2e8f0;
-                             border-radius: 8px; }
-                """)
-                mat_layout = QVBoxLayout(mat_frame)
-                mat_layout.setContentsMargins(16, 10, 16, 10)
-                mat_layout.setSpacing(6)
-
-                # Header materiale
-                header = QHBoxLayout()
-                lbl_mat = QLabel(nome)
-                lbl_mat.setStyleSheet("font-size: 14px; font-weight: 700; color: #2d3748;")
-                lbl_giac = QLabel(f"Totale: {giacenza_totale:.2f} m²  |  {n_fornitori} fornitore/i")
-                lbl_giac.setStyleSheet("font-size: 12px; color: #718096;")
-                header.addWidget(lbl_mat)
-                header.addWidget(lbl_giac)
-                header.addStretch()
-                mat_layout.addLayout(header)
-
-                # Barre per-fornitore
-                fornitori = self.db_manager.get_fornitori_per_materiale(mat_id)
-                for mf in fornitori:
-                    mf_id, forn_nome, prezzo_forn, s_min, s_max, giacenza = mf
-                    forn_row = QHBoxLayout()
-                    forn_row.setSpacing(12)
-
-                    lbl_f = QLabel(forn_nome)
-                    lbl_f.setStyleSheet("font-size: 12px; color: #4a5568; font-weight: 600;")
-                    lbl_f.setFixedWidth(120)
-                    forn_row.addWidget(lbl_f)
-
-                    perc = (giacenza / s_max * 100) if s_max > 0 else 0
-                    barra = BarraScorta(perc)
-                    barra.setMinimumHeight(20)
-                    forn_row.addWidget(barra, 1)
-
-                    lbl_val = QLabel(f"{giacenza:.1f} / {s_max:.1f} m²")
-                    lbl_val.setStyleSheet("font-size: 11px; color: #718096;")
-                    lbl_val.setFixedWidth(100)
-                    forn_row.addWidget(lbl_val)
-
-                    mat_layout.addLayout(forn_row)
-
-                cont_layout.addWidget(mat_frame)
-
-            cont_layout.addStretch()
-            scroll.setWidget(container)
-            dlg_layout.addWidget(scroll)
-
-            lbl_tot = QLabel(f"Giacenza totale categoria: {totale:.2f} m²")
-            lbl_tot.setStyleSheet("font-size: 13px; font-weight: 600; color: #4a5568;")
-            dlg_layout.addWidget(lbl_tot)
-
-        btn_close = QPushButton("Chiudi")
-        btn_close.setStyleSheet("""
-            QPushButton { background-color: #4a5568; color: #ffffff; min-height: 36px; padding: 8px 20px; }
-            QPushButton:hover { background-color: #2d3748; }
-        """)
-        btn_close.clicked.connect(dialog.accept)
-        dlg_layout.addWidget(btn_close, alignment=Qt.AlignRight)
-
-        dialog.exec_()
 
     def _crea_card_scorta(self, mat_id, nome, giacenza_totale, scorta_massima, n_fornitori, prezzo_min):
         """Crea una card per un materiale (giacenza aggregata su tutti i fornitori)"""

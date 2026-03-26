@@ -45,8 +45,6 @@ class VisualizzaPreventiviWindow(QMainWindow):
         self.parent_window = parent
         self.init_ui()
         self.load_clienti_filtro()
-        self.load_categorie_filtro()
-        self.load_sottocategorie_filtro()
         self.load_preventivi()
 
     def init_ui(self) -> None:
@@ -272,28 +270,6 @@ class VisualizzaPreventiviWindow(QMainWindow):
         filters_layout.addWidget(cliente_label)
         filters_layout.addWidget(self.filtro_cliente)
 
-        # Filtro Categoria
-        categoria_label = QLabel("Categoria:")
-        categoria_label.setStyleSheet("QLabel { font-weight: 500; color: #4a5568; }")
-        self.filtro_categoria = QComboBox()
-        self.filtro_categoria.addItem("Tutte le categorie", None)
-        self.filtro_categoria.currentIndexChanged.connect(self.load_preventivi)
-        self.filtro_categoria.setMinimumWidth(160)
-
-        filters_layout.addWidget(categoria_label)
-        filters_layout.addWidget(self.filtro_categoria)
-
-        # Filtro Sottocategoria
-        sottocategoria_label = QLabel("Sottocategoria:")
-        sottocategoria_label.setStyleSheet("QLabel { font-weight: 500; color: #4a5568; }")
-        self.filtro_sottocategoria = QComboBox()
-        self.filtro_sottocategoria.addItem("Tutte le sottocategorie", None)
-        self.filtro_sottocategoria.currentIndexChanged.connect(self.load_preventivi)
-        self.filtro_sottocategoria.setMinimumWidth(180)
-
-        filters_layout.addWidget(sottocategoria_label)
-        filters_layout.addWidget(self.filtro_sottocategoria)
-
         # Filtro Keyword
         keyword_label = QLabel("Cerca:")
         keyword_label.setStyleSheet("QLabel { font-weight: 500; color: #4a5568; }")
@@ -317,9 +293,9 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
         # Tabella principale
         self.lista_preventivi = QTableWidget()
-        self.lista_preventivi.setColumnCount(9)
+        self.lista_preventivi.setColumnCount(7)
         self.lista_preventivi.setHorizontalHeaderLabels([
-            "#", "Tipo", "Cliente", "Misura", "Categoria", "Sottocategoria",
+            "#", "Tipo", "Cliente", "Misura",
             "Descrizione", "Prev. €", "Prezzo €"
         ])
         self.lista_preventivi.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -336,11 +312,9 @@ class VisualizzaPreventiviWindow(QMainWindow):
         hdr.setSectionResizeMode(1, QHeaderView.ResizeToContents)   # Tipo
         hdr.setSectionResizeMode(2, QHeaderView.ResizeToContents)   # Cliente
         hdr.setSectionResizeMode(3, QHeaderView.ResizeToContents)   # Misura
-        hdr.setSectionResizeMode(4, QHeaderView.ResizeToContents)   # Categoria
-        hdr.setSectionResizeMode(5, QHeaderView.ResizeToContents)   # Sottocategoria
-        hdr.setSectionResizeMode(6, QHeaderView.Stretch)            # Descrizione (più lunga)
-        hdr.setSectionResizeMode(7, QHeaderView.ResizeToContents)   # Prev €
-        hdr.setSectionResizeMode(8, QHeaderView.ResizeToContents)   # Prezzo €
+        hdr.setSectionResizeMode(4, QHeaderView.Stretch)            # Descrizione (più lunga)
+        hdr.setSectionResizeMode(5, QHeaderView.ResizeToContents)   # Prev €
+        hdr.setSectionResizeMode(6, QHeaderView.ResizeToContents)   # Prezzo €
 
         self.lista_preventivi.doubleClicked.connect(self.visualizza_preventivo)
         self.lista_preventivi.currentItemChanged.connect(self._on_selezione_cambiata)
@@ -573,55 +547,6 @@ class VisualizzaPreventiviWindow(QMainWindow):
     # METODI FUNZIONALI
     # =============================================================================
 
-    def load_categorie_filtro(self) -> None:
-        """Popola il filtro categorie con i valori esistenti nel DB"""
-        current_data = self.filtro_categoria.currentData()
-        self.filtro_categoria.blockSignals(True)
-        self.filtro_categoria.clear()
-        self.filtro_categoria.addItem("Tutte le categorie", None)
-        try:
-            preventivi = self.db_manager.get_all_preventivi()
-            categorie = set()
-            for prev in preventivi:
-                prev_c = self.db_manager.get_preventivo_by_id(prev[0])
-                if prev_c:
-                    cat = (prev_c.get('categoria') or '').strip()
-                    if cat:
-                        categorie.add(cat)
-            for cat in sorted(categorie):
-                self.filtro_categoria.addItem(cat, cat)
-            # Ripristina selezione precedente se ancora presente
-            idx = self.filtro_categoria.findData(current_data)
-            if idx >= 0:
-                self.filtro_categoria.setCurrentIndex(idx)
-        except Exception as e:
-            print(f"Errore nel caricamento categorie filtro: {str(e)}")
-        self.filtro_categoria.blockSignals(False)
-
-    def load_sottocategorie_filtro(self) -> None:
-        """Popola il filtro sottocategorie con i valori esistenti nel DB"""
-        current_data = self.filtro_sottocategoria.currentData()
-        self.filtro_sottocategoria.blockSignals(True)
-        self.filtro_sottocategoria.clear()
-        self.filtro_sottocategoria.addItem("Tutte le sottocategorie", None)
-        try:
-            preventivi = self.db_manager.get_all_preventivi()
-            sottocategorie = set()
-            for prev in preventivi:
-                prev_c = self.db_manager.get_preventivo_by_id(prev[0])
-                if prev_c:
-                    sc = (prev_c.get('sottocategoria') or '').strip()
-                    if sc:
-                        sottocategorie.add(sc)
-            for sc in sorted(sottocategorie):
-                self.filtro_sottocategoria.addItem(sc, sc)
-            idx = self.filtro_sottocategoria.findData(current_data)
-            if idx >= 0:
-                self.filtro_sottocategoria.setCurrentIndex(idx)
-        except Exception as e:
-            print(f"Errore nel caricamento sottocategorie filtro: {str(e)}")
-        self.filtro_sottocategoria.blockSignals(False)
-
     def _get_current_preventivo_id(self):
         """Restituisce l'id del preventivo della riga selezionata nella tabella, o None"""
         item = self.lista_preventivi.currentItem()
@@ -673,8 +598,6 @@ class VisualizzaPreventiviWindow(QMainWindow):
         filtro_origine_text = self.filtro_origine.currentText()
         filtro_cliente_data = self.filtro_cliente.currentData()
         filtro_keyword_text = self.filtro_keyword.text().lower().strip()
-        filtro_categoria_data = self.filtro_categoria.currentData()
-        filtro_sottocategoria_data = self.filtro_sottocategoria.currentData()
 
         # Carica SEMPRE tutti i preventivi
         if filtro_origine_text == "Con modifiche":
@@ -704,16 +627,6 @@ class VisualizzaPreventiviWindow(QMainWindow):
 
             # APPLICA FILTRO CLIENTE
             if filtro_cliente_data and nome_cliente.strip() != filtro_cliente_data:
-                continue
-
-            # APPLICA FILTRO CATEGORIA
-            categoria = prev_completo.get('categoria', '') or ''
-            if filtro_categoria_data and categoria.strip() != filtro_categoria_data:
-                continue
-
-            # APPLICA FILTRO SOTTOCATEGORIA
-            sottocategoria = prev_completo.get('sottocategoria', '') or ''
-            if filtro_sottocategoria_data and sottocategoria.strip() != filtro_sottocategoria_data:
                 continue
 
             # APPLICA FILTRO KEYWORD
@@ -750,11 +663,9 @@ class VisualizzaPreventiviWindow(QMainWindow):
             self.lista_preventivi.setItem(row_idx, 1, make_cell(tipo_preventivo))
             self.lista_preventivi.setItem(row_idx, 2, make_cell(nome_cliente or "—"))
             self.lista_preventivi.setItem(row_idx, 3, make_cell(misura or "—"))
-            self.lista_preventivi.setItem(row_idx, 4, make_cell(categoria or "—"))
-            self.lista_preventivi.setItem(row_idx, 5, make_cell(sottocategoria or "—"))
-            self.lista_preventivi.setItem(row_idx, 6, make_cell(descrizione or "—"))
-            self.lista_preventivi.setItem(row_idx, 7, make_cell(prev_str, align=Qt.AlignRight | Qt.AlignVCenter))
-            self.lista_preventivi.setItem(row_idx, 8, make_cell(prezzo_str, align=Qt.AlignRight | Qt.AlignVCenter))
+            self.lista_preventivi.setItem(row_idx, 4, make_cell(descrizione or "—"))
+            self.lista_preventivi.setItem(row_idx, 5, make_cell(prev_str, align=Qt.AlignRight | Qt.AlignVCenter))
+            self.lista_preventivi.setItem(row_idx, 6, make_cell(prezzo_str, align=Qt.AlignRight | Qt.AlignVCenter))
             count += 1
 
         self.lista_preventivi.resizeRowsToContents()

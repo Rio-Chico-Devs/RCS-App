@@ -136,8 +136,6 @@ class DatabaseManager:
             ("codice", "TEXT NOT NULL DEFAULT ''"),
             ("finitura", "TEXT NOT NULL DEFAULT ''"),
             ("storico_modifiche", "TEXT DEFAULT '[]'"),
-            ("categoria", "TEXT NOT NULL DEFAULT ''"),
-            ("sottocategoria", "TEXT NOT NULL DEFAULT ''"),
         ]
 
         for column_name, column_def in new_columns:
@@ -166,48 +164,6 @@ class DatabaseManager:
                     cursor.execute(f"ALTER TABLE materiali ADD COLUMN {column_name} {column_def}")
                 except sqlite3.OperationalError as e:
                     print(f"[DB migrazione] materiali.{column_name}: {e}", file=sys.stderr)
-
-        # Tabella categorie materiale
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS categorie_materiale (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nome TEXT NOT NULL UNIQUE,
-                giacenza_minima REAL NOT NULL DEFAULT 0.0,
-                giacenza_desiderata REAL NOT NULL DEFAULT 0.0,
-                capacita_magazzino REAL NOT NULL DEFAULT 0.0,
-                note TEXT DEFAULT ''
-            )
-        """)
-
-        # Migrazione: aggiungi categoria_id ai materiali se non esiste
-        cursor.execute("PRAGMA table_info(materiali)")
-        mat_cols = [c[1] for c in cursor.fetchall()]
-        if 'categoria_id' not in mat_cols:
-            try:
-                cursor.execute("ALTER TABLE materiali ADD COLUMN categoria_id INTEGER REFERENCES categorie_materiale(id)")
-            except Exception as e:
-                print(f"[DB migrazione] materiali.categoria_id: {e}", file=sys.stderr)
-
-        # Tabella categorie materiale
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS categorie_materiale (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nome TEXT NOT NULL UNIQUE,
-                giacenza_minima REAL NOT NULL DEFAULT 0.0,
-                giacenza_desiderata REAL NOT NULL DEFAULT 0.0,
-                capacita_magazzino REAL NOT NULL DEFAULT 0.0,
-                note TEXT DEFAULT ''
-            )
-        """)
-
-        # Migrazione: aggiungi categoria_id ai materiali se non esiste (secondo controllo)
-        cursor.execute("PRAGMA table_info(materiali)")
-        mat_cols = [c[1] for c in cursor.fetchall()]
-        if 'categoria_id' not in mat_cols:
-            try:
-                cursor.execute("ALTER TABLE materiali ADD COLUMN categoria_id INTEGER REFERENCES categorie_materiale(id)")
-            except Exception as e:
-                print(f"[DB migrazione] materiali.categoria_id (2): {e}", file=sys.stderr)
 
         # Tabella movimenti magazzino
         cursor.execute("""
@@ -331,14 +287,14 @@ class DatabaseManager:
             except sqlite3.IntegrityError:
                 return False
 
-    def update_materiale_base(self, materiale_id, nome, spessore, prezzo, categoria_id=None):
+    def update_materiale_base(self, materiale_id, nome, spessore, prezzo):
         """Aggiorna solo i campi base di un materiale (senza toccare fornitori/giacenza legacy)"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    "UPDATE materiali SET nome = ?, spessore = ?, prezzo = ?, categoria_id = ? WHERE id = ?",
-                    (nome, spessore, prezzo, categoria_id, materiale_id)
+                    "UPDATE materiali SET nome = ?, spessore = ?, prezzo = ? WHERE id = ?",
+                    (nome, spessore, prezzo, materiale_id)
                 )
                 conn.commit()
                 return cursor.rowcount > 0
@@ -356,14 +312,14 @@ class DatabaseManager:
             conn.commit()
             return cursor.rowcount > 0
 
-    def update_materiale(self, materiale_id, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0, categoria_id=None):
+    def update_materiale(self, materiale_id, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0):
         """Aggiorna un materiale esistente"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    "UPDATE materiali SET nome = ?, spessore = ?, prezzo = ?, fornitore = ?, prezzo_fornitore = ?, capacita_magazzino = ?, giacenza = ?, categoria_id = ? WHERE id = ?",
-                    (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id, materiale_id)
+                    "UPDATE materiali SET nome = ?, spessore = ?, prezzo = ?, fornitore = ?, prezzo_fornitore = ?, capacita_magazzino = ?, giacenza = ? WHERE id = ?",
+                    (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, materiale_id)
                 )
                 conn.commit()
                 return cursor.rowcount > 0
@@ -670,51 +626,6 @@ class DatabaseManager:
                 GROUP BY m.id, m.nome
                 ORDER BY {order}
             """)
-            return cursor.fetchall()
-
-    def get_scorte_per_categoria(self, ordina_per='giacenza_asc'):
-        """Restituisce le scorte aggregate per categoria (somma giacenza da materiale_fornitori)"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            if ordina_per == 'giacenza_asc':
-                order = "giacenza_totale ASC"
-            elif ordina_per == 'giacenza_desc':
-                order = "giacenza_totale DESC"
-            else:
-                order = "c.nome ASC"
-
-            cursor.execute(f"""
-                SELECT c.id, c.nome,
-                       COALESCE(SUM(COALESCE(mf_sum.giac, m.giacenza)), 0) as giacenza_totale,
-                       c.capacita_magazzino, c.giacenza_minima, c.giacenza_desiderata,
-                       COUNT(DISTINCT m.id) as num_materiali, c.note
-                FROM categorie_materiale c
-                LEFT JOIN materiali m ON m.categoria_id = c.id
-                LEFT JOIN (
-                    SELECT materiale_id, SUM(giacenza) as giac
-                    FROM materiale_fornitori
-                    GROUP BY materiale_id
-                ) mf_sum ON mf_sum.materiale_id = m.id
-                GROUP BY c.id, c.nome, c.capacita_magazzino, c.giacenza_minima, c.giacenza_desiderata, c.note
-                ORDER BY {order}
-            """)
-            return cursor.fetchall()
-
-    def get_materiali_per_categoria_con_fornitori(self, categoria_id):
-        """Restituisce i materiali di una categoria con i relativi fornitori e stock"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT m.id, m.nome,
-                       COALESCE(SUM(mf.giacenza), m.giacenza) as giacenza_totale,
-                       COALESCE(MAX(mf.scorta_massima), m.capacita_magazzino) as scorta_massima,
-                       COUNT(mf.id) as n_fornitori
-                FROM materiali m
-                LEFT JOIN materiale_fornitori mf ON mf.materiale_id = m.id
-                WHERE m.categoria_id = ?
-                GROUP BY m.id, m.nome
-                ORDER BY m.nome
-            """, (categoria_id,))
             return cursor.fetchall()
 
     # =================== METODI PREVENTIVI CON VERSIONING ===================
@@ -1198,71 +1109,6 @@ class DatabaseManager:
             for mat_id in materiale_ids:
                 cursor.execute("UPDATE materiali SET fornitore = ? WHERE id = ?", (nome_fornitore, mat_id))
             conn.commit()
-
-    # =================== METODI CATEGORIE MATERIALE ===================
-
-    def get_all_categorie(self):
-        """Restituisce tutte le categorie di materiale"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, giacenza_minima, giacenza_desiderata, capacita_magazzino, note FROM categorie_materiale ORDER BY nome")
-            return cursor.fetchall()
-
-    def get_categoria_by_id(self, categoria_id):
-        """Restituisce una categoria specifica"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, giacenza_minima, giacenza_desiderata, capacita_magazzino, note FROM categorie_materiale WHERE id = ?", (categoria_id,))
-            return cursor.fetchone()
-
-    def add_categoria(self, nome, giacenza_minima=0.0, giacenza_desiderata=0.0, capacita_magazzino=0.0, note=""):
-        """Aggiunge una nuova categoria"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            try:
-                cursor.execute(
-                    "INSERT INTO categorie_materiale (nome, giacenza_minima, giacenza_desiderata, capacita_magazzino, note) VALUES (?, ?, ?, ?, ?)",
-                    (nome, giacenza_minima, giacenza_desiderata, capacita_magazzino, note)
-                )
-                conn.commit()
-                return cursor.lastrowid
-            except sqlite3.IntegrityError:
-                return False
-
-    def update_categoria(self, categoria_id, nome, giacenza_minima=0.0, giacenza_desiderata=0.0, capacita_magazzino=0.0, note=""):
-        """Aggiorna una categoria esistente"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            try:
-                cursor.execute(
-                    "UPDATE categorie_materiale SET nome = ?, giacenza_minima = ?, giacenza_desiderata = ?, capacita_magazzino = ?, note = ? WHERE id = ?",
-                    (nome, giacenza_minima, giacenza_desiderata, capacita_magazzino, note, categoria_id)
-                )
-                conn.commit()
-                return cursor.rowcount > 0
-            except sqlite3.IntegrityError:
-                return False
-
-    def delete_categoria(self, categoria_id):
-        """Elimina una categoria e rimuove il riferimento dai materiali collegati"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("UPDATE materiali SET categoria_id = NULL WHERE categoria_id = ?", (categoria_id,))
-            cursor.execute("DELETE FROM categorie_materiale WHERE id = ?", (categoria_id,))
-            conn.commit()
-            return cursor.rowcount > 0
-
-    def get_materiali_per_categoria(self, categoria_id):
-        """Restituisce i materiali di una categoria specifica"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, nome, giacenza, capacita_magazzino, fornitore, prezzo_fornitore
-                FROM materiali
-                WHERE categoria_id = ?
-                ORDER BY nome
-            """, (categoria_id,))
-            return cursor.fetchall()
 
     def delete_preventivo_e_revisioni(self, preventivo_id):
         """Elimina un preventivo e tutte le sue revisioni se è l'originale,
