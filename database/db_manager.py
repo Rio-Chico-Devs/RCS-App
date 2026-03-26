@@ -547,6 +547,12 @@ class DatabaseManager:
                 order = "giacenza_totale ASC"
             elif ordina_per == 'giacenza_desc':
                 order = "giacenza_totale DESC"
+            elif ordina_per == 'n_fornitori_asc':
+                order = "n_fornitori ASC, m.nome ASC"
+            elif ordina_per == 'n_fornitori_desc':
+                order = "n_fornitori DESC, m.nome ASC"
+            elif ordina_per == 'fornitore_asc':
+                order = "(SELECT MIN(fornitore_nome) FROM materiale_fornitori WHERE materiale_id = m.id) ASC, m.nome ASC"
             else:
                 order = "m.nome ASC"
 
