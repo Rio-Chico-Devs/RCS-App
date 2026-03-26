@@ -24,6 +24,7 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QFrame, QGraphicsDropShadowEffect, QGroupBox,
                              QTextEdit, QSplitter)
 from PyQt5.QtCore import Qt, pyqtSignal
+import difflib
 from PyQt5.QtGui import QColor
 from datetime import datetime
 import json
@@ -420,6 +421,40 @@ class VisualizzaModificheDialog(QDialog):
         except Exception as e:
             return f"=== {titolo} ===\n\nErrore nella formattazione: {str(e)}"
 
+    @staticmethod
+    def _build_diff_html(lines_left, lines_right):
+        """Genera HTML con righe evidenziate in base alle differenze (difflib)."""
+        def esc(s):
+            return (s.replace('&', '&amp;')
+                     .replace('<', '&lt;')
+                     .replace('>', '&gt;')
+                     .replace(' ', '&nbsp;'))
+
+        matcher = difflib.SequenceMatcher(None, lines_left, lines_right, autojunk=False)
+        left_parts, right_parts = [], []
+
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag == 'equal':
+                for line in lines_left[i1:i2]:
+                    left_parts.append(f'<div>{esc(line)}</div>')
+                for line in lines_right[j1:j2]:
+                    right_parts.append(f'<div>{esc(line)}</div>')
+            elif tag == 'replace':
+                for line in lines_left[i1:i2]:
+                    left_parts.append(f'<div style="background-color:#fef5e7;">{esc(line)}</div>')
+                for line in lines_right[j1:j2]:
+                    right_parts.append(f'<div style="background-color:#fef5e7;">{esc(line)}</div>')
+            elif tag == 'delete':
+                for line in lines_left[i1:i2]:
+                    left_parts.append(f'<div style="background-color:#fff5f5;">{esc(line)}</div>')
+            elif tag == 'insert':
+                for line in lines_right[j1:j2]:
+                    right_parts.append(f'<div style="background-color:#f0fff4;">{esc(line)}</div>')
+
+        style = 'font-family: monospace; font-size: 13px; line-height: 1.7;'
+        return (f'<div style="{style}">{"".join(left_parts)}</div>',
+                f'<div style="{style}">{"".join(right_parts)}</div>')
+
     def confronta_con_corrente(self) -> None:
         """Confronta la versione selezionata con quella corrente"""
         current_item = self.lista_versioni.currentItem()
@@ -468,7 +503,10 @@ class VisualizzaModificheDialog(QDialog):
         except Exception:
             timestamp_str = timestamp
 
-        text_left.setText(self.formatta_dettagli_preventivo(versione_selezionata, f"VERSIONE DEL {timestamp_str}"))
+        testo_sx = self.formatta_dettagli_preventivo(versione_selezionata, f"VERSIONE DEL {timestamp_str}")
+        testo_dx = self.formatta_dettagli_preventivo(self.preventivo_corrente, "VERSIONE CORRENTE")
+        html_sx, html_dx = self._build_diff_html(testo_sx.splitlines(), testo_dx.splitlines())
+        text_left.setHtml(html_sx)
         left_layout.addWidget(text_left)
         splitter.addWidget(left_group)
 
@@ -477,7 +515,7 @@ class VisualizzaModificheDialog(QDialog):
         right_layout = QVBoxLayout(right_group)
         text_right = QTextEdit()
         text_right.setReadOnly(True)
-        text_right.setText(self.formatta_dettagli_preventivo(self.preventivo_corrente, "VERSIONE CORRENTE"))
+        text_right.setHtml(html_dx)
         right_layout.addWidget(text_right)
         splitter.addWidget(right_group)
 
