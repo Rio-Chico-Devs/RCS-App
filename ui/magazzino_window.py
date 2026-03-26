@@ -659,7 +659,11 @@ class MagazzinoWindow(QMainWindow):
         forn_col.addWidget(lbl_forn)
         card_layout.addLayout(forn_col)
 
-        card_layout.addStretch()
+        # Barra scorta
+        percentuale = (giacenza_totale / scorta_massima * 100) if scorta_massima > 0 else 0
+        barra = BarraScorta(percentuale)
+        barra.setMinimumWidth(160)
+        card_layout.addWidget(barra, 1)
 
         # Bottone fornitori (drill-down)
         btn_forn = QPushButton("Fornitori")
