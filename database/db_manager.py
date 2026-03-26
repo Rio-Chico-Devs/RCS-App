@@ -1300,17 +1300,23 @@ class DatabaseManager:
     # =================== METODI CLIENTI ===================
 
     def get_all_clienti(self):
-        """Restituisce tutti i clienti ordinati per nome"""
+        """Restituisce tutti i clienti con conteggio preventivi, ordinati per nome"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, email, telefono, note FROM clienti ORDER BY nome")
+            cursor.execute("""
+                SELECT c.id, c.nome, COUNT(p.id) as n_preventivi
+                FROM clienti c
+                LEFT JOIN preventivi p ON p.nome_cliente = c.nome
+                GROUP BY c.id, c.nome
+                ORDER BY c.nome
+            """)
             return cursor.fetchall()
 
     def get_cliente_by_id(self, cliente_id):
         """Restituisce un cliente specifico tramite ID"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, email, telefono, note FROM clienti WHERE id = ?", (cliente_id,))
+            cursor.execute("SELECT id, nome FROM clienti WHERE id = ?", (cliente_id,))
             return cursor.fetchone()
 
     def add_cliente(self, nome, email="", telefono="", note=""):
@@ -1318,10 +1324,7 @@ class DatabaseManager:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             try:
-                cursor.execute(
-                    "INSERT INTO clienti (nome, email, telefono, note) VALUES (?, ?, ?, ?)",
-                    (nome, email, telefono, note)
-                )
+                cursor.execute("INSERT INTO clienti (nome) VALUES (?)", (nome,))
                 conn.commit()
                 return cursor.lastrowid
             except sqlite3.IntegrityError:
@@ -1332,10 +1335,7 @@ class DatabaseManager:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             try:
-                cursor.execute(
-                    "UPDATE clienti SET nome = ?, email = ?, telefono = ?, note = ? WHERE id = ?",
-                    (nome, email, telefono, note, cliente_id)
-                )
+                cursor.execute("UPDATE clienti SET nome = ? WHERE id = ?", (nome, cliente_id))
                 conn.commit()
                 return cursor.rowcount > 0
             except sqlite3.IntegrityError:
