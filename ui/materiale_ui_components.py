@@ -291,10 +291,12 @@ class MaterialeUIComponents:
             QComboBox::drop-down { border: none; width: 20px; }
             QComboBox QAbstractItemView {
                 background-color: #ffffff;
-                selection-background-color: #edf2f7;
+                selection-background-color: #4299e1;
+                selection-color: #ffffff;
                 font-size: 13px;
             }
             QComboBox QAbstractItemView::item { min-height: 28px; padding: 4px 8px; }
+            QComboBox QAbstractItemView::item:hover { background-color: #bee3f8; color: #2d3748; }
         """)
         window_instance.combo_posa.currentIndexChanged.connect(window_instance.on_parametro_changed)
         form_layout.addRow(MaterialeUIComponents.create_standard_label("Posa"), window_instance.combo_posa)
