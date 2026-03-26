@@ -1075,11 +1075,21 @@ class MagazzinoWindow(QMainWindow):
         """)
         layout.addWidget(self.lbl_riepilogo_consumi)
 
-        # Tabella consumi
+        # Tabella movimenti individuali
         self.tabella_consumi = QTableWidget()
-        self.tabella_consumi.setColumnCount(4)
-        self.tabella_consumi.setHorizontalHeaderLabels(["Materiale", "Consumato (m²)", "Prezzo Fornitore (€/m²)", "Spesa Totale (€)"])
-        self.tabella_consumi.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.tabella_consumi.setColumnCount(7)
+        self.tabella_consumi.setHorizontalHeaderLabels(
+            ["Data", "Tipo", "Materiale", "Quantità (m²)", "Fornitore", "Note", ""]
+        )
+        self.tabella_consumi.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.tabella_consumi.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.tabella_consumi.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.tabella_consumi.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.tabella_consumi.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        self.tabella_consumi.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
+        self.tabella_consumi.horizontalHeader().setSectionResizeMode(6, QHeaderView.Fixed)
+        self.tabella_consumi.setColumnWidth(6, 170)
+        self.tabella_consumi.verticalHeader().setVisible(False)
         self.tabella_consumi.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabella_consumi.setAlternatingRowColors(True)
         self.tabella_consumi.setStyleSheet("""
@@ -1091,43 +1101,162 @@ class MagazzinoWindow(QMainWindow):
         layout.addWidget(self.tabella_consumi, 1)
 
     def carica_consumi(self):
-        """Carica e visualizza i consumi per il periodo selezionato"""
+        """Carica e visualizza i movimenti individuali per il periodo selezionato"""
         periodo = self.combo_periodo.currentData() or 'mese_corrente'
         data_inizio, data_fine = self._calcola_date_periodo(periodo)
 
-        consumi = self.db_manager.get_consumi_periodo(data_inizio, data_fine)
+        movimenti = self.db_manager.get_movimenti_periodo(data_inizio, data_fine)
 
-        self.tabella_consumi.setRowCount(len(consumi))
+        self.tabella_consumi.setRowCount(len(movimenti))
 
-        totale_consumato = 0.0
-        totale_spesa = 0.0
+        totale_scarico = 0.0
+        n_scarichi = 0
 
-        for row, consumo in enumerate(consumi):
-            mat_id, nome, prezzo_fornitore, quantita = consumo
-            spesa = quantita * prezzo_fornitore
+        for row, mov in enumerate(movimenti):
+            mov_id, nome, tipo, quantita, data, note, fornitore_nome, mat_id = mov
 
-            totale_consumato += quantita
-            totale_spesa += spesa
+            if tipo == 'scarico':
+                totale_scarico += quantita
+                n_scarichi += 1
 
-            self.tabella_consumi.setItem(row, 0, QTableWidgetItem(nome))
-            self.tabella_consumi.setItem(row, 1, QTableWidgetItem(f"{quantita:.2f}"))
-            self.tabella_consumi.setItem(row, 2, QTableWidgetItem(f"€ {prezzo_fornitore:.2f}"))
+            # Data
+            data_str = data[:10] if len(data) >= 10 else data
+            self.tabella_consumi.setItem(row, 0, QTableWidgetItem(data_str))
 
-            spesa_item = QTableWidgetItem(f"€ {spesa:.2f}")
-            spesa_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            self.tabella_consumi.setItem(row, 3, spesa_item)
+            # Tipo con colore
+            tipo_item = QTableWidgetItem(tipo.upper())
+            tipo_item.setForeground(QColor(56, 161, 105) if tipo == 'carico' else QColor(229, 62, 62))
+            tipo_item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
+            self.tabella_consumi.setItem(row, 1, tipo_item)
+
+            self.tabella_consumi.setItem(row, 2, QTableWidgetItem(nome))
+
+            q_item = QTableWidgetItem(f"{quantita:.2f}")
+            q_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.tabella_consumi.setItem(row, 3, q_item)
+
+            self.tabella_consumi.setItem(row, 4, QTableWidgetItem(fornitore_nome or "—"))
+            self.tabella_consumi.setItem(row, 5, QTableWidgetItem(note or ""))
+
+            # Pulsanti Modifica / Elimina
+            btn_frame = QFrame()
+            btn_layout = QHBoxLayout(btn_frame)
+            btn_layout.setContentsMargins(4, 2, 4, 2)
+            btn_layout.setSpacing(6)
+
+            btn_mod = QPushButton("Modifica")
+            btn_mod.setFixedHeight(30)
+            btn_mod.setStyleSheet("""
+                QPushButton { background-color: #edf2f7; color: #2d3748; border: none;
+                              border-radius: 4px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+                QPushButton:hover { background-color: #e2e8f0; }
+            """)
+            btn_mod.clicked.connect(lambda checked, mid=mov_id, q=quantita, n=note or "":
+                                    self._modifica_movimento(mid, q, n))
+
+            btn_del = QPushButton("Elimina")
+            btn_del.setFixedHeight(30)
+            btn_del.setStyleSheet("""
+                QPushButton { background-color: #fff5f5; color: #c53030; border: 1px solid #fed7d7;
+                              border-radius: 4px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+                QPushButton:hover { background-color: #fed7d7; }
+            """)
+            btn_del.clicked.connect(lambda checked, mid=mov_id, mn=nome, t=tipo, q=quantita:
+                                    self._elimina_movimento(mid, mn, t, q))
+
+            btn_layout.addWidget(btn_mod)
+            btn_layout.addWidget(btn_del)
+            self.tabella_consumi.setCellWidget(row, 6, btn_frame)
+            self.tabella_consumi.setRowHeight(row, 44)
 
         # Aggiorna riepilogo
         periodo_testo = self.combo_periodo.currentText()
-        if consumi:
+        if movimenti:
             self.lbl_riepilogo_consumi.setText(
-                f"{periodo_testo}:  {totale_consumato:.2f} m² consumati  |  "
-                f"Spesa totale: € {totale_spesa:.2f}"
+                f"{periodo_testo}:  {len(movimenti)} movimenti  |  "
+                f"Totale scaricato: {totale_scarico:.2f} m²  ({n_scarichi} scarichi)"
             )
         else:
             self.lbl_riepilogo_consumi.setText(
-                f"{periodo_testo}:  Nessun consumo registrato nel periodo selezionato"
+                f"{periodo_testo}:  Nessun movimento registrato nel periodo selezionato"
             )
+
+    def _modifica_movimento(self, movimento_id, quantita_attuale, note_attuale):
+        """Dialog per modificare quantità e note di un movimento"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Modifica Movimento")
+        dialog.setFixedSize(400, 220)
+        dialog.setStyleSheet("""
+            QDialog { background-color: #fafbfc; }
+            QLabel { color: #2d3748; font-size: 14px; font-weight: 500; }
+            QDoubleSpinBox, QLineEdit {
+                border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px;
+                font-size: 14px; background-color: #ffffff; min-height: 18px; }
+            QPushButton { border: none; border-radius: 6px; font-size: 14px;
+                          font-weight: 600; padding: 10px 20px; min-height: 36px; }
+        """)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(14)
+
+        form = QFormLayout()
+        form.setVerticalSpacing(10)
+
+        spin_q = QDoubleSpinBox()
+        spin_q.setDecimals(2)
+        spin_q.setMaximum(99999.99)
+        spin_q.setSuffix(" m²")
+        spin_q.setValue(quantita_attuale)
+        spin_q.setMinimumHeight(36)
+
+        edit_note = QLineEdit()
+        edit_note.setText(note_attuale)
+        edit_note.setPlaceholderText("Note opzionali...")
+
+        form.addRow("Quantità:", spin_q)
+        form.addRow("Note:", edit_note)
+        layout.addLayout(form)
+
+        btns = QHBoxLayout()
+        btn_salva = QPushButton("Salva")
+        btn_salva.setStyleSheet("QPushButton { background-color: #4a5568; color: #ffffff; } QPushButton:hover { background-color: #2d3748; }")
+        btn_annulla = QPushButton("Annulla")
+        btn_annulla.setStyleSheet("QPushButton { background-color: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; } QPushButton:hover { background-color: #edf2f7; }")
+        btns.addWidget(btn_salva)
+        btns.addWidget(btn_annulla)
+        layout.addLayout(btns)
+
+        btn_annulla.clicked.connect(dialog.reject)
+        btn_salva.clicked.connect(dialog.accept)
+
+        if dialog.exec_() == QDialog.Accepted:
+            nuova_q = spin_q.value()
+            if nuova_q <= 0:
+                QMessageBox.warning(self, "Errore", "La quantità deve essere maggiore di 0.")
+                return
+            ok = self.db_manager.modifica_movimento(movimento_id, nuova_q, edit_note.text().strip())
+            if ok:
+                self.carica_consumi()
+                self.carica_scorte()
+            else:
+                QMessageBox.critical(self, "Errore", "Errore durante la modifica del movimento.")
+
+    def _elimina_movimento(self, movimento_id, nome_materiale, tipo, quantita):
+        """Conferma ed elimina un movimento, aggiornando automaticamente la giacenza"""
+        risposta = QMessageBox.question(
+            self, "Elimina Movimento",
+            f"Eliminare il movimento '{tipo.upper()}' di {quantita:.2f} m² per '{nome_materiale}'?\n\n"
+            f"La giacenza in magazzino verrà aggiornata automaticamente.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if risposta == QMessageBox.Yes:
+            ok = self.db_manager.elimina_movimento(movimento_id)
+            if ok:
+                self.carica_consumi()
+                self.carica_scorte()
+            else:
+                QMessageBox.critical(self, "Errore", "Errore durante l'eliminazione del movimento.")
 
     def _calcola_date_periodo(self, periodo):
         """Calcola data inizio e fine per il periodo selezionato"""

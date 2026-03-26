@@ -518,6 +518,98 @@ class DatabaseManager:
             """, (materiale_id, limit))
             return cursor.fetchall()
 
+    def get_movimenti_periodo(self, data_inizio, data_fine):
+        """Restituisce tutti i movimenti individuali in un periodo (non aggregati)"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT mov.id, m.nome, mov.tipo, mov.quantita, mov.data,
+                       mov.note, mov.fornitore_nome, mov.materiale_id
+                FROM movimenti_magazzino mov
+                JOIN materiali m ON m.id = mov.materiale_id
+                WHERE mov.data >= ? AND mov.data <= ?
+                ORDER BY mov.data DESC
+            """, (data_inizio, data_fine))
+            return cursor.fetchall()
+
+    def get_movimento_by_id(self, movimento_id):
+        """Restituisce un singolo movimento per id"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, materiale_id, tipo, quantita, data, note, preventivo_id, fornitore_nome
+                FROM movimenti_magazzino WHERE id = ?
+            """, (movimento_id,))
+            return cursor.fetchone()
+
+    def modifica_movimento(self, movimento_id, nuova_quantita, note):
+        """Modifica un movimento: reversa il vecchio effetto su giacenza e applica il nuovo"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT materiale_id, tipo, quantita, fornitore_nome FROM movimenti_magazzino WHERE id = ?",
+                (movimento_id,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+            materiale_id, tipo, vecchia_q, fornitore_nome = row
+
+            def _aggiorna_giacenza(cur, mat_id, forn, t, delta):
+                if forn:
+                    if t == 'carico':
+                        cur.execute("UPDATE materiale_fornitori SET giacenza = giacenza + ? WHERE materiale_id = ? AND fornitore_nome = ?", (delta, mat_id, forn))
+                    else:
+                        cur.execute("UPDATE materiale_fornitori SET giacenza = MAX(giacenza + ?, 0) WHERE materiale_id = ? AND fornitore_nome = ?", (delta, mat_id, forn))
+                else:
+                    if t == 'carico':
+                        cur.execute("UPDATE materiali SET giacenza = giacenza + ? WHERE id = ?", (delta, mat_id))
+                    else:
+                        cur.execute("UPDATE materiali SET giacenza = MAX(giacenza + ?, 0) WHERE id = ?", (delta, mat_id))
+
+            # Reversa vecchio effetto (segno opposto)
+            _aggiorna_giacenza(cursor, materiale_id, fornitore_nome, tipo,
+                               -vecchia_q if tipo == 'carico' else vecchia_q)
+            # Applica nuovo effetto
+            _aggiorna_giacenza(cursor, materiale_id, fornitore_nome, tipo,
+                               nuova_quantita if tipo == 'carico' else -nuova_quantita)
+
+            cursor.execute(
+                "UPDATE movimenti_magazzino SET quantita = ?, note = ? WHERE id = ?",
+                (nuova_quantita, note, movimento_id)
+            )
+            conn.commit()
+            return True
+
+    def elimina_movimento(self, movimento_id):
+        """Elimina un movimento e reversa il suo effetto sulla giacenza"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT materiale_id, tipo, quantita, fornitore_nome FROM movimenti_magazzino WHERE id = ?",
+                (movimento_id,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return False
+            materiale_id, tipo, quantita, fornitore_nome = row
+
+            # Reversa effetto sulla giacenza
+            if fornitore_nome:
+                if tipo == 'carico':
+                    cursor.execute("UPDATE materiale_fornitori SET giacenza = MAX(giacenza - ?, 0) WHERE materiale_id = ? AND fornitore_nome = ?", (quantita, materiale_id, fornitore_nome))
+                else:
+                    cursor.execute("UPDATE materiale_fornitori SET giacenza = giacenza + ? WHERE materiale_id = ? AND fornitore_nome = ?", (quantita, materiale_id, fornitore_nome))
+            else:
+                if tipo == 'carico':
+                    cursor.execute("UPDATE materiali SET giacenza = MAX(giacenza - ?, 0) WHERE id = ?", (quantita, materiale_id))
+                else:
+                    cursor.execute("UPDATE materiali SET giacenza = giacenza + ? WHERE id = ?", (quantita, materiale_id))
+
+            cursor.execute("DELETE FROM movimenti_magazzino WHERE id = ?", (movimento_id,))
+            conn.commit()
+            return True
+
     def get_consumi_periodo(self, data_inizio, data_fine):
         """Restituisce i consumi aggregati per materiale in un periodo"""
         with sqlite3.connect(self.db_path) as conn:
