@@ -178,6 +178,8 @@ class PreventivoUIComponents:
         window_instance.combo_nome_cliente = QComboBox()
         window_instance.combo_nome_cliente.setEditable(True)
         window_instance.combo_nome_cliente.setInsertPolicy(QComboBox.NoInsert)
+        window_instance.combo_nome_cliente.setMaxVisibleItems(20)
+        window_instance.combo_nome_cliente.setSizeAdjustPolicy(QComboBox.AdjustToContentsOnFirstShow)
         window_instance.combo_nome_cliente.setStyleSheet("""
             QComboBox {
                 border: 1px solid #e2e8f0;
@@ -188,7 +190,33 @@ class PreventivoUIComponents:
                 color: #2d3748;
             }
             QComboBox:focus { border-color: #4a5568; }
-            QComboBox::drop-down { border: none; }
+            QComboBox::drop-down { border: none; width: 24px; }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 6px solid #4a5568;
+                width: 0; height: 0;
+                margin-right: 6px;
+            }
+            QComboBox QAbstractItemView {
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                background-color: #ffffff;
+                selection-background-color: #edf2f7;
+                selection-color: #2d3748;
+                font-size: 14px;
+                padding: 4px;
+                outline: none;
+            }
+            QComboBox QAbstractItemView::item {
+                min-height: 36px;
+                padding: 6px 12px;
+                color: #2d3748;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background-color: #f7fafc;
+            }
         """)
         # Popola clienti
         try:
