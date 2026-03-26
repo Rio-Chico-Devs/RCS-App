@@ -206,11 +206,13 @@ class DocumentUtils:
                         lunghezza = getattr(materiale, 'lunghezza', 0)
                         sviluppo = getattr(materiale, 'sviluppo', 0)
                         nome = getattr(materiale, 'nome', f'Materiale {i+1}')
+                        posa = getattr(materiale, 'posa', '==')
                     elif isinstance(materiale, dict):
                         giri = materiale.get('giri', 0)
                         lunghezza = materiale.get('lunghezza', 0)
                         sviluppo = materiale.get('sviluppo', 0)
                         nome = materiale.get('nome', materiale.get('materiale_nome', f'Materiale {i+1}'))
+                        posa = materiale.get('posa', '==')
                     else:
                         giri = 1
                         lunghezza = 1000
@@ -280,8 +282,8 @@ class DocumentUtils:
                     para_rect.paragraph_format.space_before = Pt(0)
                     para_rect.paragraph_format.space_after = Pt(0)
                     
-                    # == a sinistra
-                    run_eq = para_rect.add_run("==")
+                    # Posa a sinistra
+                    run_eq = para_rect.add_run(posa)
                     run_eq.font.size = Pt(8)
                     run_eq.bold = True
                     
@@ -549,6 +551,7 @@ class DocumentUtils:
                     con_lato   = getattr(materiale, 'conicita_lato', 'sinistra')
                     con_alt    = getattr(materiale, 'conicita_altezza_mm', 0.0)
                     con_lung   = getattr(materiale, 'conicita_lunghezza_mm', 0.0)
+                    posa       = getattr(materiale, 'posa', '==')
                 elif isinstance(materiale, dict):
                     giri       = materiale.get('giri', 0)
                     lunghezza  = materiale.get('lunghezza', 0)
@@ -558,9 +561,10 @@ class DocumentUtils:
                     con_lato   = materiale.get('conicita_lato', 'sinistra')
                     con_alt    = materiale.get('conicita_altezza_mm', 0.0)
                     con_lung   = materiale.get('conicita_lunghezza_mm', 0.0)
+                    posa       = materiale.get('posa', '==')
                 else:
                     giri=1; lunghezza=1000; sviluppo=100; nome=f'Materiale {i+1}'
-                    is_conica=False; con_lato='sinistra'; con_alt=0.0; con_lung=0.0
+                    is_conica=False; con_lato='sinistra'; con_alt=0.0; con_lung=0.0; posa='=='
 
                 # Calcola taglio_info (misure conica) da mostrare PRIMA della lunghezza
                 taglio_info = ''
@@ -596,14 +600,14 @@ class DocumentUtils:
                         f'<table:table-cell table:style-name="CMB">'
                         f'<text:p text:style-name="PCL">'
                         + lines_xml +
-                        f'<text:tab/>== {nome}'
+                        f'<text:tab/>{posa} {nome}'
                         f'</text:p>'
                         f'</table:table-cell>'
                     )
                 else:
                     center_cell = (
                         f'<table:table-cell table:style-name="CMB">'
-                        f'<text:p text:style-name="PCL"><text:tab/>== {nome}</text:p>'
+                        f'<text:p text:style-name="PCL"><text:tab/>{posa} {nome}</text:p>'
                         f'</table:table-cell>'
                     )
 
@@ -788,6 +792,7 @@ class DocumentUtils:
                     con_lato = getattr(materiale, 'conicita_lato', 'sinistra')
                     con_alt = getattr(materiale, 'conicita_altezza_mm', 0.0)
                     con_lung = getattr(materiale, 'conicita_lunghezza_mm', 0.0)
+                    posa = getattr(materiale, 'posa', '==')
                 elif isinstance(materiale, dict):
                     giri = materiale.get('giri', 0)
                     lunghezza = materiale.get('lunghezza', 0)
@@ -797,10 +802,11 @@ class DocumentUtils:
                     con_lato = materiale.get('conicita_lato', 'sinistra')
                     con_alt = materiale.get('conicita_altezza_mm', 0.0)
                     con_lung = materiale.get('conicita_lunghezza_mm', 0.0)
+                    posa = materiale.get('posa', '==')
                 else:
                     giri = 1; lunghezza = 1000; sviluppo = 100
                     nome = f'Materiale {i+1}'
-                    is_conica = False; con_lato = 'sinistra'; con_alt = 0.0; con_lung = 0.0
+                    is_conica = False; con_lato = 'sinistra'; con_alt = 0.0; con_lung = 0.0; posa = '=='
 
                 # Diagonale per tela conica (solo una linea nell'angolo, nient'altro)
                 diag_svg = ''
@@ -832,7 +838,7 @@ class DocumentUtils:
                     + diag_svg +
                     f'<input type="text" placeholder="Orient." style="width: {s["orient_width"]}; border: none; '
                     f'font-size: {s["orient_font"]}; background: transparent; position: relative; z-index: 1;">'
-                    f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 43%; z-index: 1;">== {nome}</strong>'
+                    f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 43%; z-index: 1;">{posa} {nome}</strong>'
                     f'</div>'
                 )
 

@@ -46,6 +46,9 @@ class MaterialeCalcolato:
         # Orientamento (da toolbar rotate/flip della TelaPreviewWidget)
         self.orientamento = {'rotation': 0, 'flip_h': False, 'flip_v': False}
 
+        # Posa tela: '==' 0°, '\\' 45° sin, '//' 45° des, '||' 90°
+        self.posa = '=='
+
     @property
     def stratifica(self):
         """Alias per sviluppo - per compatibilità con codice esistente"""
@@ -126,6 +129,7 @@ class MaterialeCalcolato:
             'conicita_altezza_mm': self.conicita_altezza_mm,
             'conicita_lunghezza_mm': self.conicita_lunghezza_mm,
             'scarto_mm2': self.scarto_mm2,
-            'orientamento': self.orientamento
+            'orientamento': self.orientamento,
+            'posa': self.posa,
         }
         return d
