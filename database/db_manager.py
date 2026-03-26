@@ -1021,6 +1021,20 @@ class DatabaseManager:
 
     # =================== METODI FORNITORI ===================
 
+    def get_fornitori_nomi_attivi(self):
+        """Restituisce i nomi distinti dei fornitori che hanno almeno un materiale"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT fornitore_nome FROM materiale_fornitori ORDER BY fornitore_nome")
+            return [row[0] for row in cursor.fetchall()]
+
+    def get_materiali_ids_per_fornitore(self, fornitore_nome):
+        """Restituisce gli id dei materiali che hanno un certo fornitore"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT DISTINCT materiale_id FROM materiale_fornitori WHERE fornitore_nome = ?", (fornitore_nome,))
+            return {row[0] for row in cursor.fetchall()}
+
     def get_all_fornitori(self):
         """Restituisce tutti i fornitori"""
         with sqlite3.connect(self.db_path) as conn:

@@ -309,16 +309,26 @@ class MagazzinoWindow(QMainWindow):
         lbl_ordina.setStyleSheet("font-weight: 600;")
         self.combo_ordina_mat = QComboBox()
         self.combo_ordina_mat.addItem("Nome A-Z", "nome")
-        self.combo_ordina_mat.addItem("Per fornitore", "fornitore_asc")
         self.combo_ordina_mat.addItem("Più fornitori", "n_fornitori_desc")
         self.combo_ordina_mat.addItem("Meno fornitori", "n_fornitori_asc")
         self.combo_ordina_mat.currentIndexChanged.connect(self.carica_scorte)
+
+        lbl_fornitore = QLabel("Fornitore:")
+        lbl_fornitore.setStyleSheet("font-weight: 600;")
+        self.combo_fornitore_filtro = QComboBox()
+        self.combo_fornitore_filtro.addItem("Tutti", None)
+        for nome_f in self.db_manager.get_fornitori_nomi_attivi():
+            self.combo_fornitore_filtro.addItem(nome_f, nome_f)
+        self.combo_fornitore_filtro.currentIndexChanged.connect(self.carica_scorte)
 
         top_layout.addSpacing(8)
         top_layout.addWidget(self.search_scorte)
         top_layout.addSpacing(8)
         top_layout.addWidget(lbl_filtro)
         top_layout.addWidget(self.combo_filtro_scorte)
+        top_layout.addSpacing(8)
+        top_layout.addWidget(lbl_fornitore)
+        top_layout.addWidget(self.combo_fornitore_filtro)
         top_layout.addSpacing(8)
         top_layout.addWidget(lbl_ordina)
         top_layout.addWidget(self.combo_ordina_mat)
@@ -370,11 +380,10 @@ class MagazzinoWindow(QMainWindow):
         ordina_per = self.combo_ordina_mat.currentData() or 'nome'
         scorte = self.db_manager.get_scorte(ordina_per)
 
-        # Applica filtro testo e filtro scorte
-        search_text = getattr(self, 'search_scorte', None)
-        search_text = search_text.text().lower() if search_text else ''
-        filtro = getattr(self, 'combo_filtro_scorte', None)
-        filtro_val = filtro.currentData() if filtro else 'tutte'
+        # Applica filtri
+        search_text = self.search_scorte.text().lower()
+        filtro_val = self.combo_filtro_scorte.currentData()
+        fornitore_sel = self.combo_fornitore_filtro.currentData()
 
         if search_text:
             scorte = [m for m in scorte if search_text in m[1].lower()]
@@ -382,6 +391,9 @@ class MagazzinoWindow(QMainWindow):
             scorte = [m for m in scorte if m[3] > 0 and m[2] < m[3] * 0.3]
         elif filtro_val == 'alte':
             scorte = [m for m in scorte if m[3] == 0 or m[2] >= m[3] * 0.7]
+        if fornitore_sel:
+            ids = self.db_manager.get_materiali_ids_per_fornitore(fornitore_sel)
+            scorte = [m for m in scorte if m[0] in ids]
 
         if not scorte:
             lbl_vuoto = QLabel("Nessun materiale presente in magazzino.")
