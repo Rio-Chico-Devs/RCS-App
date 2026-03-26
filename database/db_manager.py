@@ -283,6 +283,17 @@ class DatabaseManager:
                 except sqlite3.IntegrityError:
                     pass
 
+        # Tabella clienti
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS clienti (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT NOT NULL UNIQUE,
+                email TEXT DEFAULT '',
+                telefono TEXT DEFAULT '',
+                note TEXT DEFAULT ''
+            )
+        """)
+
     # =================== METODI MATERIALI (IDENTICI ALL'ORIGINALE) ===================
 
     def get_all_materiali(self):
@@ -1283,5 +1294,57 @@ class DatabaseManager:
                     DELETE FROM preventivi WHERE id = ?
                 """, (preventivo_id,))
 
+            conn.commit()
+            return cursor.rowcount > 0
+
+    # =================== METODI CLIENTI ===================
+
+    def get_all_clienti(self):
+        """Restituisce tutti i clienti ordinati per nome"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, nome, email, telefono, note FROM clienti ORDER BY nome")
+            return cursor.fetchall()
+
+    def get_cliente_by_id(self, cliente_id):
+        """Restituisce un cliente specifico tramite ID"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id, nome, email, telefono, note FROM clienti WHERE id = ?", (cliente_id,))
+            return cursor.fetchone()
+
+    def add_cliente(self, nome, email="", telefono="", note=""):
+        """Aggiunge un nuovo cliente"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "INSERT INTO clienti (nome, email, telefono, note) VALUES (?, ?, ?, ?)",
+                    (nome, email, telefono, note)
+                )
+                conn.commit()
+                return cursor.lastrowid
+            except sqlite3.IntegrityError:
+                return False
+
+    def update_cliente(self, cliente_id, nome, email="", telefono="", note=""):
+        """Aggiorna un cliente esistente"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    "UPDATE clienti SET nome = ?, email = ?, telefono = ?, note = ? WHERE id = ?",
+                    (nome, email, telefono, note, cliente_id)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+            except sqlite3.IntegrityError:
+                return False
+
+    def delete_cliente(self, cliente_id):
+        """Elimina un cliente"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM clienti WHERE id = ?", (cliente_id,))
             conn.commit()
             return cursor.rowcount > 0

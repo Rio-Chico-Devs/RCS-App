@@ -279,7 +279,7 @@ class PreventivoBusinessLogic:
     def get_dati_cliente(window_instance):
         """Recupera dati cliente dai controlli"""
         return {
-            'nome_cliente': window_instance.edit_nome_cliente.text().strip() if hasattr(window_instance, 'edit_nome_cliente') else "",
+            'nome_cliente': window_instance.combo_nome_cliente.currentText().strip() if hasattr(window_instance, 'combo_nome_cliente') else "",
             'numero_ordine': window_instance.edit_numero_ordine.text().strip() if hasattr(window_instance, 'edit_numero_ordine') else "",
             'descrizione': window_instance.edit_descrizione.text().strip() if hasattr(window_instance, 'edit_descrizione') else "",
             'codice': window_instance.edit_codice.text().strip() if hasattr(window_instance, 'edit_codice') else "",
