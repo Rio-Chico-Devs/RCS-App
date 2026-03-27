@@ -43,7 +43,7 @@ class MainWindowBusinessLogic:
             clienti = set()
             for prev in preventivi:
                 if len(prev) >= 5:
-                    nome_cliente = prev[4].strip() if prev[4] else ''
+                    nome_cliente = str(prev[4]).strip() if prev[4] is not None else ''
                     if nome_cliente:
                         clienti.add(nome_cliente)
 

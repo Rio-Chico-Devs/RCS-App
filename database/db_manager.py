@@ -608,42 +608,46 @@ class DatabaseManager:
 
     def modifica_movimento(self, movimento_id, nuova_quantita, note):
         """Modifica un movimento: reversa il vecchio effetto su giacenza e applica il nuovo"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT materiale_id, tipo, quantita, fornitore_nome FROM movimenti_magazzino WHERE id = ?",
-                (movimento_id,)
-            )
-            row = cursor.fetchone()
-            if not row:
-                return False
-            materiale_id, tipo, vecchia_q, fornitore_nome = row
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "SELECT materiale_id, tipo, quantita, fornitore_nome FROM movimenti_magazzino WHERE id = ?",
+                    (movimento_id,)
+                )
+                row = cursor.fetchone()
+                if not row:
+                    return False
+                materiale_id, tipo, vecchia_q, fornitore_nome = row
 
-            def _aggiorna_giacenza(cur, mat_id, forn, t, delta):
-                if forn:
-                    if t == 'carico':
-                        cur.execute("UPDATE materiale_fornitori SET giacenza = giacenza + ? WHERE materiale_id = ? AND fornitore_nome = ?", (delta, mat_id, forn))
+                def _aggiorna_giacenza(cur, mat_id, forn, t, delta):
+                    if forn:
+                        if t == 'carico':
+                            cur.execute("UPDATE materiale_fornitori SET giacenza = giacenza + ? WHERE materiale_id = ? AND fornitore_nome = ?", (delta, mat_id, forn))
+                        else:
+                            cur.execute("UPDATE materiale_fornitori SET giacenza = MAX(giacenza + ?, 0) WHERE materiale_id = ? AND fornitore_nome = ?", (delta, mat_id, forn))
                     else:
-                        cur.execute("UPDATE materiale_fornitori SET giacenza = MAX(giacenza + ?, 0) WHERE materiale_id = ? AND fornitore_nome = ?", (delta, mat_id, forn))
-                else:
-                    if t == 'carico':
-                        cur.execute("UPDATE materiali SET giacenza = giacenza + ? WHERE id = ?", (delta, mat_id))
-                    else:
-                        cur.execute("UPDATE materiali SET giacenza = MAX(giacenza + ?, 0) WHERE id = ?", (delta, mat_id))
+                        if t == 'carico':
+                            cur.execute("UPDATE materiali SET giacenza = giacenza + ? WHERE id = ?", (delta, mat_id))
+                        else:
+                            cur.execute("UPDATE materiali SET giacenza = MAX(giacenza + ?, 0) WHERE id = ?", (delta, mat_id))
 
-            # Reversa vecchio effetto (segno opposto)
-            _aggiorna_giacenza(cursor, materiale_id, fornitore_nome, tipo,
-                               -vecchia_q if tipo == 'carico' else vecchia_q)
-            # Applica nuovo effetto
-            _aggiorna_giacenza(cursor, materiale_id, fornitore_nome, tipo,
-                               nuova_quantita if tipo == 'carico' else -nuova_quantita)
+                # Reversa vecchio effetto (segno opposto)
+                _aggiorna_giacenza(cursor, materiale_id, fornitore_nome, tipo,
+                                   -vecchia_q if tipo == 'carico' else vecchia_q)
+                # Applica nuovo effetto
+                _aggiorna_giacenza(cursor, materiale_id, fornitore_nome, tipo,
+                                   nuova_quantita if tipo == 'carico' else -nuova_quantita)
 
-            cursor.execute(
-                "UPDATE movimenti_magazzino SET quantita = ?, note = ? WHERE id = ?",
-                (nuova_quantita, note, movimento_id)
-            )
-            conn.commit()
-            return True
+                cursor.execute(
+                    "UPDATE movimenti_magazzino SET quantita = ?, note = ? WHERE id = ?",
+                    (nuova_quantita, note, movimento_id)
+                )
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in modifica_movimento: {e}")
+            return False
 
     def elimina_movimento(self, movimento_id):
         """Elimina un movimento e reversa il suo effetto sulla giacenza"""
@@ -1022,15 +1026,19 @@ class DatabaseManager:
 
     def get_all_preventivi(self):
         """Restituisce tutti i preventivi salvati - AGGIORNATO con nuovi campi"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, data_creazione, preventivo_finale, prezzo_cliente,
-                       nome_cliente, numero_ordine, descrizione, codice, numero_revisione,
-                       storico_modifiche
-                FROM preventivi ORDER BY data_creazione DESC
-            """)
-            return cursor.fetchall()
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, data_creazione, preventivo_finale, prezzo_cliente,
+                           nome_cliente, numero_ordine, descrizione, codice, numero_revisione,
+                           storico_modifiche
+                    FROM preventivi ORDER BY data_creazione DESC
+                """)
+                return cursor.fetchall()
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in get_all_preventivi: {e}")
+            return []
 
     def get_all_preventivi_latest(self):
         """NUOVO: Restituisce solo l'ultima revisione di ogni preventivo con i nuovi campi"""
@@ -1073,53 +1081,61 @@ class DatabaseManager:
 
     def get_preventivo_by_id(self, preventivo_id):
         """Restituisce un preventivo specifico con tutti i dettagli - AGGIORNATO"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM preventivi WHERE id = ?", (preventivo_id,))
-            row = cursor.fetchone()
-            if row:
-                # Converti il JSON dei materiali utilizzati
-                columns = [description[0] for description in cursor.description]
-                preventivo = dict(zip(columns, row))
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM preventivi WHERE id = ?", (preventivo_id,))
+                row = cursor.fetchone()
+                if row:
+                    # Converti il JSON dei materiali utilizzati
+                    columns = [description[0] for description in cursor.description]
+                    preventivo = dict(zip(columns, row))
 
-                # Gestisci compatibilità con vecchia struttura
-                materiali_json = preventivo.get('materiali_utilizzati', '[]')
-                if materiali_json:
-                    try:
-                        preventivo['materiali_utilizzati'] = json.loads(materiali_json)
-                    except (json.JSONDecodeError, TypeError):
+                    # Gestisci compatibilità con vecchia struttura
+                    materiali_json = preventivo.get('materiali_utilizzati', '[]')
+                    if materiali_json:
+                        try:
+                            preventivo['materiali_utilizzati'] = json.loads(materiali_json)
+                        except (json.JSONDecodeError, TypeError):
+                            preventivo['materiali_utilizzati'] = []
+                    else:
                         preventivo['materiali_utilizzati'] = []
-                else:
-                    preventivo['materiali_utilizzati'] = []
 
-                # Assicurati che i nuovi campi esistano (compatibilità)
-                for campo in ['nome_cliente', 'numero_ordine', 'misura', 'descrizione', 'codice']:
-                    if campo not in preventivo:
-                        preventivo[campo] = ''
+                    # Assicurati che i nuovi campi esistano (compatibilità)
+                    for campo in ['nome_cliente', 'numero_ordine', 'misura', 'descrizione', 'codice']:
+                        if campo not in preventivo:
+                            preventivo[campo] = ''
 
-                # Gestisci storico modifiche
-                storico_json = preventivo.get('storico_modifiche', '[]')
-                try:
-                    preventivo['storico_modifiche'] = json.loads(storico_json) if storico_json else []
-                except (json.JSONDecodeError, TypeError):
-                    preventivo['storico_modifiche'] = []
+                    # Gestisci storico modifiche
+                    storico_json = preventivo.get('storico_modifiche', '[]')
+                    try:
+                        preventivo['storico_modifiche'] = json.loads(storico_json) if storico_json else []
+                    except (json.JSONDecodeError, TypeError):
+                        preventivo['storico_modifiche'] = []
 
-                return preventivo
+                    return preventivo
+                return None
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in get_preventivo_by_id: {e}")
             return None
 
     def get_revisioni_preventivo(self, preventivo_originale_id):
         """NUOVO: Restituisce tutte le revisioni di un preventivo con i nuovi campi"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, data_creazione, preventivo_finale, prezzo_cliente,
-                       nome_cliente, numero_ordine, descrizione, codice,
-                       numero_revisione, note_revisione
-                FROM preventivi
-                WHERE preventivo_originale_id = ? OR id = ?
-                ORDER BY numero_revisione DESC
-            """, (preventivo_originale_id, preventivo_originale_id))
-            return cursor.fetchall()
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, data_creazione, preventivo_finale, prezzo_cliente,
+                           nome_cliente, numero_ordine, descrizione, codice,
+                           numero_revisione, note_revisione
+                    FROM preventivi
+                    WHERE preventivo_originale_id = ? OR id = ?
+                    ORDER BY numero_revisione DESC
+                """, (preventivo_originale_id, preventivo_originale_id))
+                return cursor.fetchall()
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in get_revisioni_preventivo: {e}")
+            return []
 
     # =================== METODI FORNITORI ===================
 
@@ -1201,50 +1217,58 @@ class DatabaseManager:
     def delete_preventivo_e_revisioni(self, preventivo_id):
         """Elimina un preventivo e tutte le sue revisioni se è l'originale,
         oppure solo la revisione se viene passato l'ID di una revisione."""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
 
-            # Controlla se è un originale o una revisione
-            cursor.execute("""
-                SELECT preventivo_originale_id
-                FROM preventivi WHERE id = ?
-            """, (preventivo_id,))
-
-            result = cursor.fetchone()
-            if not result:
-                return False
-
-            preventivo_originale_id = result[0]
-
-            if preventivo_originale_id is None:
-                # È un originale: elimina originale + tutte le sue revisioni
+                # Controlla se è un originale o una revisione
                 cursor.execute("""
-                    DELETE FROM preventivi
-                    WHERE preventivo_originale_id = ? OR id = ?
-                """, (preventivo_id, preventivo_id))
-            else:
-                # È una revisione: elimina solo questa revisione
-                cursor.execute("""
-                    DELETE FROM preventivi WHERE id = ?
+                    SELECT preventivo_originale_id
+                    FROM preventivi WHERE id = ?
                 """, (preventivo_id,))
 
-            conn.commit()
-            return cursor.rowcount > 0
+                result = cursor.fetchone()
+                if not result:
+                    return False
+
+                preventivo_originale_id = result[0]
+
+                if preventivo_originale_id is None:
+                    # È un originale: elimina originale + tutte le sue revisioni
+                    cursor.execute("""
+                        DELETE FROM preventivi
+                        WHERE preventivo_originale_id = ? OR id = ?
+                    """, (preventivo_id, preventivo_id))
+                else:
+                    # È una revisione: elimina solo questa revisione
+                    cursor.execute("""
+                        DELETE FROM preventivi WHERE id = ?
+                    """, (preventivo_id,))
+
+                conn.commit()
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in delete_preventivo_e_revisioni: {e}")
+            return False
 
     # =================== METODI CLIENTI ===================
 
     def get_all_clienti(self):
         """Restituisce tutti i clienti con conteggio preventivi, ordinati per nome"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT c.id, c.nome, COUNT(p.id) as n_preventivi
-                FROM clienti c
-                LEFT JOIN preventivi p ON p.nome_cliente = c.nome
-                GROUP BY c.id, c.nome
-                ORDER BY c.nome
-            """)
-            return cursor.fetchall()
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT c.id, c.nome, COUNT(p.id) as n_preventivi
+                    FROM clienti c
+                    LEFT JOIN preventivi p ON p.nome_cliente = c.nome
+                    GROUP BY c.id, c.nome
+                    ORDER BY c.nome
+                """)
+                return cursor.fetchall()
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in get_all_clienti: {e}")
+            return []
 
     def get_cliente_by_id(self, cliente_id):
         """Restituisce un cliente specifico tramite ID"""
@@ -1263,6 +1287,9 @@ class DatabaseManager:
                 return cursor.lastrowid
             except sqlite3.IntegrityError:
                 return False
+            except sqlite3.Error as e:
+                logging.getLogger('rcs').error(f"DB error in add_cliente: {e}")
+                return False
 
     def update_cliente(self, cliente_id, nome, email="", telefono="", note=""):
         """Aggiorna un cliente esistente"""
@@ -1274,11 +1301,18 @@ class DatabaseManager:
                 return cursor.rowcount > 0
             except sqlite3.IntegrityError:
                 return False
+            except sqlite3.Error as e:
+                logging.getLogger('rcs').error(f"DB error in update_cliente: {e}")
+                return False
 
     def delete_cliente(self, cliente_id):
         """Elimina un cliente"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM clienti WHERE id = ?", (cliente_id,))
-            conn.commit()
-            return cursor.rowcount > 0
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM clienti WHERE id = ?", (cliente_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in delete_cliente: {e}")
+            return False
