@@ -559,40 +559,52 @@ class DatabaseManager:
 
     def get_movimenti_per_materiale(self, materiale_id, limit=100):
         """Restituisce i movimenti di un materiale"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT m.id, m.tipo, m.quantita, m.data, m.note, m.preventivo_id
-                FROM movimenti_magazzino m
-                WHERE m.materiale_id = ?
-                ORDER BY m.data DESC
-                LIMIT ?
-            """, (materiale_id, limit))
-            return cursor.fetchall()
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT m.id, m.tipo, m.quantita, m.data, m.note, m.preventivo_id
+                    FROM movimenti_magazzino m
+                    WHERE m.materiale_id = ?
+                    ORDER BY m.data DESC
+                    LIMIT ?
+                """, (materiale_id, limit))
+                return cursor.fetchall()
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in get_movimenti_per_materiale: {e}")
+            return []
 
     def get_movimenti_periodo(self, data_inizio, data_fine):
         """Restituisce tutti i movimenti individuali in un periodo (non aggregati)"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT mov.id, m.nome, mov.tipo, mov.quantita, mov.data,
-                       mov.note, mov.fornitore_nome, mov.materiale_id
-                FROM movimenti_magazzino mov
-                JOIN materiali m ON m.id = mov.materiale_id
-                WHERE mov.data >= ? AND mov.data <= ?
-                ORDER BY mov.data DESC
-            """, (data_inizio, data_fine))
-            return cursor.fetchall()
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT mov.id, m.nome, mov.tipo, mov.quantita, mov.data,
+                           mov.note, mov.fornitore_nome, mov.materiale_id
+                    FROM movimenti_magazzino mov
+                    JOIN materiali m ON m.id = mov.materiale_id
+                    WHERE mov.data >= ? AND mov.data <= ?
+                    ORDER BY mov.data DESC
+                """, (data_inizio, data_fine))
+                return cursor.fetchall()
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in get_movimenti_periodo: {e}")
+            return []
 
     def get_movimento_by_id(self, movimento_id):
         """Restituisce un singolo movimento per id"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, materiale_id, tipo, quantita, data, note, preventivo_id, fornitore_nome
-                FROM movimenti_magazzino WHERE id = ?
-            """, (movimento_id,))
-            return cursor.fetchone()
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, materiale_id, tipo, quantita, data, note, preventivo_id, fornitore_nome
+                    FROM movimenti_magazzino WHERE id = ?
+                """, (movimento_id,))
+                return cursor.fetchone()
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in get_movimento_by_id: {e}")
+            return None
 
     def modifica_movimento(self, movimento_id, nuova_quantita, note):
         """Modifica un movimento: reversa il vecchio effetto su giacenza e applica il nuovo"""
