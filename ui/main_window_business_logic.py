@@ -7,7 +7,7 @@ Uso riservato esclusivamente a RCS
 
 Version: 1.1.0
 Last Updated: 25/09/2025
-Author: Sviluppatore PyQt5 + Claude
+Author: Antonio VB
 
 CHANGELOG:
 v1.1.0 (25/09/2025):

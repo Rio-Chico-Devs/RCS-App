@@ -102,10 +102,21 @@ class DocumentUtils:
                 f.write(html_content)
                 
             # Apri automaticamente
-            os.startfile(file_path)
-            
+            try:
+                import sys as _sys
+                if _sys.platform == 'win32':
+                    os.startfile(file_path)
+                elif _sys.platform == 'darwin':
+                    import subprocess
+                    subprocess.Popen(['open', file_path])
+                else:
+                    import subprocess
+                    subprocess.Popen(['xdg-open', file_path])
+            except Exception:
+                pass
+
             return file_path
-            
+
         except Exception as e:
             if parent:
                 QMessageBox.warning(parent, "Errore", f"Errore nella generazione HTML: {e}")
@@ -333,10 +344,21 @@ class DocumentUtils:
             doc.save(file_path)
 
             # Apri automaticamente
-            os.startfile(file_path)
-            
+            try:
+                import sys as _sys
+                if _sys.platform == 'win32':
+                    os.startfile(file_path)
+                elif _sys.platform == 'darwin':
+                    import subprocess
+                    subprocess.Popen(['open', file_path])
+                else:
+                    import subprocess
+                    subprocess.Popen(['xdg-open', file_path])
+            except Exception:
+                pass
+
             return file_path
-            
+
         except Exception as e:
             if parent:
                 QMessageBox.warning(parent, "Errore", f"Errore nella generazione DOCX: {e}")

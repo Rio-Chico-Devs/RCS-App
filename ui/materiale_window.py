@@ -5,7 +5,7 @@ MaterialeWindow - Interfaccia di calcolo materiali REFACTORIZZATA con FIX svilup
 
 Version: 2.2.0 - REFACTORED
 Last Updated: 23/09/2025
-Author: Antonio VB & Claude
+Author: Antonio VB
 
 CHANGELOG:
 v2.2.0 (23/09/2025):

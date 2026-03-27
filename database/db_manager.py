@@ -20,6 +20,7 @@ import sqlite3
 import os
 import sys
 import json
+import logging
 from datetime import datetime
 
 class DatabaseManager:
@@ -35,6 +36,30 @@ class DatabaseManager:
         self.db_path = db_path
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.init_database()
+        self._backup_database()
+
+    def _backup_database(self):
+        """Crea un backup automatico del database all'avvio. Mantiene gli ultimi 7 backup."""
+        try:
+            import shutil
+            backup_dir = os.path.join(os.path.dirname(self.db_path), "backup")
+            os.makedirs(backup_dir, exist_ok=True)
+
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            backup_name = f"materiali_backup_{timestamp}.db"
+            backup_path = os.path.join(backup_dir, backup_name)
+
+            if os.path.exists(self.db_path):
+                shutil.copy2(self.db_path, backup_path)
+
+            # Mantieni solo gli ultimi 7 backup
+            backups = sorted([
+                f for f in os.listdir(backup_dir) if f.startswith("materiali_backup_") and f.endswith(".db")
+            ])
+            while len(backups) > 7:
+                os.remove(os.path.join(backup_dir, backups.pop(0)))
+        except Exception:
+            pass  # Backup non critico, non blocca l'avvio
 
     def init_database(self):
         """Inizializza il database con le tabelle necessarie"""
@@ -254,24 +279,36 @@ class DatabaseManager:
 
     def get_all_materiali(self):
         """Restituisce tutti i materiali disponibili"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, scorta_minima, scorta_massima FROM materiali ORDER BY nome")
-            return cursor.fetchall()
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, scorta_minima, scorta_massima FROM materiali ORDER BY nome")
+                return cursor.fetchall()
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in get_all_materiali: {e}")
+            return []
 
     def get_materiale_by_id(self, materiale_id):
         """Restituisce un materiale specifico tramite ID"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, scorta_minima, scorta_massima FROM materiali WHERE id = ?", (materiale_id,))
-            return cursor.fetchone()
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, scorta_minima, scorta_massima FROM materiali WHERE id = ?", (materiale_id,))
+                return cursor.fetchone()
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in get_materiale_by_id: {e}")
+            return None
 
     def get_materiale_by_nome(self, nome):
         """Restituisce un materiale specifico tramite nome"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, scorta_minima, scorta_massima FROM materiali WHERE nome = ?", (nome,))
-            return cursor.fetchone()
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, scorta_minima, scorta_massima FROM materiali WHERE nome = ?", (nome,))
+                return cursor.fetchone()
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in get_materiale_by_nome: {e}")
+            return None
 
     def add_materiale(self, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0):
         """Aggiunge un nuovo materiale"""
@@ -300,17 +337,24 @@ class DatabaseManager:
                 return cursor.rowcount > 0
             except sqlite3.IntegrityError:
                 return False
+            except sqlite3.Error as e:
+                logging.getLogger('rcs').error(f"DB error in update_materiale_base: {e}")
+                return False
 
     def update_materiale_scorte(self, materiale_id, scorta_minima, scorta_massima):
         """Aggiorna le scorte aggregate (min/max) di un materiale"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE materiali SET scorta_minima = ?, scorta_massima = ? WHERE id = ?",
-                (scorta_minima, scorta_massima, materiale_id)
-            )
-            conn.commit()
-            return cursor.rowcount > 0
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE materiali SET scorta_minima = ?, scorta_massima = ? WHERE id = ?",
+                    (scorta_minima, scorta_massima, materiale_id)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in update_materiale_scorte: {e}")
+            return False
 
     def update_materiale(self, materiale_id, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0):
         """Aggiorna un materiale esistente"""
@@ -325,41 +369,56 @@ class DatabaseManager:
                 return cursor.rowcount > 0
             except sqlite3.IntegrityError:
                 return False
+            except sqlite3.Error as e:
+                logging.getLogger('rcs').error(f"DB error in update_materiale: {e}")
+                return False
 
     def update_prezzo_materiale(self, materiale_id, nuovo_prezzo):
         """Aggiorna solo il prezzo di un materiale"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE materiali SET prezzo = ? WHERE id = ?",
-                (nuovo_prezzo, materiale_id)
-            )
-            conn.commit()
-            return cursor.rowcount > 0
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute(
+                    "UPDATE materiali SET prezzo = ? WHERE id = ?",
+                    (nuovo_prezzo, materiale_id)
+                )
+                conn.commit()
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in update_prezzo_materiale: {e}")
+            return False
 
     def delete_materiale(self, materiale_id):
         """Elimina un materiale, i suoi movimenti e le sue voci fornitore"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("DELETE FROM movimenti_magazzino WHERE materiale_id = ?", (materiale_id,))
-            cursor.execute("DELETE FROM materiale_fornitori WHERE materiale_id = ?", (materiale_id,))
-            cursor.execute("DELETE FROM materiali WHERE id = ?", (materiale_id,))
-            conn.commit()
-            return cursor.rowcount > 0
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM movimenti_magazzino WHERE materiale_id = ?", (materiale_id,))
+                cursor.execute("DELETE FROM materiale_fornitori WHERE materiale_id = ?", (materiale_id,))
+                cursor.execute("DELETE FROM materiali WHERE id = ?", (materiale_id,))
+                conn.commit()
+                return cursor.rowcount > 0
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in delete_materiale: {e}")
+            return False
 
     # =================== METODI MATERIALE_FORNITORI ===================
 
     def get_fornitori_per_materiale(self, materiale_id):
         """Restituisce i fornitori di un materiale specifico"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT id, fornitore_nome, prezzo_fornitore, scorta_minima, scorta_massima, giacenza
-                FROM materiale_fornitori
-                WHERE materiale_id = ?
-                ORDER BY fornitore_nome
-            """, (materiale_id,))
-            return cursor.fetchall()
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, fornitore_nome, prezzo_fornitore, scorta_minima, scorta_massima, giacenza
+                    FROM materiale_fornitori
+                    WHERE materiale_id = ?
+                    ORDER BY fornitore_nome
+                """, (materiale_id,))
+                return cursor.fetchall()
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in get_fornitori_per_materiale: {e}")
+            return []
 
     def get_fornitori_counts(self):
         """Restituisce dict {materiale_id: n_fornitori} per tutti i materiali"""

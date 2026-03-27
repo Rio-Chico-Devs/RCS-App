@@ -228,6 +228,9 @@ class AnagraficaClientiWindow(QMainWindow):
         if not nome:
             QMessageBox.warning(self, "Attenzione", "Inserisci il nome del cliente.")
             return
+        if len(nome) > 100:
+            QMessageBox.warning(self, "Attenzione", "Il nome del cliente non può superare 100 caratteri.")
+            return
         result = self.db_manager.add_cliente(nome)
         if result is False:
             QMessageBox.warning(self, "Errore", f"Un cliente con nome '{nome}' esiste già.")
@@ -334,6 +337,9 @@ class NuovoClienteQuickDialog(QDialog):
         nome = self.edit_nome.text().strip()
         if not nome:
             QMessageBox.warning(self, "Attenzione", "Il nome del cliente è obbligatorio.")
+            return
+        if len(nome) > 100:
+            QMessageBox.warning(self, "Attenzione", "Il nome del cliente non può superare 100 caratteri.")
             return
         result = self.db_manager.add_cliente(nome)
         if result is False:

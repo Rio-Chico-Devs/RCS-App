@@ -7,7 +7,7 @@ Uso riservato esclusivamente a RCS
 
 Version: 1.0.0
 Last Updated: 23/09/2025
-Author: Antonio VB + Claude
+Author: Antonio VB
 """
 
 from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QWidget, QLabel,
@@ -223,8 +223,9 @@ class PreventivoUIComponents:
             clienti = window_instance.db_manager.get_all_clienti()
             for c in clienti:
                 window_instance.combo_nome_cliente.addItem(c[1])
-        except Exception:
-            pass
+        except Exception as e:
+            import logging
+            logging.getLogger('rcs').warning(f"Impossibile caricare lista clienti: {e}")
         nome_cliente_hl.addWidget(window_instance.combo_nome_cliente, 1)
         btn_nuovo_cliente = QPushButton("+")
         btn_nuovo_cliente.setFixedSize(32, 32)
@@ -246,8 +247,9 @@ class PreventivoUIComponents:
                     clienti2 = wi.db_manager.get_all_clienti()
                     for c in clienti2:
                         wi.combo_nome_cliente.addItem(c[1])
-                except Exception:
-                    pass
+                except Exception as e:
+                    import logging
+                    logging.getLogger('rcs').warning(f"Impossibile caricare lista clienti: {e}")
                 idx = wi.combo_nome_cliente.findText(dialog.nome_aggiunto, Qt.MatchFixedString)
                 if idx >= 0:
                     wi.combo_nome_cliente.setCurrentIndex(idx)
