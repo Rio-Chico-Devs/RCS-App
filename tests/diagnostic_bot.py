@@ -56,6 +56,7 @@ class Report:
         self._results    = []
         self._t_start    = None
         self._check_total = 0
+        self.skipped     = 0
 
     def section(self, nome):
         if self._current is not None:
@@ -70,6 +71,10 @@ class Report:
         self._check_total += 1
         if verbose:
             print(f"  {GREEN}✓{RESET} {msg}")
+
+    def skip(self, msg, verbose=True):
+        self.skipped += 1
+        print(f"  {YELLOW}⊘{RESET}  {msg}")
 
     def warn(self, msg):
         self._results.append(("warn", msg))
@@ -120,7 +125,8 @@ class Report:
         print(f"  {BOLD}TOTALE CHECK: {totale_check}{RESET}  "
               f"{GREEN}✓ {totale_ok} ok{RESET}  "
               f"{YELLOW}⚠ {totale_warn} warn{RESET}  "
-              f"{colore}✗ {totale_fail} fail{RESET}")
+              f"{colore}✗ {totale_fail} fail{RESET}  "
+              f"{YELLOW}⊘ {self.skipped} saltati{RESET}")
         print(f"{BOLD}{'═'*72}{RESET}\n")
         return totale_fail
 
@@ -282,7 +288,7 @@ def test_01_materiali_bulk(db, N_MAT, verbose=False):
         row_prima, _ = safe(db.get_materiale_by_id, mid)
         nome_full = (row_prima[1] if row_prima else "X") + "_FULL"
         res, exc = safe(db.update_materiale, mid, nome_full, 0.25, 99.99,
-                        "FORN_FULL", 50.0, 1000.0, 5.0, None)
+                        "FORN_FULL", 50.0, 1000.0, 5.0)
         if exc or not res:
             errori_upd_full += 1
         else:
