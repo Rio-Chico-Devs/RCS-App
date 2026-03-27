@@ -206,11 +206,13 @@ class DocumentUtils:
                         lunghezza = getattr(materiale, 'lunghezza', 0)
                         sviluppo = getattr(materiale, 'sviluppo', 0)
                         nome = getattr(materiale, 'nome', f'Materiale {i+1}')
+                        posa = getattr(materiale, 'posa', '==')
                     elif isinstance(materiale, dict):
                         giri = materiale.get('giri', 0)
                         lunghezza = materiale.get('lunghezza', 0)
                         sviluppo = materiale.get('sviluppo', 0)
                         nome = materiale.get('nome', materiale.get('materiale_nome', f'Materiale {i+1}'))
+                        posa = materiale.get('posa', '==')
                     else:
                         giri = 1
                         lunghezza = 1000
@@ -280,8 +282,8 @@ class DocumentUtils:
                     para_rect.paragraph_format.space_before = Pt(0)
                     para_rect.paragraph_format.space_after = Pt(0)
                     
-                    # == a sinistra
-                    run_eq = para_rect.add_run("==")
+                    # Posa a sinistra
+                    run_eq = para_rect.add_run(posa)
                     run_eq.font.size = Pt(8)
                     run_eq.bold = True
                     
@@ -406,6 +408,8 @@ class DocumentUtils:
         cpad = '0.2cm'  if num_mat <= 10 else ('0.12cm' if num_mat <= 17 else '0.08cm')
         npad = '0.1cm'  if num_mat <= 10 else ('0.05cm' if num_mat <= 17 else '0.02cm')
 
+        pad_cm_val = float(pad.replace('cm', ''))
+
         NS = (
             'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
             'xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" '
@@ -428,6 +432,9 @@ class DocumentUtils:
             f'<office:automatic-styles>'
             f'<style:style style:name="PN" style:family="paragraph">'
             f'<style:text-properties fo:font-size="{ft_info}"/></style:style>'
+            f'<style:style style:name="PKN" style:family="paragraph">'
+            f'<style:paragraph-properties fo:keep-with-next="always" fo:margin-top="0cm" fo:margin-bottom="0cm" fo:line-height="0.01cm"/>'
+            f'<style:text-properties fo:font-size="1pt"/></style:style>'
             f'<style:style style:name="PT" style:family="paragraph">'
             f'<style:paragraph-properties fo:text-align="center" fo:margin-bottom="0.3cm"/>'
             f'<style:text-properties fo:font-size="14pt" fo:font-weight="bold"/></style:style>'
@@ -440,6 +447,16 @@ class DocumentUtils:
             f'<style:style style:name="PL" style:family="paragraph">'
             f'<style:paragraph-properties fo:text-align="center" fo:margin-top="{margin_mat}" fo:margin-bottom="0cm"/>'
             f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
+            f'<style:style style:name="PLR" style:family="paragraph">'
+            f'<style:paragraph-properties fo:margin-top="0cm" fo:margin-bottom="0cm">'
+            f'<style:tab-stops><style:tab-stop style:position="4.5cm" style:type="center"/></style:tab-stops>'
+            f'</style:paragraph-properties>'
+            f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
+            f'<style:style style:name="PCL" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="start" fo:margin-top="0cm" fo:margin-bottom="0cm">'
+            f'<style:tab-stops><style:tab-stop style:position="{0.43 * 12.0 - pad_cm_val:.3f}cm" style:type="left"/></style:tab-stops>'
+            f'</style:paragraph-properties>'
+            f'<style:text-properties fo:font-size="{ft_nome}" fo:font-weight="bold"/></style:style>'
             f'<style:style style:name="TI" style:family="table">'
             f'<style:table-properties style:width="17.7cm" table:align="margins"/></style:style>'
             f'<style:style style:name="TCI" style:family="table-column">'
@@ -458,6 +475,8 @@ class DocumentUtils:
             f'<style:table-cell-properties fo:border="1.5pt solid #000000" fo:padding="{pad}"/></style:style>'
             f'<style:style style:name="CNB" style:family="table-cell">'
             f'<style:table-cell-properties fo:border="none" fo:padding="{npad}"/></style:style>'
+            f'<style:style style:name="CNBb" style:family="table-cell">'
+            f'<style:table-cell-properties fo:border="none" fo:padding-top="{npad}" fo:padding-left="{npad}" fo:padding-right="{npad}" fo:padding-bottom="0cm" fo:vertical-align="bottom"/></style:style>'
             f'<style:style style:name="CMB_WL" style:family="table-cell">'
             f'<style:table-cell-properties '
             f'fo:border-left="3.5pt solid #000000" fo:border-right="0.75pt solid #000000" '
@@ -475,9 +494,9 @@ class DocumentUtils:
             f'<style:style style:name="TCHL_L" style:family="table-column">'
             f'<style:table-column-properties style:column-width="12.5cm"/></style:style>'
             f'<style:style style:name="RFI" style:family="table-row">'
-            f'<style:table-row-properties style:row-height="0.5cm" style:use-optimal-row-height="false"/></style:style>'
+            f'<style:table-row-properties style:row-height="0.35cm" style:use-optimal-row-height="false"/></style:style>'
             f'<style:style style:name="CFI" style:family="table-cell">'
-            f'<style:table-cell-properties fo:border="1pt solid #000000" fo:padding="0.05cm"/></style:style>'
+            f'<style:table-cell-properties fo:border="none" fo:padding="0.05cm"/></style:style>'
             f'<style:style style:name="THL" style:family="table">'
             f'<style:table-properties style:width="16cm" table:align="center" fo:margin-top="{margin_mat}" fo:margin-bottom="0cm"/></style:style>'
             f'<style:style style:name="TO" style:family="table">'
@@ -532,6 +551,7 @@ class DocumentUtils:
                     con_lato   = getattr(materiale, 'conicita_lato', 'sinistra')
                     con_alt    = getattr(materiale, 'conicita_altezza_mm', 0.0)
                     con_lung   = getattr(materiale, 'conicita_lunghezza_mm', 0.0)
+                    posa       = getattr(materiale, 'posa', '==')
                 elif isinstance(materiale, dict):
                     giri       = materiale.get('giri', 0)
                     lunghezza  = materiale.get('lunghezza', 0)
@@ -541,44 +561,65 @@ class DocumentUtils:
                     con_lato   = materiale.get('conicita_lato', 'sinistra')
                     con_alt    = materiale.get('conicita_altezza_mm', 0.0)
                     con_lung   = materiale.get('conicita_lunghezza_mm', 0.0)
+                    posa       = materiale.get('posa', '==')
                 else:
                     giri=1; lunghezza=1000; sviluppo=100; nome=f'Materiale {i+1}'
-                    is_conica=False; con_lato='sinistra'; con_alt=0.0; con_lung=0.0
+                    is_conica=False; con_lato='sinistra'; con_alt=0.0; con_lung=0.0; posa='=='
+
+                # Calcola taglio_info (misure conica) da mostrare PRIMA della lunghezza
+                taglio_info = ''
+                if is_conica and con_lung > 0:
+                    taglio_info = f'L:{con_lung:.0f}'
+                    if con_alt > 0:
+                        taglio_info += f' / h:{con_alt:.0f}'
+                    taglio_info += ' mm'
 
                 if is_conica and con_lung > 0:
-                    # Linea diagonale ODF nativa (rispetta dark/light mode come il testo normale)
-                    # Cella identica al normale, con draw:line sovrapposta nell'angolo
+                    # Linea diagonale ODF nativa con y1/y2 corretti per toccare i bordi del rettangolo
                     d_cm = 1.5   # larghezza orizzontale della diagonale
                     cw_cm = 11.7  # larghezza contenuto cella (12cm - padding)
+                    h_i = rect_h_cm
+                    # y1 negativo per toccare il bordo superiore, y2 per toccare il bordo inferiore
+                    diag_y1 = f'-{pad_cm_val:.2f}cm'
+                    diag_y2 = f'{h_i - pad_cm_val:.2f}cm'
                     lines_xml = ''
                     if con_lato in ('sinistra', 'entrambi'):
                         lines_xml += (
                             f'<draw:line draw:style-name="DiagLine" text:anchor-type="paragraph"'
-                            f' svg:x1="0cm" svg:y1="0cm" svg:x2="{d_cm}cm" svg:y2="{rect_h}"'
+                            f' svg:x1="0cm" svg:y1="{diag_y1}" svg:x2="{d_cm}cm" svg:y2="{diag_y2}"'
                             f' draw:z-index="{i * 2}"><text:p/></draw:line>'
                         )
                     if con_lato in ('destra', 'entrambi'):
                         lines_xml += (
                             f'<draw:line draw:style-name="DiagLine" text:anchor-type="paragraph"'
-                            f' svg:x1="{cw_cm - d_cm:.1f}cm" svg:y1="0cm"'
-                            f' svg:x2="{cw_cm}cm" svg:y2="{rect_h}"'
+                            f' svg:x1="{cw_cm - d_cm:.1f}cm" svg:y1="{diag_y2}"'
+                            f' svg:x2="{cw_cm}cm" svg:y2="{diag_y1}"'
                             f' draw:z-index="{i * 2 + 1}"><text:p/></draw:line>'
                         )
                     center_cell = (
                         f'<table:table-cell table:style-name="CMB">'
-                        f'<text:p text:style-name="PC">'
+                        f'<text:p text:style-name="PCL">'
                         + lines_xml +
-                        f'==          {nome}'
+                        f'<text:tab/>{posa} {nome}'
                         f'</text:p>'
                         f'</table:table-cell>'
                     )
                 else:
                     center_cell = (
                         f'<table:table-cell table:style-name="CMB">'
-                        f'<text:p text:style-name="PC">==          {nome}</text:p>'
+                        f'<text:p text:style-name="PCL"><text:tab/>{posa} {nome}</text:p>'
                         f'</table:table-cell>'
                     )
 
+                # header_line: TCFI vuota (campo editabile), TCHL_L = misure taglio (sx) + lunghezza (dx)
+                if taglio_info:
+                    lun_cell_xml = (
+                        f'<text:p text:style-name="PLR">'
+                        f'{taglio_info}<text:tab/>{int(lunghezza)} mm'
+                        f'</text:p>'
+                    )
+                else:
+                    lun_cell_xml = f'<text:p text:style-name="PLR"><text:tab/>{int(lunghezza)} mm</text:p>'
                 header_line = (
                     f'<table:table table:name="HL{i}" table:style-name="THL">'
                     f'<table:table-column table:style-name="TCFI"/>'
@@ -587,13 +628,14 @@ class DocumentUtils:
                     f'<table:table-cell table:style-name="CFI">'
                     f'<text:p text:style-name="PN"></text:p>'
                     f'</table:table-cell>'
-                    f'<table:table-cell table:style-name="CNB">'
-                    f'<text:p text:style-name="PC">{int(lunghezza)} mm</text:p>'
+                    f'<table:table-cell table:style-name="CNBb">'
+                    + lun_cell_xml +
                     f'</table:table-cell>'
                     f'</table:table-row></table:table>'
                 )
                 mat_parts.append(
                     header_line +
+                    f'<text:p text:style-name="PKN"/>' +
                     f'<table:table table:name="M{i}" table:style-name="TM">'
                     f'<table:table-column table:style-name="TCN"/>'
                     f'<table:table-column table:style-name="TCW"/>'
@@ -750,6 +792,7 @@ class DocumentUtils:
                     con_lato = getattr(materiale, 'conicita_lato', 'sinistra')
                     con_alt = getattr(materiale, 'conicita_altezza_mm', 0.0)
                     con_lung = getattr(materiale, 'conicita_lunghezza_mm', 0.0)
+                    posa = getattr(materiale, 'posa', '==')
                 elif isinstance(materiale, dict):
                     giri = materiale.get('giri', 0)
                     lunghezza = materiale.get('lunghezza', 0)
@@ -759,10 +802,11 @@ class DocumentUtils:
                     con_lato = materiale.get('conicita_lato', 'sinistra')
                     con_alt = materiale.get('conicita_altezza_mm', 0.0)
                     con_lung = materiale.get('conicita_lunghezza_mm', 0.0)
+                    posa = materiale.get('posa', '==')
                 else:
                     giri = 1; lunghezza = 1000; sviluppo = 100
                     nome = f'Materiale {i+1}'
-                    is_conica = False; con_lato = 'sinistra'; con_alt = 0.0; con_lung = 0.0
+                    is_conica = False; con_lato = 'sinistra'; con_alt = 0.0; con_lung = 0.0; posa = '=='
 
                 # Diagonale per tela conica (solo una linea nell'angolo, nient'altro)
                 diag_svg = ''
@@ -779,6 +823,14 @@ class DocumentUtils:
                         + ''.join(lines) + '</svg>'
                     )
 
+                # Calcola taglio_info (misure conica) da mostrare PRIMA della lunghezza
+                taglio_info_html = ''
+                if is_conica and con_lung > 0:
+                    taglio_info_html = f'L:{con_lung:.0f}'
+                    if con_alt > 0:
+                        taglio_info_html += f' / h:{con_alt:.0f}'
+                    taglio_info_html += ' mm'
+
                 figura_html = (
                     f'<div style="width: 80mm; height: {s["rect_height"]}; border: 2px solid #000; display: flex; '
                     f'align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; '
@@ -786,10 +838,28 @@ class DocumentUtils:
                     + diag_svg +
                     f'<input type="text" placeholder="Orient." style="width: {s["orient_width"]}; border: none; '
                     f'font-size: {s["orient_font"]}; background: transparent; position: relative; z-index: 1;">'
-                    f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 50%; '
-                    f'transform: translateX(-50%); z-index: 1;">{nome}</strong>'
+                    f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 43%; z-index: 1;">{posa} {nome}</strong>'
                     f'</div>'
                 )
+
+                # Riga 1 sopra rettangolo: per conica taglio_info a sinistra e lunghezza centrata (abs);
+                # per normale solo lunghezza centrata. Entrambe testo libero fuori da qualsiasi casella.
+                # Stesse proprietà box del rettangolo (border 2px + padding 0 3mm)
+                # così text-align:center produce lo stesso centro di left:50% nel rettangolo
+                _box = 'width: 80mm; border: 2px solid transparent; padding: 0 3mm; flex-shrink: 0; font-size: {fi}; box-sizing: content-box;'.format(fi=s['font_info'])
+                if taglio_info_html:
+                    sopra_rettangolo_html = (
+                        f'<div style="{_box} position: relative;">'
+                        f'<div style="position: absolute; left: 0; top: 0;"><strong>{taglio_info_html}</strong></div>'
+                        f'<div style="text-align: center;"><strong>{lunghezza}mm</strong></div>'
+                        f'</div>'
+                    )
+                else:
+                    sopra_rettangolo_html = (
+                        f'<div style="{_box} text-align: center;">'
+                        f'<strong>{lunghezza}mm</strong>'
+                        f'</div>'
+                    )
 
                 # Larghezze colonne layout: [campo] [G] [tela 80mm] [H]
                 w_campo = '28mm'
@@ -797,22 +867,20 @@ class DocumentUtils:
                 w_h     = '18mm'
 
                 materiali_html += f"""
-                <div style="margin: {s['margin_mat']} auto 0; page-break-inside: avoid; width: fit-content;">
-                    <!-- Riga 1: campo compilabile a sinistra + lunghezza centrata sulla tela -->
-                    <div style="display: flex; align-items: center; margin-bottom: 0;">
+                <div style="margin: {s['margin_mat']} auto 0; page-break-inside: avoid; break-inside: avoid; width: fit-content;">
+                    <!-- Riga 1: (conica) misure taglio a sx + lunghezza a dx sopra il rettangolo; (normale) lunghezza centrata -->
+                    <div style="display: flex; align-items: flex-end; margin-bottom: 0;">
                         <div style="width: {w_campo}; flex-shrink: 0;">
                             <input type="text" placeholder="" style="width: 100%; height: 5mm; border: 1.5px solid #000; background: #fff; color: #000; font-size: {s['font_info']}; padding: 0 1mm; box-sizing: border-box;">
                         </div>
                         <div style="width: {w_g}; flex-shrink: 0;"></div>
-                        <div style="width: 80mm; text-align: center; font-size: {s['font_info']}; flex-shrink: 0;">
-                            <strong>{lunghezza}mm</strong>
-                        </div>
+                        {sopra_rettangolo_html}
                         <div style="width: {w_h}; flex-shrink: 0;"></div>
                     </div>
                     <!-- Riga 2: spazio campo + G + tela + H -->
                     <div style="display: flex; align-items: center;">
                         <div style="width: {w_campo}; flex-shrink: 0;"></div>
-                        <div style="width: {w_g}; text-align: right; font-size: {s['font_giri']}; flex-shrink: 0; padding-right: 1mm;">
+                        <div style="width: {w_g}; text-align: right; font-size: {s['font_giri']}; flex-shrink: 0; padding-right: 1mm; box-sizing: border-box;">
                             <strong>G{giri}</strong>
                         </div>
                         {figura_html}

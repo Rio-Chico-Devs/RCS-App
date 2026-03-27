@@ -1,5 +1,5 @@
 class Materiale:
-    def __init__(self, nome="", spessore=0.0, prezzo=0.0, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0, categoria_id=None):
+    def __init__(self, nome="", spessore=0.0, prezzo=0.0, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0):
         self.nome = nome
         self.spessore = spessore
         self.prezzo = prezzo
@@ -7,7 +7,6 @@ class Materiale:
         self.prezzo_fornitore = prezzo_fornitore
         self.capacita_magazzino = capacita_magazzino
         self.giacenza = giacenza
-        self.categoria_id = categoria_id
 
 class MaterialeCalcolato:
     def __init__(self):
@@ -45,6 +44,9 @@ class MaterialeCalcolato:
 
         # Orientamento (da toolbar rotate/flip della TelaPreviewWidget)
         self.orientamento = {'rotation': 0, 'flip_h': False, 'flip_v': False}
+
+        # Posa tela: '==' 0°, '\\' 45° sin, '//' 45° des, '||' 90°
+        self.posa = '=='
 
     @property
     def stratifica(self):
@@ -126,6 +128,7 @@ class MaterialeCalcolato:
             'conicita_altezza_mm': self.conicita_altezza_mm,
             'conicita_lunghezza_mm': self.conicita_lunghezza_mm,
             'scarto_mm2': self.scarto_mm2,
-            'orientamento': self.orientamento
+            'orientamento': self.orientamento,
+            'posa': self.posa,
         }
         return d

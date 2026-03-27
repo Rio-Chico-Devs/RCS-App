@@ -273,6 +273,32 @@ class MaterialeUIComponents:
         window_instance.edit_giri.valueChanged.connect(window_instance.on_parametro_changed)
         form_layout.addRow(MaterialeUIComponents.create_standard_label("Giri"), window_instance.edit_giri)
 
+        # Posa tela
+        window_instance.combo_posa = QComboBox()
+        window_instance.combo_posa.addItem("==  (0°)",   '==')
+        window_instance.combo_posa.addItem("\\\\  (45° sin)", '\\\\')
+        window_instance.combo_posa.addItem("//  (45° des)", '//')
+        window_instance.combo_posa.addItem("||  (90°)",  '||')
+        window_instance.combo_posa.setStyleSheet("""
+            QComboBox {
+                border: 1px solid #e2e8f0;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-size: 13px;
+                background-color: #ffffff;
+                color: #2d3748;
+            }
+            QComboBox::drop-down { border: none; width: 20px; }
+            QComboBox QAbstractItemView {
+                background-color: #ffffff;
+                selection-background-color: #edf2f7;
+                font-size: 13px;
+            }
+            QComboBox QAbstractItemView::item { min-height: 28px; padding: 4px 8px; }
+        """)
+        window_instance.combo_posa.currentIndexChanged.connect(window_instance.on_parametro_changed)
+        form_layout.addRow(MaterialeUIComponents.create_standard_label("Posa"), window_instance.combo_posa)
+
         layout.addLayout(form_layout)
 
         # Toggle Conica

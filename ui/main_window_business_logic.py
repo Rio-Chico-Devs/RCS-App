@@ -451,6 +451,16 @@ class MainWindowBusinessLogic:
         window_instance.magazzino_window.show()
 
     @staticmethod
+    def apri_anagrafica_clienti(window_instance):
+        """Apre la finestra per gestire l'anagrafica clienti"""
+        from ui.anagrafica_clienti_window import AnagraficaClientiWindow
+        window_instance.anagrafica_clienti_window = AnagraficaClientiWindow(
+            window_instance.db_manager,
+            window_instance
+        )
+        window_instance.anagrafica_clienti_window.show()
+
+    @staticmethod
     def apri_confronto_preventivi(window_instance):
         """NUOVO: Apre la finestra per confrontare due preventivi"""
         from ui.confronto_preventivi_window import ConfrontoPreventiviWindow

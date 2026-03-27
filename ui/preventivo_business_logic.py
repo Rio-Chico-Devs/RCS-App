@@ -164,8 +164,6 @@ class PreventivoBusinessLogic:
     @staticmethod
     def gestisci_materiale_aggiunto(window_instance, materiale_calcolato):
         """Gestisce nuovo materiale aggiunto"""
-        print(f"DEBUG: Aggiungendo materiale: {materiale_calcolato.nome}, giri: {materiale_calcolato.giri}, sviluppo: {materiale_calcolato.sviluppo}")
-        
         window_instance.preventivo.materiali_calcolati.append(materiale_calcolato)
         
         # Ricalcola costo totale materiali
@@ -177,11 +175,7 @@ class PreventivoBusinessLogic:
     
     @staticmethod
     def gestisci_materiale_modificato(window_instance, materiale_calcolato, indice):
-        """Gestisce modifica materiale con debug specifico per i giri"""
-        print(f"DEBUG: Modificando materiale {indice}: {materiale_calcolato.nome}")
-        print(f"DEBUG: Giri: {materiale_calcolato.giri}, Sviluppo: {materiale_calcolato.sviluppo}")
-        print(f"DEBUG: Diametro interno: {materiale_calcolato.diametro_interno}, finale: {materiale_calcolato.diametro_finale}")
-        
+        """Gestisce modifica materiale"""
         # Sostituisci il materiale
         window_instance.preventivo.materiali_calcolati[indice] = materiale_calcolato
         
@@ -194,27 +188,19 @@ class PreventivoBusinessLogic:
         # Aggiorna interfaccia
         window_instance.aggiorna_materiali_info()
         window_instance.aggiorna_totali()
-        
-        print(f"DEBUG: Aggiornamento completato per materiale {indice}")
-    
+
     @staticmethod
     def ricalcola_diametri_successivi(window_instance, indice_modificato):
         """Ricalcola diametri per i materiali successivi"""
-        print(f"DEBUG: Ricalcolando diametri successivi a partire dall'indice {indice_modificato}")
-        
         for i in range(indice_modificato + 1, len(window_instance.preventivo.materiali_calcolati)):
             materiale_precedente = window_instance.preventivo.materiali_calcolati[i - 1]
             materiale_corrente = window_instance.preventivo.materiali_calcolati[i]
-            
-            print(f"DEBUG: Materiale {i} - Diametro interno prima: {materiale_corrente.diametro_interno}")
-            
+
             # Aggiorna diametro interno del materiale corrente
             materiale_corrente.diametro_interno = materiale_precedente.diametro_finale
-            
+
             # Ricalcola tutti i valori dipendenti
             materiale_corrente.ricalcola_tutto()
-            
-            print(f"DEBUG: Materiale {i} - Diametro interno dopo: {materiale_corrente.diametro_interno}, finale: {materiale_corrente.diametro_finale}")
     
     @staticmethod
     def aggiorna_totali(window_instance):
@@ -293,7 +279,7 @@ class PreventivoBusinessLogic:
     def get_dati_cliente(window_instance):
         """Recupera dati cliente dai controlli"""
         return {
-            'nome_cliente': window_instance.edit_nome_cliente.text().strip() if hasattr(window_instance, 'edit_nome_cliente') else "",
+            'nome_cliente': window_instance.combo_nome_cliente.currentText().strip() if hasattr(window_instance, 'combo_nome_cliente') else "",
             'numero_ordine': window_instance.edit_numero_ordine.text().strip() if hasattr(window_instance, 'edit_numero_ordine') else "",
             'descrizione': window_instance.edit_descrizione.text().strip() if hasattr(window_instance, 'edit_descrizione') else "",
             'codice': window_instance.edit_codice.text().strip() if hasattr(window_instance, 'edit_codice') else "",

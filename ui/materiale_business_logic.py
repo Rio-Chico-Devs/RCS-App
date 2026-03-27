@@ -129,6 +129,10 @@ class MaterialeBusinessLogic:
         # Aggiorna giri dal form
         window_instance.materiale_calcolato.giri = window_instance.edit_giri.value()
 
+        # Aggiorna posa dal combo
+        if hasattr(window_instance, 'combo_posa'):
+            window_instance.materiale_calcolato.posa = window_instance.combo_posa.currentData()
+
         # Leggi sempre diametro e lunghezza dai campi cilindrici (base per i calcoli)
         window_instance.materiale_calcolato.diametro = window_instance.edit_diametro.value()
         window_instance.materiale_calcolato.lunghezza = window_instance.edit_lunghezza.value()
@@ -244,7 +248,15 @@ class MaterialeBusinessLogic:
         window_instance.edit_diametro.setValue(window_instance.materiale_esistente.diametro)
         window_instance.edit_lunghezza.setValue(window_instance.materiale_esistente.lunghezza)
         window_instance.edit_giri.setValue(window_instance.materiale_esistente.giri)
-        
+
+        # Carica posa se presente
+        if hasattr(window_instance, 'combo_posa'):
+            posa = getattr(window_instance.materiale_esistente, 'posa', '==')
+            for i in range(window_instance.combo_posa.count()):
+                if window_instance.combo_posa.itemData(i) == posa:
+                    window_instance.combo_posa.setCurrentIndex(i)
+                    break
+
         # Carica sviluppo manuale se esistente
         if hasattr(window_instance.materiale_esistente, 'arrotondamento_manuale') and window_instance.materiale_esistente.arrotondamento_manuale != 0:
             window_instance.edit_arrotondamento.setValue(window_instance.materiale_esistente.arrotondamento_manuale)

@@ -13,7 +13,7 @@ Author: Antonio VB + Claude
 from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QWidget, QLabel,
                              QLineEdit, QFormLayout, QGroupBox, QDoubleSpinBox, QFrame,
                              QGridLayout, QGraphicsDropShadowEffect, QScrollArea, QListWidget,
-                             QListWidgetItem, QSizePolicy, QTextEdit)
+                             QListWidgetItem, QSizePolicy, QTextEdit, QComboBox)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QFont
 from ui.materiale_ui_components import NoScrollDoubleSpinBox
@@ -171,8 +171,93 @@ class PreventivoUIComponents:
         
         # Prima riga: Nome Cliente e Numero Ordine
         client_grid.addWidget(PreventivoUIComponents.create_standard_label("Nome Cliente:"), 0, 0)
-        window_instance.edit_nome_cliente = QLineEdit()
-        client_grid.addWidget(window_instance.edit_nome_cliente, 0, 1)
+        nome_cliente_widget = QWidget()
+        nome_cliente_hl = QHBoxLayout(nome_cliente_widget)
+        nome_cliente_hl.setContentsMargins(0, 0, 0, 0)
+        nome_cliente_hl.setSpacing(4)
+        window_instance.combo_nome_cliente = QComboBox()
+        window_instance.combo_nome_cliente.setEditable(True)
+        window_instance.combo_nome_cliente.setInsertPolicy(QComboBox.NoInsert)
+        window_instance.combo_nome_cliente.setMaxVisibleItems(20)
+        window_instance.combo_nome_cliente.setSizeAdjustPolicy(QComboBox.AdjustToContentsOnFirstShow)
+        window_instance.combo_nome_cliente.setStyleSheet("""
+            QComboBox {
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                padding: 6px 12px;
+                background-color: #ffffff;
+                font-size: 14px;
+                color: #2d3748;
+            }
+            QComboBox:focus { border-color: #4a5568; }
+            QComboBox::drop-down { border: none; width: 24px; }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 6px solid #4a5568;
+                width: 0; height: 0;
+                margin-right: 6px;
+            }
+            QComboBox QAbstractItemView {
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                background-color: #ffffff;
+                selection-background-color: #edf2f7;
+                selection-color: #2d3748;
+                font-size: 14px;
+                padding: 4px;
+                outline: none;
+            }
+            QComboBox QAbstractItemView::item {
+                min-height: 36px;
+                padding: 6px 12px;
+                color: #2d3748;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background-color: #f7fafc;
+            }
+        """)
+        # Popola clienti
+        try:
+            clienti = window_instance.db_manager.get_all_clienti()
+            for c in clienti:
+                window_instance.combo_nome_cliente.addItem(c[1])
+        except Exception:
+            pass
+        nome_cliente_hl.addWidget(window_instance.combo_nome_cliente, 1)
+        btn_nuovo_cliente = QPushButton("+")
+        btn_nuovo_cliente.setFixedSize(32, 32)
+        btn_nuovo_cliente.setToolTip("Aggiungi nuovo cliente")
+        btn_nuovo_cliente.setStyleSheet("""
+            QPushButton {
+                background-color: #4a5568; color: #ffffff;
+                font-size: 18px; font-weight: 700;
+                border-radius: 6px; padding: 0;
+            }
+            QPushButton:hover { background-color: #2d3748; }
+        """)
+        def _apri_nuovo_cliente(wi=window_instance):
+            from ui.anagrafica_clienti_window import NuovoClienteQuickDialog
+            dialog = NuovoClienteQuickDialog(wi.db_manager, wi)
+            if dialog.exec_() == NuovoClienteQuickDialog.Accepted and dialog.nome_aggiunto:
+                wi.combo_nome_cliente.clear()
+                try:
+                    clienti2 = wi.db_manager.get_all_clienti()
+                    for c in clienti2:
+                        wi.combo_nome_cliente.addItem(c[1])
+                except Exception:
+                    pass
+                idx = wi.combo_nome_cliente.findText(dialog.nome_aggiunto, Qt.MatchFixedString)
+                if idx >= 0:
+                    wi.combo_nome_cliente.setCurrentIndex(idx)
+                else:
+                    wi.combo_nome_cliente.lineEdit().setText(dialog.nome_aggiunto)
+        btn_nuovo_cliente.clicked.connect(_apri_nuovo_cliente)
+        nome_cliente_hl.addWidget(btn_nuovo_cliente)
+        # Alias per compatibilità
+        window_instance.edit_nome_cliente = window_instance.combo_nome_cliente
+        client_grid.addWidget(nome_cliente_widget, 0, 1)
         
         client_grid.addWidget(PreventivoUIComponents.create_standard_label("Numero Ordine:"), 0, 2)
         window_instance.edit_numero_ordine = QLineEdit()
@@ -193,7 +278,7 @@ class PreventivoUIComponents:
         
         # Disabilita i campi se in modalità visualizza
         if window_instance.modalita == 'visualizza':
-            window_instance.edit_nome_cliente.setReadOnly(True)
+            window_instance.combo_nome_cliente.setEnabled(False)
             window_instance.edit_numero_ordine.setReadOnly(True)
             window_instance.edit_codice.setReadOnly(True)
             window_instance.edit_descrizione.setReadOnly(True)
@@ -675,8 +760,13 @@ class PreventivoUIComponents:
     @staticmethod
     def set_dati_cliente(window_instance, nome_cliente, numero_ordine, descrizione, codice):
         """Imposta dati cliente nei controlli"""
-        if hasattr(window_instance, 'edit_nome_cliente'):
-            window_instance.edit_nome_cliente.setText(nome_cliente or "")
+        if hasattr(window_instance, 'combo_nome_cliente'):
+            nome = nome_cliente or ""
+            idx = window_instance.combo_nome_cliente.findText(nome, Qt.MatchFixedString)
+            if idx >= 0:
+                window_instance.combo_nome_cliente.setCurrentIndex(idx)
+            else:
+                window_instance.combo_nome_cliente.lineEdit().setText(nome)
         if hasattr(window_instance, 'edit_numero_ordine'):
             window_instance.edit_numero_ordine.setText(numero_ordine or "")
         if hasattr(window_instance, 'edit_descrizione'):

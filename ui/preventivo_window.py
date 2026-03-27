@@ -33,7 +33,8 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
                              QWidget, QLabel, QLineEdit, QFormLayout, QMessageBox,
                              QScrollArea, QGroupBox, QSpinBox, QDoubleSpinBox,
                              QDialog, QListWidget, QListWidgetItem, QGridLayout, QFrame,
-                             QSizePolicy, QApplication, QGraphicsDropShadowEffect, QTextEdit)
+                             QSizePolicy, QApplication, QGraphicsDropShadowEffect, QTextEdit,
+                             QComboBox)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QFont, QDoubleValidator, QColor
 from ui.materiale_ui_components import NoScrollSpinBox, NoScrollDoubleSpinBox
@@ -80,8 +81,6 @@ class PreventivoWindow(QMainWindow):
         self.codice_data = preventivo_data.get('codice', '')
         self.misura_data = preventivo_data.get('misura', '')
         self.finitura_data = preventivo_data.get('finitura', '')
-        self.categoria_data = preventivo_data.get('categoria', '')
-        self.sottocategoria_data = preventivo_data.get('sottocategoria', '')
 
         # IMPORTANTE: Carica TUTTI i valori numerici e verifica che siano validi
         self.preventivo.costi_accessori = float(preventivo_data.get('costi_accessori', 0.0))
@@ -115,7 +114,12 @@ class PreventivoWindow(QMainWindow):
                 # Dati conici
                 materiale.is_conica = mat_data.get('is_conica', False)
                 materiale.sezioni_coniche = mat_data.get('sezioni_coniche', [])
+                materiale.conicita_lato = mat_data.get('conicita_lato', 'sinistra')
+                materiale.conicita_altezza_mm = mat_data.get('conicita_altezza_mm', 0.0)
+                materiale.conicita_lunghezza_mm = mat_data.get('conicita_lunghezza_mm', 0.0)
+                materiale.scarto_mm2 = mat_data.get('scarto_mm2', 0.0)
                 materiale.orientamento = mat_data.get('orientamento', {'rotation': 0, 'flip_h': False, 'flip_v': False})
+                materiale.posa = mat_data.get('posa', '==')
 
                 self.preventivo.materiali_calcolati.append(materiale)
         except (json.JSONDecodeError, TypeError):
@@ -255,22 +259,78 @@ class PreventivoWindow(QMainWindow):
         client_grid = QGridLayout(client_grid_widget)
         client_grid.setSpacing(16)
         
-        # Prima riga: Nome Cliente, Numero Ordine, Categoria, Sottocategoria
+        # Prima riga: Nome Cliente, Numero Ordine
         client_grid.addWidget(self.create_standard_label("Nome Cliente:"), 0, 0)
-        self.edit_nome_cliente = QLineEdit()
-        client_grid.addWidget(self.edit_nome_cliente, 0, 1)
+        # Combo clienti + pulsante nuovo cliente
+        nome_cliente_widget = QWidget()
+        nome_cliente_hl = QHBoxLayout(nome_cliente_widget)
+        nome_cliente_hl.setContentsMargins(0, 0, 0, 0)
+        nome_cliente_hl.setSpacing(4)
+        self.combo_nome_cliente = QComboBox()
+        self.combo_nome_cliente.setEditable(True)
+        self.combo_nome_cliente.setInsertPolicy(QComboBox.NoInsert)
+        self.combo_nome_cliente.setMaxVisibleItems(20)
+        self.combo_nome_cliente.setSizeAdjustPolicy(QComboBox.AdjustToContentsOnFirstShow)
+        self.combo_nome_cliente.setStyleSheet("""
+            QComboBox {
+                border: 1px solid #e2e8f0;
+                border-radius: 6px;
+                padding: 6px 12px;
+                background-color: #ffffff;
+                font-size: 14px;
+                color: #2d3748;
+            }
+            QComboBox:focus { border-color: #4a5568; }
+            QComboBox::drop-down { border: none; width: 24px; }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 6px solid #4a5568;
+                width: 0; height: 0;
+                margin-right: 6px;
+            }
+            QComboBox QAbstractItemView {
+                border: 1px solid #e2e8f0;
+                border-radius: 8px;
+                background-color: #ffffff;
+                selection-background-color: #edf2f7;
+                selection-color: #2d3748;
+                font-size: 14px;
+                padding: 4px;
+                outline: none;
+            }
+            QComboBox QAbstractItemView::item {
+                min-height: 36px;
+                padding: 6px 12px;
+                color: #2d3748;
+            }
+            QComboBox QAbstractItemView::item:hover {
+                background-color: #f7fafc;
+            }
+        """)
+        self._popola_combo_clienti()
+        nome_cliente_hl.addWidget(self.combo_nome_cliente, 1)
+        btn_nuovo_cliente = QPushButton("+")
+        btn_nuovo_cliente.setFixedSize(32, 32)
+        btn_nuovo_cliente.setToolTip("Aggiungi nuovo cliente")
+        btn_nuovo_cliente.setStyleSheet("""
+            QPushButton {
+                background-color: #4a5568; color: #ffffff;
+                font-size: 18px; font-weight: 700;
+                border-radius: 6px; padding: 0;
+            }
+            QPushButton:hover { background-color: #2d3748; }
+        """)
+        btn_nuovo_cliente.clicked.connect(self._apri_nuovo_cliente_dialog)
+        nome_cliente_hl.addWidget(btn_nuovo_cliente)
+        # Compatibilità: alias edit_nome_cliente → combo_nome_cliente
+        self.edit_nome_cliente = self.combo_nome_cliente
+        client_grid.addWidget(nome_cliente_widget, 0, 1)
 
         client_grid.addWidget(self.create_standard_label("Numero Ordine:"), 0, 2)
         self.edit_numero_ordine = QLineEdit()
         client_grid.addWidget(self.edit_numero_ordine, 0, 3)
-
-        client_grid.addWidget(self.create_standard_label("Categoria:"), 0, 4)
-        self.edit_categoria = QLineEdit()
-        client_grid.addWidget(self.edit_categoria, 0, 5)
-
-        client_grid.addWidget(self.create_standard_label("Sottocategoria:"), 0, 6)
-        self.edit_sottocategoria = QLineEdit()
-        client_grid.addWidget(self.edit_sottocategoria, 0, 7)
 
         # Seconda riga: Codice, Misura e Finitura
         client_grid.addWidget(self.create_standard_label("Codice:"), 1, 0)
@@ -295,7 +355,7 @@ class PreventivoWindow(QMainWindow):
         
         # Carica i dati se esistenti
         if hasattr(self, 'nome_cliente_data'):
-            self.edit_nome_cliente.setText(self.nome_cliente_data)
+            self._set_combo_cliente(self.nome_cliente_data)
             self.edit_numero_ordine.setText(self.numero_ordine_data)
             self.edit_descrizione.setText(self.descrizione_data)
             self.edit_codice.setText(self.codice_data)
@@ -303,10 +363,6 @@ class PreventivoWindow(QMainWindow):
                 self.edit_misura.setText(self.misura_data)
             if hasattr(self, 'finitura_data'):
                 self.edit_finitura.setText(self.finitura_data)
-            if hasattr(self, 'categoria_data'):
-                self.edit_categoria.setText(self.categoria_data)
-            if hasattr(self, 'sottocategoria_data'):
-                self.edit_sottocategoria.setText(self.sottocategoria_data)
 
         parent_layout.addWidget(client_group)
     
@@ -319,8 +375,6 @@ class PreventivoWindow(QMainWindow):
         self.edit_codice.setEnabled(False)
         self.edit_misura.setEnabled(False)
         self.edit_finitura.setEnabled(False)
-        self.edit_categoria.setEnabled(False)
-        self.edit_sottocategoria.setEnabled(False)
 
         # Disabilita tutti i SpinBox
         self.edit_minuti_taglio.setEnabled(False)
@@ -836,18 +890,43 @@ class PreventivoWindow(QMainWindow):
         parent_layout.addLayout(footer_layout)
     
     # =================== METODI FUNZIONALI ===================
-    
+
+    def _popola_combo_clienti(self):
+        """Popola il combo con i clienti dal DB"""
+        self.combo_nome_cliente.clear()
+        clienti = self.db_manager.get_all_clienti()
+        for c in clienti:
+            self.combo_nome_cliente.addItem(c[1])  # nome
+
+    def _set_combo_cliente(self, nome):
+        """Imposta il valore del combo cliente (esistente o libero)"""
+        if not nome:
+            self.combo_nome_cliente.setCurrentIndex(-1)
+            self.combo_nome_cliente.lineEdit().setText("")
+            return
+        idx = self.combo_nome_cliente.findText(nome, Qt.MatchFixedString)
+        if idx >= 0:
+            self.combo_nome_cliente.setCurrentIndex(idx)
+        else:
+            self.combo_nome_cliente.lineEdit().setText(nome)
+
+    def _apri_nuovo_cliente_dialog(self):
+        """Apre il dialog rapido per aggiungere un nuovo cliente"""
+        from ui.anagrafica_clienti_window import NuovoClienteQuickDialog
+        dialog = NuovoClienteQuickDialog(self.db_manager, self)
+        if dialog.exec_() == NuovoClienteQuickDialog.Accepted and dialog.nome_aggiunto:
+            self._popola_combo_clienti()
+            self._set_combo_cliente(dialog.nome_aggiunto)
+
     def get_dati_cliente(self):
         """Raccoglie i dati cliente dai campi"""
         return {
-            'nome_cliente': self.edit_nome_cliente.text().strip(),
+            'nome_cliente': self.combo_nome_cliente.currentText().strip(),
             'numero_ordine': self.edit_numero_ordine.text().strip(),
             'descrizione': self.edit_descrizione.text().strip(),
             'codice': self.edit_codice.text().strip(),
             'misura': self.edit_misura.text().strip(),
             'finitura': self.edit_finitura.text().strip(),
-            'categoria': self.edit_categoria.text().strip(),
-            'sottocategoria': self.edit_sottocategoria.text().strip(),
         }
     
     def carica_valori_con_delay(self):
@@ -857,7 +936,7 @@ class PreventivoWindow(QMainWindow):
         
         # Carica dati cliente
         if hasattr(self, 'nome_cliente_data'):
-            self.edit_nome_cliente.setText(self.nome_cliente_data or "")
+            self._set_combo_cliente(self.nome_cliente_data or "")
             self.edit_numero_ordine.setText(self.numero_ordine_data or "")
             self.edit_descrizione.setText(self.descrizione_data or "")
             self.edit_codice.setText(self.codice_data or "")
@@ -865,10 +944,6 @@ class PreventivoWindow(QMainWindow):
                 self.edit_misura.setText(self.misura_data or "")
             if hasattr(self, 'finitura_data'):
                 self.edit_finitura.setText(self.finitura_data or "")
-            if hasattr(self, 'categoria_data'):
-                self.edit_categoria.setText(self.categoria_data or "")
-            if hasattr(self, 'sottocategoria_data'):
-                self.edit_sottocategoria.setText(self.sottocategoria_data or "")
 
         # Imposta valori mano d'opera
         try:
@@ -1182,8 +1257,8 @@ class PreventivoWindow(QMainWindow):
 
         indice = checked[0]
         materiale_da_modificare = self.preventivo.materiali_calcolati[indice]
+        self._dialog_materiali.accept()
         self.apri_finestra_modifica_materiale(indice, materiale_da_modificare)
-        self._aggiorna_lista_materiali_dialog()
 
     def elimina_materiali_selezionati(self):
         """Elimina uno o più materiali flaggati"""

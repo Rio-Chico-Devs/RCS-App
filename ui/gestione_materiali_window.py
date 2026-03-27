@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
                              QLineEdit, QDoubleSpinBox, QFormLayout, QDialog, QGridLayout,
                              QComboBox, QTabWidget, QTextEdit, QAbstractItemView,
                              QCheckBox, QScrollArea, QTableWidget, QTableWidgetItem,
-                             QHeaderView, QAbstractScrollArea)
+                             QHeaderView, QAbstractScrollArea, QStackedWidget)
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 from PyQt5.QtGui import QFont, QColor, QPainter, QBrush, QPen
 from ui.materiale_ui_components import NoScrollDoubleSpinBox
@@ -175,10 +175,7 @@ class GestioneMaterialiWindow(QMainWindow):
     def __init__(self, db_manager, parent=None):
         super().__init__(None)
         self.db_manager = db_manager
-        self._categoria_corrente_idx = 0
-        self._categorie_lista = []
         self.init_ui()
-        self.carica_categorie_combo()
         self.carica_materiali()
         self.showMaximized()
 
@@ -200,7 +197,7 @@ class GestioneMaterialiWindow(QMainWindow):
         header_layout = QHBoxLayout()
         title = QLabel("Gestione Materiali")
         title.setStyleSheet("QLabel { font-size: 24px; font-weight: 700; color: #2d3748; }")
-        subtitle = QLabel("Modifica materiali e gestisci le categorie di raggruppamento")
+        subtitle = QLabel("Modifica materiali")
         subtitle.setStyleSheet("QLabel { font-size: 14px; font-weight: 400; color: #718096; }")
         header_layout.addWidget(title)
         header_layout.addSpacing(20)
@@ -215,10 +212,6 @@ class GestioneMaterialiWindow(QMainWindow):
         self.tab_materiali = QWidget()
         self._build_tab_materiali(self.tab_materiali)
         self.tab_widget.addTab(self.tab_materiali, "Singoli Materiali")
-
-        self.tab_categorie = QWidget()
-        self._build_tab_categorie(self.tab_categorie)
-        self.tab_widget.addTab(self.tab_categorie, "Categorie")
 
         main_layout.addWidget(self.tab_widget, 1)
 
@@ -240,15 +233,31 @@ class GestioneMaterialiWindow(QMainWindow):
     # ------------------------------------------------------------------
 
     def _build_tab_materiali(self, parent):
-        layout = QHBoxLayout(parent)
-        layout.setSpacing(20)
+        layout = QVBoxLayout(parent)
+        layout.setSpacing(0)
         layout.setContentsMargins(0, 12, 0, 0)
 
-        # ── Left: lista + filtri ──────────────────────────────────────
-        left = QWidget()
-        left.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        left_layout = QVBoxLayout(left)
-        left_layout.setSpacing(20)
+        self.stack_materiali = QStackedWidget()
+        layout.addWidget(self.stack_materiali)
+
+        # Pagina 0: lista materiali (fullscreen)
+        page_list = QWidget()
+        self._build_page_list(page_list)
+        self.stack_materiali.addWidget(page_list)
+
+        # Pagina 1: dettaglio materiale
+        page_detail = QWidget()
+        self._build_page_detail(page_detail)
+        self.stack_materiali.addWidget(page_detail)
+
+        self.abilita_form(False)
+        self.abilita_pulsanti_form(False)
+
+    def _build_page_list(self, parent):
+        """Pagina 0: lista materiali a tutto schermo con solo ricerca"""
+        layout = QVBoxLayout(parent)
+        layout.setSpacing(16)
+        layout.setContentsMargins(0, 0, 0, 0)
 
         lista_group = QGroupBox("Materiali Disponibili")
         lista_group.setGraphicsEffect(_make_shadow())
@@ -256,56 +265,18 @@ class GestioneMaterialiWindow(QMainWindow):
         lista_inner.setContentsMargins(20, 28, 20, 15)
         lista_inner.setSpacing(10)
 
-        # Filtri
-        filtri_frame = QFrame()
-        filtri_frame.setStyleSheet("""
-            QFrame { background-color: #f7fafc; border: 1px solid #e2e8f0;
-                     border-radius: 8px; padding: 10px; }
-        """)
-        filtri_layout = QVBoxLayout(filtri_frame)
-        filtri_layout.setContentsMargins(10, 8, 10, 8)
-        filtri_layout.setSpacing(8)
-
-        # Riga 1: ricerca testo
-        riga1 = QHBoxLayout()
-        riga1.addWidget(QLabel("Cerca:"))
+        # Barra ricerca
+        search_row = QHBoxLayout()
+        search_row.addWidget(QLabel("Cerca:"))
         self.search_edit = QLineEdit()
         self.search_edit.setPlaceholderText("Inserisci nome materiale...")
         self.search_edit.textChanged.connect(self._applica_filtri)
-        riga1.addWidget(self.search_edit)
-        filtri_layout.addLayout(riga1)
-
-        # Riga 2: checkbox + combo scorte
-        riga2 = QHBoxLayout()
-        riga2.setSpacing(16)
-
-        self.chk_fornitore = QCheckBox("Ordina per fornitore")
-        self.chk_fornitore.stateChanged.connect(self._applica_filtri)
-        riga2.addWidget(self.chk_fornitore)
-
-        self.chk_alfabetico = QCheckBox("Ordina A-Z")
-        self.chk_alfabetico.stateChanged.connect(self._applica_filtri)
-        riga2.addWidget(self.chk_alfabetico)
-
-        riga2.addStretch()
-
-        lbl_scorte = QLabel("Scorte:")
-        lbl_scorte.setStyleSheet("QLabel { font-size: 13px; }")
-        riga2.addWidget(lbl_scorte)
-        self.combo_scorte = QComboBox()
-        self.combo_scorte.setFixedWidth(160)
-        self.combo_scorte.addItem("Tutte", "tutte")
-        self.combo_scorte.addItem("Scorte basse prima", "basse")
-        self.combo_scorte.addItem("Scorte alte prima", "alte")
-        self.combo_scorte.currentIndexChanged.connect(self._applica_filtri)
-        riga2.addWidget(self.combo_scorte)
-
-        filtri_layout.addLayout(riga2)
-        lista_inner.addWidget(filtri_frame)
+        search_row.addWidget(self.search_edit)
+        lista_inner.addLayout(search_row)
 
         self.lista_materiali = QListWidget()
         self.lista_materiali.itemSelectionChanged.connect(self.on_materiale_selezionato)
-        lista_inner.addWidget(self.lista_materiali)
+        lista_inner.addWidget(self.lista_materiali, 1)
 
         self.lbl_conteggio = QLabel("0 materiali caricati")
         self.lbl_conteggio.setStyleSheet("QLabel { color: #718096; font-size: 13px; font-weight: 500; }")
@@ -332,18 +303,36 @@ class GestioneMaterialiWindow(QMainWindow):
         list_btns.addStretch()
         lista_inner.addLayout(list_btns)
 
-        left_layout.addWidget(lista_group)
-        layout.addWidget(left)
+        layout.addWidget(lista_group, 1)
 
-        # ── Right: form dettagli + fornitori ─────────────────────────
-        right = QWidget()
-        right.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        right_layout = QVBoxLayout(right)
-        right_layout.setSpacing(14)
+    def _build_page_detail(self, parent):
+        """Pagina 1: dettaglio materiale con form + scorte aggregate + fornitori"""
+        layout = QVBoxLayout(parent)
+        layout.setSpacing(14)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        # --- Gruppo: dati base materiale ---
+        # Pulsante Indietro
+        back_row = QHBoxLayout()
+        btn_back = QPushButton("◀  Torna alla lista")
+        btn_back.setStyleSheet("""
+            QPushButton { background-color: #f7fafc; color: #4a5568;
+                          border: 1px solid #e2e8f0; min-height: 36px; padding: 6px 18px; }
+            QPushButton:hover { background-color: #edf2f7; }
+        """)
+        btn_back.clicked.connect(self._torna_alla_lista)
+        back_row.addWidget(btn_back)
+        back_row.addStretch()
+        layout.addLayout(back_row)
+
+        # Layout a due colonne 50/50: sinistra = form, destra = fornitori
+        columns = QHBoxLayout()
+        columns.setSpacing(20)
+        columns.setContentsMargins(0, 0, 0, 0)
+
+        # ── Colonna sinistra: form dettagli ──────────────────────────
         form_group = QGroupBox("Dettagli Materiale")
         form_group.setGraphicsEffect(_make_shadow())
+        form_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         form_inner = QVBoxLayout(form_group)
         form_inner.setContentsMargins(20, 28, 20, 15)
         form_inner.setSpacing(10)
@@ -382,14 +371,25 @@ class GestioneMaterialiWindow(QMainWindow):
         self.edit_prezzo.setSuffix(" €")
         self.edit_prezzo.setMinimumHeight(36)
 
-        self.combo_categoria = QComboBox()
-        self.combo_categoria.setMinimumHeight(36)
-        self.combo_categoria.setToolTip("Categoria opzionale per raggruppare materiali simili")
+        self.edit_scorta_min_mat = NoScrollDoubleSpinBox()
+        self.edit_scorta_min_mat.setDecimals(2)
+        self.edit_scorta_min_mat.setMaximum(99999.99)
+        self.edit_scorta_min_mat.setSuffix(" m²")
+        self.edit_scorta_min_mat.setMinimumHeight(36)
+        self.edit_scorta_min_mat.setToolTip("Scorta minima aggregata del materiale (indipendente dai fornitori)")
+
+        self.edit_scorta_max_mat = NoScrollDoubleSpinBox()
+        self.edit_scorta_max_mat.setDecimals(2)
+        self.edit_scorta_max_mat.setMaximum(99999.99)
+        self.edit_scorta_max_mat.setSuffix(" m²")
+        self.edit_scorta_max_mat.setMinimumHeight(36)
+        self.edit_scorta_max_mat.setToolTip("Scorta massima aggregata del materiale (indipendente dai fornitori)")
 
         form_fields.addRow(_std_label("Nome Materiale:"), self.edit_nome)
         form_fields.addRow(_std_label("Spessore:"), self.edit_spessore)
         form_fields.addRow(_std_label("Prezzo (Preventivo):"), self.edit_prezzo)
-        form_fields.addRow(_std_label("Categoria (opzionale):"), self.combo_categoria)
+        form_fields.addRow(_std_label("Scorta Min (aggregata):"), self.edit_scorta_min_mat)
+        form_fields.addRow(_std_label("Scorta Max (aggregata):"), self.edit_scorta_max_mat)
 
         form_inner.addLayout(form_fields)
 
@@ -398,7 +398,7 @@ class GestioneMaterialiWindow(QMainWindow):
 
         self.btn_salva = QPushButton("Salva Materiale")
         self.btn_salva.setStyleSheet("""
-            QPushButton { background-color: #4a5568; color: #ffffff; min-height: 40px; }
+            QPushButton { background-color: #4a5568; color: #ffffff; min-height: 32px; }
             QPushButton:hover { background-color: #2d3748; }
             QPushButton:disabled { background-color: #a0aec0; color: #ffffff; }
         """)
@@ -406,7 +406,7 @@ class GestioneMaterialiWindow(QMainWindow):
 
         self.btn_elimina = QPushButton("Elimina Materiale")
         self.btn_elimina.setStyleSheet("""
-            QPushButton { background-color: #e53e3e; color: #ffffff; min-height: 40px; }
+            QPushButton { background-color: #e53e3e; color: #ffffff; min-height: 32px; }
             QPushButton:hover { background-color: #c53030; }
             QPushButton:disabled { background-color: #a0aec0; color: #ffffff; }
         """)
@@ -415,7 +415,7 @@ class GestioneMaterialiWindow(QMainWindow):
         self.btn_reset = QPushButton("Reset")
         self.btn_reset.setStyleSheet("""
             QPushButton { background-color: #f7fafc; color: #4a5568;
-                          border: 1px solid #e2e8f0; min-height: 40px; }
+                          border: 1px solid #e2e8f0; min-height: 32px; }
             QPushButton:hover { background-color: #edf2f7; }
         """)
         self.btn_reset.clicked.connect(self.reset_form)
@@ -425,18 +425,18 @@ class GestioneMaterialiWindow(QMainWindow):
         form_btns.addStretch()
         form_btns.addWidget(self.btn_reset)
         form_inner.addLayout(form_btns)
+        form_inner.addStretch()
 
-        right_layout.addWidget(form_group)
+        columns.addWidget(form_group, 1)
 
-        # --- Gruppo: fornitori del materiale ---
+        # ── Colonna destra: fornitori ─────────────────────────────────
         self.fornitori_group = QGroupBox("Fornitori del Materiale")
         self.fornitori_group.setGraphicsEffect(_make_shadow())
-        self.fornitori_group.setVisible(False)
+        self.fornitori_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         forn_inner = QVBoxLayout(self.fornitori_group)
         forn_inner.setContentsMargins(20, 28, 20, 15)
         forn_inner.setSpacing(10)
 
-        # Tabella fornitori
         self.tabella_fornitori_mat = QTableWidget()
         self.tabella_fornitori_mat.setColumnCount(6)
         self.tabella_fornitori_mat.setHorizontalHeaderLabels(
@@ -452,8 +452,7 @@ class GestioneMaterialiWindow(QMainWindow):
         self.tabella_fornitori_mat.verticalHeader().setVisible(False)
         self.tabella_fornitori_mat.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabella_fornitori_mat.setSelectionBehavior(QTableWidget.SelectRows)
-        self.tabella_fornitori_mat.setMaximumHeight(220)
-        forn_inner.addWidget(self.tabella_fornitori_mat)
+        forn_inner.addWidget(self.tabella_fornitori_mat, 1)
 
         btn_aggiungi_forn = QPushButton("+ Aggiungi Fornitore")
         btn_aggiungi_forn.setStyleSheet("""
@@ -463,175 +462,23 @@ class GestioneMaterialiWindow(QMainWindow):
         btn_aggiungi_forn.clicked.connect(self._aggiungi_fornitore_materiale)
         forn_inner.addWidget(btn_aggiungi_forn, alignment=Qt.AlignLeft)
 
-        right_layout.addWidget(self.fornitori_group)
-        right_layout.addStretch()
-        layout.addWidget(right)
+        columns.addWidget(self.fornitori_group, 1)
 
-        self.abilita_form(False)
-        self.abilita_pulsanti_form(False)
-
-    # ------------------------------------------------------------------
-    # Tab: Categorie  (grandi pulsanti + tabella dettaglio)
-    # ------------------------------------------------------------------
-
-    def _build_tab_categorie(self, parent):
-        layout = QVBoxLayout(parent)
-        layout.setSpacing(16)
-        layout.setContentsMargins(0, 12, 0, 0)
-
-        # ── Header con pulsante Nuova Categoria ──
-        header_row = QHBoxLayout()
-        lbl_cat_title = QLabel("Categorie")
-        lbl_cat_title.setStyleSheet("QLabel { font-size: 18px; font-weight: 700; color: #2d3748; }")
-        header_row.addWidget(lbl_cat_title)
-        header_row.addStretch()
-
-        self.btn_nuova_categoria = QPushButton("+ Nuova Categoria")
-        self.btn_nuova_categoria.setStyleSheet("""
-            QPushButton { background-color: #4a5568; color: #ffffff; min-height: 36px; padding: 8px 20px; }
-            QPushButton:hover { background-color: #2d3748; }
-        """)
-        self.btn_nuova_categoria.clicked.connect(self.nuova_categoria)
-        header_row.addWidget(self.btn_nuova_categoria)
-
-        btn_aggiorna_cat = QPushButton("Aggiorna")
-        btn_aggiorna_cat.setStyleSheet("""
-            QPushButton { background-color: #f7fafc; color: #4a5568;
-                          border: 1px solid #e2e8f0; min-height: 36px; padding: 8px 16px; }
-            QPushButton:hover { background-color: #edf2f7; }
-        """)
-        btn_aggiorna_cat.clicked.connect(self.carica_categorie)
-        header_row.addWidget(btn_aggiorna_cat)
-        layout.addLayout(header_row)
-
-        # ── Griglia pulsanti categorie ──
-        cat_buttons_group = QGroupBox("Seleziona una categoria")
-        cat_buttons_group.setGraphicsEffect(_make_shadow())
-        cat_buttons_inner = QVBoxLayout(cat_buttons_group)
-        cat_buttons_inner.setContentsMargins(20, 28, 20, 15)
-
-        self.cat_buttons_scroll = QScrollArea()
-        self.cat_buttons_scroll.setWidgetResizable(True)
-        self.cat_buttons_scroll.setMaximumHeight(160)
-        self.cat_buttons_scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
-
-        self.cat_buttons_container = QWidget()
-        self.cat_buttons_layout = QHBoxLayout(self.cat_buttons_container)
-        self.cat_buttons_layout.setSpacing(12)
-        self.cat_buttons_layout.addStretch()
-
-        self.cat_buttons_scroll.setWidget(self.cat_buttons_container)
-        cat_buttons_inner.addWidget(self.cat_buttons_scroll)
-        layout.addWidget(cat_buttons_group)
-
-        # ── Pannello dettaglio categoria (nascosto inizialmente) ──
-        self.cat_detail_group = QGroupBox("")
-        self.cat_detail_group.setGraphicsEffect(_make_shadow())
-        self.cat_detail_group.setVisible(False)
-        cat_detail_inner = QVBoxLayout(self.cat_detail_group)
-        cat_detail_inner.setContentsMargins(20, 28, 20, 15)
-        cat_detail_inner.setSpacing(12)
-
-        # Header dettaglio: nome categoria + frecce + pulsanti modifica/elimina
-        detail_header = QHBoxLayout()
-
-        self.btn_cat_prev = QPushButton("◀")
-        self.btn_cat_prev.setFixedSize(36, 36)
-        self.btn_cat_prev.setStyleSheet("""
-            QPushButton { background-color: #edf2f7; color: #4a5568; border-radius: 18px;
-                          font-size: 16px; padding: 0px; }
-            QPushButton:hover { background-color: #e2e8f0; }
-            QPushButton:disabled { background-color: #f7fafc; color: #cbd5e0; }
-        """)
-        self.btn_cat_prev.clicked.connect(self._cat_prev)
-
-        self.lbl_cat_nome = QLabel("")
-        self.lbl_cat_nome.setStyleSheet("QLabel { font-size: 20px; font-weight: 700; color: #2d3748; }")
-        self.lbl_cat_nome.setAlignment(Qt.AlignCenter)
-
-        self.btn_cat_next = QPushButton("▶")
-        self.btn_cat_next.setFixedSize(36, 36)
-        self.btn_cat_next.setStyleSheet("""
-            QPushButton { background-color: #edf2f7; color: #4a5568; border-radius: 18px;
-                          font-size: 16px; padding: 0px; }
-            QPushButton:hover { background-color: #e2e8f0; }
-            QPushButton:disabled { background-color: #f7fafc; color: #cbd5e0; }
-        """)
-        self.btn_cat_next.clicked.connect(self._cat_next)
-
-        detail_header.addWidget(self.btn_cat_prev)
-        detail_header.addWidget(self.lbl_cat_nome, 1)
-        detail_header.addWidget(self.btn_cat_next)
-        detail_header.addSpacing(20)
-
-        self.btn_modifica_cat = QPushButton("Modifica")
-        self.btn_modifica_cat.setStyleSheet("""
-            QPushButton { background-color: #4a5568; color: #ffffff; min-height: 32px; padding: 6px 16px; }
-            QPushButton:hover { background-color: #2d3748; }
-        """)
-        self.btn_modifica_cat.clicked.connect(self._modifica_categoria_corrente)
-        detail_header.addWidget(self.btn_modifica_cat)
-
-        self.btn_elimina_cat = QPushButton("Elimina")
-        self.btn_elimina_cat.setStyleSheet("""
-            QPushButton { background-color: #e53e3e; color: #ffffff; min-height: 32px; padding: 6px 16px; }
-            QPushButton:hover { background-color: #c53030; }
-        """)
-        self.btn_elimina_cat.clicked.connect(self.elimina_categoria)
-        detail_header.addWidget(self.btn_elimina_cat)
-
-        cat_detail_inner.addLayout(detail_header)
-
-        # Info sintetica categoria
-        self.lbl_cat_info = QLabel("")
-        self.lbl_cat_info.setStyleSheet("QLabel { color: #718096; font-size: 13px; font-weight: 400; }")
-        self.lbl_cat_info.setAlignment(Qt.AlignCenter)
-        cat_detail_inner.addWidget(self.lbl_cat_info)
-
-        # Tabella materiali della categoria
-        self.tabella_materiali_cat = QTableWidget()
-        self.tabella_materiali_cat.setColumnCount(5)
-        self.tabella_materiali_cat.setHorizontalHeaderLabels(
-            ["Materiale", "Fornitore", "Barra Scorte", "Scorta Min", "Scorta Max"]
-        )
-        self.tabella_materiali_cat.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-        self.tabella_materiali_cat.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        self.tabella_materiali_cat.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
-        self.tabella_materiali_cat.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
-        self.tabella_materiali_cat.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
-        self.tabella_materiali_cat.verticalHeader().setVisible(False)
-        self.tabella_materiali_cat.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.tabella_materiali_cat.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.tabella_materiali_cat.setAlternatingRowColors(True)
-        self.tabella_materiali_cat.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
-        cat_detail_inner.addWidget(self.tabella_materiali_cat)
-
-        layout.addWidget(self.cat_detail_group, 1)
+        layout.addLayout(columns, 1)
 
     # ==================================================================
     # Materiali – logic
     # ==================================================================
 
-    def carica_categorie_combo(self):
-        self.combo_categoria.clear()
-        self.combo_categoria.addItem("— Nessuna categoria —", None)
-        for cat in self.db_manager.get_all_categorie():
-            self.combo_categoria.addItem(cat[1], cat[0])
-
     def carica_materiali(self):
         self.lista_materiali.clear()
         self.materiali_data = self.db_manager.get_all_materiali()
-        cat_map = {c[0]: c[1] for c in self.db_manager.get_all_categorie()}
+        forn_counts = self.db_manager.get_fornitori_counts()
 
         for mat in self.materiali_data:
             id_mat, nome, spessore, prezzo = mat[:4]
-            fornitore = mat[4] if len(mat) > 4 else ""
-            categoria_id = mat[8] if len(mat) > 8 else None
-            testo = f"{nome} • {spessore}mm • €{prezzo:.2f}"
-            if fornitore:
-                testo += f" • {fornitore}"
-            if categoria_id and categoria_id in cat_map:
-                testo += f" • [{cat_map[categoria_id]}]"
+            n_forn = forn_counts.get(id_mat, 0)
+            testo = f"{nome} | {spessore}mm | €{prezzo:.2f} | {n_forn} fornitore/i"
 
             item = QListWidgetItem(testo)
             item.setData(Qt.UserRole, mat)
@@ -641,66 +488,24 @@ class GestioneMaterialiWindow(QMainWindow):
         self._applica_filtri()
 
     def _applica_filtri(self):
-        """Applica ricerca, ordinamento fornitore/alfabetico e filtro scorte."""
+        """Applica filtro di ricerca per nome."""
         search_text = self.search_edit.text().lower()
-        ordina_fornitore = self.chk_fornitore.isChecked()
-        ordina_az = self.chk_alfabetico.isChecked()
-        filtro_scorte = self.combo_scorte.currentData()
-
-        items = []
         for i in range(self.lista_materiali.count()):
             item = self.lista_materiali.item(i)
             mat = item.data(Qt.UserRole)
             nome = mat[1].lower()
-            fornitore = mat[4].lower() if len(mat) > 4 else ""
-            scorta_massima = mat[6] if len(mat) > 6 else 0.0
-            scorta_minima = mat[7] if len(mat) > 7 else 0.0
-
-            # Visibilità per ricerca testo
-            visibile = search_text in nome or search_text in fornitore
-            item.setHidden(not visibile)
-
-            if visibile:
-                # Calcola ratio per ordinamento scorte
-                ratio = (scorta_minima / scorta_massima) if scorta_massima > 0 else 0.0
-                items.append((i, mat, ratio))
-
-        # Ordinamento
-        if ordina_fornitore and ordina_az:
-            items.sort(key=lambda x: (x[1][4] if len(x[1]) > 4 else "", x[1][1]))
-        elif ordina_fornitore:
-            items.sort(key=lambda x: (x[1][4] if len(x[1]) > 4 else ""))
-        elif ordina_az:
-            items.sort(key=lambda x: x[1][1])
-
-        if filtro_scorte == "basse":
-            items.sort(key=lambda x: x[2])
-        elif filtro_scorte == "alte":
-            items.sort(key=lambda x: x[2], reverse=True)
-
-        # Riapplica ordine visivo nella lista
-        if ordina_fornitore or ordina_az or filtro_scorte != "tutte":
-            self.lista_materiali.blockSignals(True)
-            for rank, (orig_idx, mat, ratio) in enumerate(items):
-                item = self.lista_materiali.item(orig_idx)
-                # Aggiunge un prefisso numerico temporaneo per simulare riordino visivo
-                # Alternativa: takeItem/insertItem (più pesante ma più precisa)
-            self.lista_materiali.blockSignals(False)
+            item.setHidden(search_text not in nome)
 
     def on_materiale_selezionato(self):
         current_item = self.lista_materiali.currentItem()
         if not current_item:
-            self.abilita_form(False)
-            self.abilita_pulsanti_form(False)
-            self.lbl_selezione.setText("Seleziona un materiale per modificarlo")
-            self.lbl_info_materiale.setText("")
-            self.fornitori_group.setVisible(False)
             return
 
         mat = current_item.data(Qt.UserRole)
         self.materiale_corrente = mat
         id_mat, nome, spessore, prezzo = mat[:4]
-        categoria_id = mat[8] if len(mat) > 8 else None
+        scorta_min = mat[9] if len(mat) > 9 else 0.0
+        scorta_max = mat[10] if len(mat) > 10 else 0.0
 
         fornitori = self.db_manager.get_fornitori_per_materiale(id_mat)
         n_forn = len(fornitori)
@@ -710,14 +515,20 @@ class GestioneMaterialiWindow(QMainWindow):
         self.edit_nome.setText(nome)
         self.edit_spessore.setValue(spessore)
         self.edit_prezzo.setValue(prezzo)
-
-        idx = self.combo_categoria.findData(categoria_id)
-        self.combo_categoria.setCurrentIndex(idx if idx >= 0 else 0)
+        self.edit_scorta_min_mat.setValue(scorta_min)
+        self.edit_scorta_max_mat.setValue(scorta_max)
 
         self.abilita_form(True)
         self.abilita_pulsanti_form(True)
         self._carica_tabella_fornitori(id_mat)
-        self.fornitori_group.setVisible(True)
+
+        # Naviga alla pagina dettaglio
+        self.stack_materiali.setCurrentIndex(1)
+
+    def _torna_alla_lista(self):
+        """Torna alla pagina lista e deseleziona il materiale."""
+        self.lista_materiali.clearSelection()
+        self.stack_materiali.setCurrentIndex(0)
 
     def _carica_tabella_fornitori(self, materiale_id):
         """Ricarica la tabella dei fornitori per il materiale selezionato"""
@@ -743,7 +554,7 @@ class GestioneMaterialiWindow(QMainWindow):
             btn_layout_row.setSpacing(6)
 
             btn_mod = QPushButton("Modifica")
-            btn_mod.setFixedSize(86, 28)
+            btn_mod.setFixedSize(86, 32)
             btn_mod.setStyleSheet("""
                 QPushButton { background-color: #edf2f7; color: #2d3748; border: none;
                               border-radius: 4px; padding: 2px 4px; font-size: 12px; font-weight: 600; }
@@ -754,7 +565,7 @@ class GestioneMaterialiWindow(QMainWindow):
                                     self._modifica_fornitore_materiale(mid, mn, pf, sm, sx))
 
             btn_del = QPushButton("Elimina")
-            btn_del.setFixedSize(78, 28)
+            btn_del.setFixedSize(78, 32)
             btn_del.setStyleSheet("""
                 QPushButton { background-color: #fff5f5; color: #c53030; border: 1px solid #fed7d7;
                               border-radius: 4px; padding: 2px 4px; font-size: 12px; font-weight: 600; }
@@ -766,7 +577,7 @@ class GestioneMaterialiWindow(QMainWindow):
             btn_layout_row.addWidget(btn_mod)
             btn_layout_row.addWidget(btn_del)
             self.tabella_fornitori_mat.setCellWidget(row, 5, btn_frame)
-            self.tabella_fornitori_mat.setRowHeight(row, 54)
+            self.tabella_fornitori_mat.setRowHeight(row, 44)
 
     def _aggiungi_fornitore_materiale(self):
         if not hasattr(self, 'materiale_corrente'):
@@ -819,7 +630,8 @@ class GestioneMaterialiWindow(QMainWindow):
             self._carica_tabella_fornitori(mat_id)
 
     def abilita_form(self, enabled):
-        for w in [self.edit_nome, self.edit_spessore, self.edit_prezzo, self.combo_categoria]:
+        for w in [self.edit_nome, self.edit_spessore, self.edit_prezzo,
+                  self.edit_scorta_min_mat, self.edit_scorta_max_mat]:
             w.setEnabled(enabled)
 
     def abilita_pulsanti_form(self, enabled):
@@ -833,13 +645,13 @@ class GestioneMaterialiWindow(QMainWindow):
             self.edit_nome.clear()
             self.edit_spessore.setValue(0.0)
             self.edit_prezzo.setValue(0.0)
-            self.combo_categoria.setCurrentIndex(0)
+            self.edit_scorta_min_mat.setValue(0.0)
+            self.edit_scorta_max_mat.setValue(0.0)
 
     def nuovo_materiale(self):
         dialog = NuovoMaterialeDialog(self.db_manager, self)
         if dialog.exec_() == QDialog.Accepted:
             self.carica_materiali()
-            self.carica_categorie_combo()
             QMessageBox.information(self, "Successo", "Nuovo materiale aggiunto con successo!")
 
     def salva_materiale(self):
@@ -862,11 +674,13 @@ class GestioneMaterialiWindow(QMainWindow):
             return
 
         try:
-            categoria_id = self.combo_categoria.currentData()
+            scorta_min = self.edit_scorta_min_mat.value()
+            scorta_max = self.edit_scorta_max_mat.value()
             success = self.db_manager.update_materiale_base(
-                self.materiale_corrente[0], nome, spessore, prezzo, categoria_id
+                self.materiale_corrente[0], nome, spessore, prezzo
             )
             if success:
+                self.db_manager.update_materiale_scorte(self.materiale_corrente[0], scorta_min, scorta_max)
                 self.carica_materiali()
                 self.materiali_modificati.emit()
             else:
@@ -896,178 +710,12 @@ class GestioneMaterialiWindow(QMainWindow):
                     self.abilita_form(False)
                     self.abilita_pulsanti_form(False)
                     self.materiali_modificati.emit()
+                    self.stack_materiali.setCurrentIndex(0)
                 else:
                     QMessageBox.critical(self, "Errore", "Errore durante l'eliminazione del materiale.")
             except Exception as e:
                 QMessageBox.critical(self, "Errore", f"Errore durante l'eliminazione:\n{str(e)}")
 
-    # ==================================================================
-    # Categorie – logic
-    # ==================================================================
-
-    def carica_categorie(self):
-        """Ricarica la lista categorie e aggiorna i pulsanti."""
-        self._categorie_lista = self.db_manager.get_all_categorie()
-
-        # Rimuovi vecchi pulsanti (tranne lo stretch finale)
-        while self.cat_buttons_layout.count() > 1:
-            item = self.cat_buttons_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-        for idx, cat in enumerate(self._categorie_lista):
-            cat_id, nome = cat[0], cat[1]
-            mats = self.db_manager.get_materiali_per_categoria(cat_id)
-            num_mat = len(mats)
-
-            btn = QPushButton(f"{nome}\n{num_mat} materiali")
-            btn.setFixedSize(140, 80)
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #ffffff; color: #2d3748;
-                    border: 2px solid #e2e8f0; border-radius: 10px;
-                    font-size: 14px; font-weight: 600; padding: 8px;
-                }
-                QPushButton:hover {
-                    background-color: #edf2f7; border-color: #718096;
-                }
-                QPushButton:pressed {
-                    background-color: #e2e8f0; border-color: #4a5568;
-                }
-            """)
-            btn.clicked.connect(lambda checked, i=idx: self._mostra_categoria(i))
-            self.cat_buttons_layout.insertWidget(idx, btn)
-
-        self.carica_categorie_combo()
-
-        # Aggiorna dettaglio se era già visibile
-        if self.cat_detail_group.isVisible() and self._categorie_lista:
-            self._mostra_categoria(min(self._categoria_corrente_idx, len(self._categorie_lista) - 1))
-
-    def _mostra_categoria(self, idx):
-        """Mostra il dettaglio di una categoria per indice."""
-        if not self._categorie_lista or idx < 0 or idx >= len(self._categorie_lista):
-            return
-
-        self._categoria_corrente_idx = idx
-        cat = self._categorie_lista[idx]
-        cat_id, nome, scorta_min, _, scorta_max, note = cat
-
-        self.cat_detail_group.setTitle(f"Dettaglio categoria")
-        self.lbl_cat_nome.setText(nome)
-
-        mats = self.db_manager.get_materiali_per_categoria(cat_id)
-        num_mat = len(mats)
-        self.lbl_cat_info.setText(
-            f"{num_mat} materiali  •  Scorta min: {scorta_min:.1f} m²  •  Scorta max: {scorta_max:.1f} m²"
-            + (f"  •  Note: {note}" if note else "")
-        )
-
-        # Popola tabella
-        self.tabella_materiali_cat.setRowCount(num_mat)
-        for row, mat in enumerate(mats):
-            # mat = (id, nome, giacenza, capacita_magazzino, fornitore, prezzo_fornitore)
-            mat_id, mat_nome, giacenza, cap_mag, fornitore, prezzo_forn = mat
-
-            self.tabella_materiali_cat.setItem(row, 0, QTableWidgetItem(mat_nome))
-            self.tabella_materiali_cat.setItem(row, 1, QTableWidgetItem(fornitore or "—"))
-
-            # Barra scorte: usa scorta_min/max della categoria, giacenza del materiale
-            bar = StockBarWidget(scorta_min, scorta_max, giacenza)
-            bar.setMinimumHeight(26)
-            self.tabella_materiali_cat.setCellWidget(row, 2, bar)
-
-            self.tabella_materiali_cat.setItem(row, 3, QTableWidgetItem(f"{giacenza:.1f} m²"))
-            self.tabella_materiali_cat.setItem(row, 4, QTableWidgetItem(f"{cap_mag:.1f} m²"))
-
-            for col in [0, 1, 3, 4]:
-                item = self.tabella_materiali_cat.item(row, col)
-                if item:
-                    item.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-
-        self.tabella_materiali_cat.setRowHeight
-        for row in range(num_mat):
-            self.tabella_materiali_cat.setRowHeight(row, 36)
-
-        # Aggiorna frecce
-        self.btn_cat_prev.setEnabled(idx > 0)
-        self.btn_cat_next.setEnabled(idx < len(self._categorie_lista) - 1)
-
-        # Evidenzia pulsante attivo nella griglia
-        for i in range(self.cat_buttons_layout.count() - 1):  # -1 per lo stretch
-            btn = self.cat_buttons_layout.itemAt(i).widget()
-            if btn:
-                if i == idx:
-                    btn.setStyleSheet("""
-                        QPushButton {
-                            background-color: #2d3748; color: #ffffff;
-                            border: 2px solid #2d3748; border-radius: 10px;
-                            font-size: 14px; font-weight: 600; padding: 8px;
-                        }
-                    """)
-                else:
-                    btn.setStyleSheet("""
-                        QPushButton {
-                            background-color: #ffffff; color: #2d3748;
-                            border: 2px solid #e2e8f0; border-radius: 10px;
-                            font-size: 14px; font-weight: 600; padding: 8px;
-                        }
-                        QPushButton:hover {
-                            background-color: #edf2f7; border-color: #718096;
-                        }
-                    """)
-
-        self.cat_detail_group.setVisible(True)
-
-    def _cat_prev(self):
-        self._mostra_categoria(self._categoria_corrente_idx - 1)
-
-    def _cat_next(self):
-        self._mostra_categoria(self._categoria_corrente_idx + 1)
-
-    def _modifica_categoria_corrente(self):
-        if not self._categorie_lista:
-            return
-        cat = self._categorie_lista[self._categoria_corrente_idx]
-        dialog = ModificaCategoriaDialog(self.db_manager, cat, self)
-        if dialog.exec_() == QDialog.Accepted:
-            self.carica_categorie()
-
-    def nuova_categoria(self):
-        dialog = NuovaCategoriaDialog(self.db_manager, self)
-        if dialog.exec_() == QDialog.Accepted:
-            self.carica_categorie()
-            QMessageBox.information(self, "Successo", "Nuova categoria aggiunta con successo!")
-
-    def elimina_categoria(self):
-        if not self._categorie_lista:
-            return
-        cat = self._categorie_lista[self._categoria_corrente_idx]
-        nome_cat = cat[1]
-
-        risposta = QMessageBox.question(
-            self, "Conferma Eliminazione",
-            f"Eliminare la categoria '{nome_cat}'?\n\nI materiali collegati verranno scollegati (non eliminati).",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
-        )
-
-        if risposta == QMessageBox.Yes:
-            try:
-                success = self.db_manager.delete_categoria(cat[0])
-                if success:
-                    QMessageBox.information(self, "Successo", f"Categoria '{nome_cat}' eliminata!")
-                    self.cat_detail_group.setVisible(False)
-                    self._categoria_corrente_idx = 0
-                    self.carica_categorie()
-                    self.carica_materiali()
-                else:
-                    QMessageBox.critical(self, "Errore", "Errore durante l'eliminazione.")
-            except Exception as e:
-                QMessageBox.critical(self, "Errore", f"Errore:\n{str(e)}")
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        self.carica_categorie()
 
 
 # ===========================================================================
@@ -1127,15 +775,9 @@ class NuovoMaterialeDialog(QDialog):
         self.edit_prezzo.setMaximum(9999.99)
         self.edit_prezzo.setSuffix(" €")
 
-        self.combo_categoria = QComboBox()
-        self.combo_categoria.addItem("— Nessuna categoria —", None)
-        for cat in self.db_manager.get_all_categorie():
-            self.combo_categoria.addItem(cat[1], cat[0])
-
         form.addRow("Nome Materiale:", self.edit_nome)
         form.addRow("Spessore:", self.edit_spessore)
         form.addRow("Prezzo (Preventivo):", self.edit_prezzo)
-        form.addRow("Categoria (opzionale):", self.combo_categoria)
 
         layout.addLayout(form)
 
@@ -1177,9 +819,8 @@ class NuovoMaterialeDialog(QDialog):
             return
 
         try:
-            categoria_id = self.combo_categoria.currentData()
             mat_id = self.db_manager.add_materiale(
-                nome, spessore, prezzo, "", 0.0, 0.0, 0.0, categoria_id
+                nome, spessore, prezzo, "", 0.0, 0.0, 0.0
             )
             if mat_id:
                 self.accept()
@@ -1289,143 +930,3 @@ class FornitoreDialog(QDialog):
         }
 
 
-class _CategoriaDialogBase(QDialog):
-    """Base condivisa per NuovaCategoriaDialog e ModificaCategoriaDialog."""
-
-    def _build_form(self, layout):
-        form = QFormLayout()
-        form.setVerticalSpacing(16)
-
-        self.edit_nome = QLineEdit()
-        self.edit_nome.setPlaceholderText("es. TWILL, CBX200...")
-
-        self.edit_scorta_minima = NoScrollDoubleSpinBox()
-        self.edit_scorta_minima.setDecimals(2)
-        self.edit_scorta_minima.setMaximum(99999.99)
-        self.edit_scorta_minima.setSuffix(" m²")
-        self.edit_scorta_minima.setToolTip("Soglia minima: la barra diventa rossa sotto questo valore")
-
-        self.edit_scorta_massima = NoScrollDoubleSpinBox()
-        self.edit_scorta_massima.setDecimals(2)
-        self.edit_scorta_massima.setMaximum(99999.99)
-        self.edit_scorta_massima.setSuffix(" m²")
-
-        self.edit_note = QTextEdit()
-        self.edit_note.setPlaceholderText("Note opzionali sulla categoria...")
-        self.edit_note.setMaximumHeight(70)
-
-        form.addRow("Nome Categoria:", self.edit_nome)
-        form.addRow("Scorta Minima:", self.edit_scorta_minima)
-        form.addRow("Scorta Massima:", self.edit_scorta_massima)
-        form.addRow("Note:", self.edit_note)
-        layout.addLayout(form)
-
-    def _build_buttons(self, layout, label_salva):
-        btns = QHBoxLayout()
-        btns.setSpacing(12)
-
-        btn_annulla = QPushButton("Annulla")
-        btn_annulla.setStyleSheet("""
-            QPushButton { background-color: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; }
-            QPushButton:hover { background-color: #edf2f7; }
-        """)
-        btn_annulla.clicked.connect(self.reject)
-
-        btn_salva = QPushButton(label_salva)
-        btn_salva.setStyleSheet("""
-            QPushButton { background-color: #4a5568; color: #ffffff; }
-            QPushButton:hover { background-color: #2d3748; }
-        """)
-        btn_salva.clicked.connect(self._salva)
-
-        btns.addWidget(btn_annulla)
-        btns.addWidget(btn_salva)
-        layout.addLayout(btns)
-
-
-class NuovaCategoriaDialog(_CategoriaDialogBase):
-    def __init__(self, db_manager, parent=None):
-        super().__init__(parent)
-        self.db_manager = db_manager
-        self.setWindowTitle("Nuova Categoria")
-        self.setFixedSize(420, 360)
-        self.setStyleSheet(_DIALOG_STYLE)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 25, 30, 25)
-        layout.setSpacing(20)
-
-        title = QLabel("Aggiungi Nuova Categoria")
-        title.setStyleSheet("QLabel { font-size: 18px; font-weight: 700; color: #2d3748; padding-bottom: 10px; }")
-        layout.addWidget(title)
-
-        self._build_form(layout)
-        self._build_buttons(layout, "Salva Categoria")
-
-    def _salva(self):
-        nome = self.edit_nome.text().strip()
-        if not nome:
-            QMessageBox.warning(self, "Errore", "Il nome della categoria è obbligatorio.")
-            return
-        try:
-            cat_id = self.db_manager.add_categoria(
-                nome,
-                self.edit_scorta_minima.value(),
-                0.0,  # giacenza_desiderata (non usata in UI)
-                self.edit_scorta_massima.value(),
-                self.edit_note.toPlainText().strip()
-            )
-            if cat_id:
-                self.accept()
-            else:
-                QMessageBox.critical(self, "Errore", "Nome categoria già esistente.")
-        except Exception as e:
-            QMessageBox.critical(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")
-
-
-class ModificaCategoriaDialog(_CategoriaDialogBase):
-    def __init__(self, db_manager, cat_data, parent=None):
-        super().__init__(parent)
-        self.db_manager = db_manager
-        self.cat_data = cat_data  # (id, nome, giacenza_minima, giacenza_desiderata, capacita_magazzino, note)
-        self.setWindowTitle("Modifica Categoria")
-        self.setFixedSize(420, 360)
-        self.setStyleSheet(_DIALOG_STYLE)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 25, 30, 25)
-        layout.setSpacing(20)
-
-        title = QLabel("Modifica Categoria")
-        title.setStyleSheet("QLabel { font-size: 18px; font-weight: 700; color: #2d3748; padding-bottom: 10px; }")
-        layout.addWidget(title)
-
-        self._build_form(layout)
-        self._build_buttons(layout, "Salva Modifiche")
-
-        # Pre-popola
-        cat_id, nome, scorta_min, _, scorta_max, note = cat_data
-        self.edit_nome.setText(nome)
-        self.edit_scorta_minima.setValue(scorta_min or 0.0)
-        self.edit_scorta_massima.setValue(scorta_max or 0.0)
-        self.edit_note.setPlainText(note or "")
-
-    def _salva(self):
-        nome = self.edit_nome.text().strip()
-        if not nome:
-            QMessageBox.warning(self, "Errore", "Il nome della categoria è obbligatorio.")
-            return
-        try:
-            success = self.db_manager.update_categoria(
-                self.cat_data[0], nome,
-                self.edit_scorta_minima.value(),
-                0.0,  # giacenza_desiderata (non usata in UI)
-                self.edit_scorta_massima.value(),
-                self.edit_note.toPlainText().strip()
-            )
-            if success:
-                self.accept()
-            else:
-                QMessageBox.critical(self, "Errore", "Nome categoria già esistente.")
-        except Exception as e:
-            QMessageBox.critical(self, "Errore", f"Errore durante il salvataggio:\n{str(e)}")

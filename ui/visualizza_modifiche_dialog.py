@@ -447,11 +447,11 @@ class VisualizzaModificheDialog(QDialog):
         dialog.resize(1200, 700)
 
         layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(8)
 
         title = QLabel("Confronto: Versione Selezionata vs Versione Corrente")
-        title.setWordWrap(True)
-        title.setStyleSheet("font-size: 16px; font-weight: 700; color: #2d3748;")
+        title.setStyleSheet("font-size: 15px; font-weight: 700; color: #2d3748;")
         layout.addWidget(title)
 
         splitter = QSplitter(Qt.Horizontal)
@@ -481,7 +481,7 @@ class VisualizzaModificheDialog(QDialog):
         right_layout.addWidget(text_right)
         splitter.addWidget(right_group)
 
-        layout.addWidget(splitter)
+        layout.addWidget(splitter, 1)
 
         # Pulsante chiudi
         btn_chiudi_confronto = QPushButton("Chiudi")

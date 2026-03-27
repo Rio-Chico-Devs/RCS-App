@@ -293,10 +293,32 @@ class MainWindowUIComponents:
         """)
         window_instance.btn_gestisci_magazzino.clicked.connect(window_instance.apri_magazzino)
 
+        # Pulsante Anagrafica Clienti
+        window_instance.btn_anagrafica_clienti = QPushButton("Anagrafica Clienti")
+        window_instance.btn_anagrafica_clienti.setMinimumHeight(50)
+        window_instance.btn_anagrafica_clienti.setStyleSheet("""
+            QPushButton {
+                background-color: #f7fafc;
+                color: #4a5568;
+                border: 1px solid #e2e8f0;
+                min-height: 50px;
+                font-size: 16px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background-color: #edf2f7;
+            }
+            QPushButton:pressed {
+                background-color: #e2e8f0;
+            }
+        """)
+        window_instance.btn_anagrafica_clienti.clicked.connect(window_instance.apri_anagrafica_clienti)
+
         buttons_layout.addWidget(window_instance.btn_nuovo_preventivo)
         buttons_layout.addWidget(window_instance.btn_visualizza_preventivi)
         buttons_layout.addWidget(window_instance.btn_gestisci_materiali)
         buttons_layout.addWidget(window_instance.btn_gestisci_magazzino)
+        buttons_layout.addWidget(window_instance.btn_anagrafica_clienti)
 
         parent_layout.addLayout(buttons_layout)
 

@@ -262,23 +262,10 @@ class MagazzinoWindow(QMainWindow):
         self.btn_vista_singoli.setStyleSheet(_toggle_style_active)
         self.btn_vista_singoli.clicked.connect(self._vista_singoli)
 
-        self.btn_vista_categorie = QPushButton("Per Categoria")
-        self.btn_vista_categorie.setStyleSheet(_toggle_style_inactive)
-        self.btn_vista_categorie.clicked.connect(self._vista_categorie)
-
-        self._scorte_vista = 'singoli'  # 'singoli' | 'categorie'
+        self._scorte_vista = 'singoli'
 
         top_layout.addWidget(self.btn_vista_singoli)
-        top_layout.addWidget(self.btn_vista_categorie)
         top_layout.addSpacing(16)
-
-        lbl_ordina = QLabel("Ordina per:")
-        lbl_ordina.setStyleSheet("font-weight: 600;")
-        self.combo_ordinamento = QComboBox()
-        self.combo_ordinamento.addItem("Scorte basse prima", "giacenza_asc")
-        self.combo_ordinamento.addItem("Scorte alte prima", "giacenza_desc")
-        self.combo_ordinamento.addItem("Nome A-Z", "nome")
-        self.combo_ordinamento.currentIndexChanged.connect(self.carica_scorte)
 
         btn_carico = QPushButton("Carico Materiale")
         btn_carico.setStyleSheet("""
@@ -294,10 +281,42 @@ class MagazzinoWindow(QMainWindow):
         """)
         btn_scarico.clicked.connect(self.apri_dialog_scarico)
 
-        top_layout.addStretch()
-        top_layout.addWidget(lbl_ordina)
-        top_layout.addWidget(self.combo_ordinamento)
+        # Search field
+        self.search_scorte = QLineEdit()
+        self.search_scorte.setPlaceholderText("Cerca materiale...")
+        self.search_scorte.setFixedWidth(200)
+        self.search_scorte.setStyleSheet("""
+            QLineEdit { border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 12px;
+                        font-size: 13px; background-color: #ffffff; min-height: 22px; }
+            QLineEdit:focus { border-color: #718096; }
+        """)
+        self.search_scorte.textChanged.connect(self.carica_scorte)
+
+        lbl_filtro = QLabel("Mostra:")
+        lbl_filtro.setStyleSheet("font-weight: 600;")
+        self.combo_filtro_scorte = QComboBox()
+        self.combo_filtro_scorte.addItem("Tutte le scorte", "tutte")
+        self.combo_filtro_scorte.addItem("Scorte basse", "basse")
+        self.combo_filtro_scorte.addItem("Scorte alte", "alte")
+        self.combo_filtro_scorte.currentIndexChanged.connect(self.carica_scorte)
+
+        lbl_fornitore = QLabel("Fornitore:")
+        lbl_fornitore.setStyleSheet("font-weight: 600;")
+        self.combo_fornitore_filtro = QComboBox()
+        self.combo_fornitore_filtro.addItem("Tutti", None)
+        for nome_f in self.db_manager.get_fornitori_nomi_attivi():
+            self.combo_fornitore_filtro.addItem(nome_f, nome_f)
+        self.combo_fornitore_filtro.currentIndexChanged.connect(self.carica_scorte)
+
         top_layout.addSpacing(8)
+        top_layout.addWidget(self.search_scorte)
+        top_layout.addSpacing(8)
+        top_layout.addWidget(lbl_filtro)
+        top_layout.addWidget(self.combo_filtro_scorte)
+        top_layout.addSpacing(8)
+        top_layout.addWidget(lbl_fornitore)
+        top_layout.addWidget(self.combo_fornitore_filtro)
+        top_layout.addStretch()
         top_layout.addWidget(btn_carico)
         top_layout.addSpacing(8)
         top_layout.addWidget(btn_scarico)
@@ -317,33 +336,37 @@ class MagazzinoWindow(QMainWindow):
     def _vista_singoli(self):
         self._scorte_vista = 'singoli'
         self.btn_vista_singoli.setStyleSheet(self._toggle_style_active)
-        self.btn_vista_categorie.setStyleSheet(self._toggle_style_inactive)
-        self.carica_scorte()
-
-    def _vista_categorie(self):
-        self._scorte_vista = 'categorie'
-        self.btn_vista_categorie.setStyleSheet(self._toggle_style_active)
-        self.btn_vista_singoli.setStyleSheet(self._toggle_style_inactive)
         self.carica_scorte()
 
     def carica_scorte(self):
-        """Carica e visualizza le scorte nella vista corrente (singoli o categorie)"""
+        """Carica e visualizza le scorte nella vista corrente"""
         # Pulisci layout
         while self.scorte_layout.count():
             child = self.scorte_layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
 
-        vista = getattr(self, '_scorte_vista', 'singoli')
-        if vista == 'categorie':
-            self._carica_scorte_categorie()
-        else:
-            self._carica_scorte_singoli()
+        self._carica_scorte_singoli()
 
     def _carica_scorte_singoli(self):
         """Visualizza le scorte dei materiali (aggregate per materiale)"""
-        ordina_per = self.combo_ordinamento.currentData() or 'giacenza_asc'
+        ordina_per = 'nome'
         scorte = self.db_manager.get_scorte(ordina_per)
+
+        # Applica filtri
+        search_text = self.search_scorte.text().lower()
+        filtro_val = self.combo_filtro_scorte.currentData()
+        fornitore_sel = self.combo_fornitore_filtro.currentData()
+
+        if search_text:
+            scorte = [m for m in scorte if search_text in m[1].lower()]
+        if filtro_val == 'basse':
+            scorte = [m for m in scorte if m[3] > 0 and m[2] < m[3] * 0.3]
+        elif filtro_val == 'alte':
+            scorte = [m for m in scorte if m[3] == 0 or m[2] >= m[3] * 0.7]
+        if fornitore_sel:
+            ids = self.db_manager.get_materiali_ids_per_fornitore(fornitore_sel)
+            scorte = [m for m in scorte if m[0] in ids]
 
         if not scorte:
             lbl_vuoto = QLabel("Nessun materiale presente in magazzino.")
@@ -361,272 +384,65 @@ class MagazzinoWindow(QMainWindow):
 
         self.scorte_layout.addStretch()
 
-    def _carica_scorte_categorie(self):
-        """Visualizza le scorte aggregate per categoria"""
-        ordina_per = self.combo_ordinamento.currentData() or 'giacenza_asc'
-        categorie = self.db_manager.get_scorte_per_categoria(ordina_per)
-
-        if not categorie:
-            lbl_vuoto = QLabel("Nessuna categoria definita. Aggiungile da Gestione Materiali → Categorie.")
-            lbl_vuoto.setAlignment(Qt.AlignCenter)
-            lbl_vuoto.setWordWrap(True)
-            lbl_vuoto.setStyleSheet("color: #718096; font-size: 16px; padding: 40px;")
-            self.scorte_layout.addWidget(lbl_vuoto)
-            self.scorte_layout.addStretch()
-            return
-
-        for cat in categorie:
-            cat_id, nome, giacenza_totale, capacita, giacenza_minima, giacenza_desiderata, num_materiali, note = cat
-            card = self._crea_card_categoria(
-                cat_id, nome, giacenza_totale or 0.0, capacita or 0.0,
-                giacenza_minima or 0.0, giacenza_desiderata or 0.0,
-                num_materiali or 0
-            )
-            self.scorte_layout.addWidget(card)
-
-        self.scorte_layout.addStretch()
-
-    def _crea_card_categoria(self, cat_id, nome, giacenza_totale, capacita,
-                              giacenza_minima, giacenza_desiderata, num_materiali):
-        """Crea una card per una categoria con barra gradiente e informazioni aggregate"""
-        card = QFrame()
-
-        # Determine alert color based on thresholds
-        border_color = "#e2e8f0"
-        if giacenza_minima > 0 and giacenza_totale < giacenza_minima:
-            border_color = "#fc8181"  # red – below minimum
-        elif giacenza_desiderata > 0 and giacenza_totale < giacenza_desiderata:
-            border_color = "#f6ad55"  # orange – below desired
-
-        card.setStyleSheet(f"""
-            QFrame {{
-                background-color: #ffffff;
-                border: 1px solid {border_color};
-                border-radius: 10px;
-            }}
-            QFrame:hover {{
-                border-color: #a0aec0;
-            }}
-        """)
-
-        card_layout = QHBoxLayout(card)
-        card_layout.setContentsMargins(20, 14, 20, 14)
-        card_layout.setSpacing(20)
-
-        # Info categoria
-        info_layout = QVBoxLayout()
-        info_layout.setSpacing(2)
-
-        lbl_nome = QLabel(nome)
-        lbl_nome.setStyleSheet("font-size: 16px; font-weight: 700; color: #2d3748;")
-
-        dettagli = f"Giacenza totale: {giacenza_totale:.2f} m²"
-        if capacita > 0:
-            dettagli += f" / {capacita:.2f} m²"
-        dettagli += f"  |  {num_materiali} materiali"
-        if giacenza_minima > 0:
-            dettagli += f"  |  Min: {giacenza_minima:.1f} m²"
-        if giacenza_desiderata > 0:
-            dettagli += f"  |  Desiderata: {giacenza_desiderata:.1f} m²"
-
-        lbl_dettagli = QLabel(dettagli)
-        lbl_dettagli.setStyleSheet("font-size: 12px; color: #718096;")
-
-        # Alert label
-        if giacenza_minima > 0 and giacenza_totale < giacenza_minima:
-            lbl_alert = QLabel("⚠ Scorta sotto il minimo!")
-            lbl_alert.setStyleSheet("font-size: 11px; color: #c53030; font-weight: 700;")
-            info_layout.addWidget(lbl_alert)
-        elif giacenza_desiderata > 0 and giacenza_totale < giacenza_desiderata:
-            lbl_alert = QLabel("Scorta sotto il livello desiderato")
-            lbl_alert.setStyleSheet("font-size: 11px; color: #c05621; font-weight: 600;")
-            info_layout.addWidget(lbl_alert)
-
-        info_layout.addWidget(lbl_nome)
-        info_layout.addWidget(lbl_dettagli)
-
-        card_layout.addLayout(info_layout)
-
-        # Barra scorta (basata su capacità se presente, altrimenti su desiderata)
-        ref_capacity = capacita if capacita > 0 else giacenza_desiderata
-        percentuale = (giacenza_totale / ref_capacity * 100) if ref_capacity > 0 else 0
-        barra = BarraScorta(percentuale)
-        card_layout.addWidget(barra)
-
-        # Bottone mostra materiali
-        btn_dettagli = QPushButton("Materiali")
-        btn_dettagli.setStyleSheet("""
-            QPushButton {
-                background-color: #f7fafc; color: #4a5568;
-                border: 1px solid #e2e8f0; min-height: 30px;
-                padding: 4px 12px; font-size: 12px;
-            }
-            QPushButton:hover { background-color: #edf2f7; }
-        """)
-        btn_dettagli.clicked.connect(
-            lambda checked, cid=cat_id, cn=nome: self._mostra_materiali_categoria(cid, cn)
-        )
-        card_layout.addWidget(btn_dettagli)
-
-        return card
-
-    def _mostra_materiali_categoria(self, categoria_id, nome_categoria):
-        """Mostra i materiali di una categoria con giacenza aggregata e barre scorte per fornitore"""
-        mats = self.db_manager.get_materiali_per_categoria_con_fornitori(categoria_id)
-
-        dialog = QDialog(self)
-        dialog.setWindowTitle(f"Materiali – {nome_categoria}")
-        dialog.setMinimumSize(760, 480)
-        dialog.setStyleSheet("""
-            QDialog { background-color: #fafbfc; }
-            QLabel { color: #2d3748; font-family: system-ui, -apple-system, sans-serif; }
-            QScrollArea { border: none; background: transparent; }
-        """)
-
-        dlg_layout = QVBoxLayout(dialog)
-        dlg_layout.setContentsMargins(25, 25, 25, 25)
-        dlg_layout.setSpacing(12)
-
-        title = QLabel(f"Categoria: {nome_categoria}")
-        title.setStyleSheet("font-size: 16px; font-weight: 700;")
-        dlg_layout.addWidget(title)
-
-        if not mats:
-            lbl = QLabel("Nessun materiale assegnato a questa categoria.")
-            lbl.setStyleSheet("color: #718096;")
-            dlg_layout.addWidget(lbl)
-        else:
-            scroll = QScrollArea()
-            scroll.setWidgetResizable(True)
-            container = QWidget()
-            cont_layout = QVBoxLayout(container)
-            cont_layout.setSpacing(8)
-            cont_layout.setContentsMargins(0, 0, 0, 0)
-
-            totale = 0.0
-            for mat in mats:
-                # get_materiali_per_categoria_con_fornitori: id, nome, giacenza_totale, scorta_massima, n_fornitori
-                mat_id, nome, giacenza_totale, scorta_massima, n_fornitori = mat
-                totale += giacenza_totale
-
-                # Riga materiale (card collassabile)
-                mat_frame = QFrame()
-                mat_frame.setStyleSheet("""
-                    QFrame { background-color: #ffffff; border: 1px solid #e2e8f0;
-                             border-radius: 8px; }
-                """)
-                mat_layout = QVBoxLayout(mat_frame)
-                mat_layout.setContentsMargins(16, 10, 16, 10)
-                mat_layout.setSpacing(6)
-
-                # Header materiale
-                header = QHBoxLayout()
-                lbl_mat = QLabel(nome)
-                lbl_mat.setStyleSheet("font-size: 14px; font-weight: 700; color: #2d3748;")
-                lbl_giac = QLabel(f"Totale: {giacenza_totale:.2f} m²  |  {n_fornitori} fornitore/i")
-                lbl_giac.setStyleSheet("font-size: 12px; color: #718096;")
-                header.addWidget(lbl_mat)
-                header.addWidget(lbl_giac)
-                header.addStretch()
-                mat_layout.addLayout(header)
-
-                # Barre per-fornitore
-                fornitori = self.db_manager.get_fornitori_per_materiale(mat_id)
-                for mf in fornitori:
-                    mf_id, forn_nome, prezzo_forn, s_min, s_max, giacenza = mf
-                    forn_row = QHBoxLayout()
-                    forn_row.setSpacing(12)
-
-                    lbl_f = QLabel(forn_nome)
-                    lbl_f.setStyleSheet("font-size: 12px; color: #4a5568; font-weight: 600;")
-                    lbl_f.setFixedWidth(120)
-                    forn_row.addWidget(lbl_f)
-
-                    perc = (giacenza / s_max * 100) if s_max > 0 else 0
-                    barra = BarraScorta(perc)
-                    barra.setMinimumHeight(20)
-                    forn_row.addWidget(barra, 1)
-
-                    lbl_val = QLabel(f"{giacenza:.1f} / {s_max:.1f} m²")
-                    lbl_val.setStyleSheet("font-size: 11px; color: #718096;")
-                    lbl_val.setFixedWidth(100)
-                    forn_row.addWidget(lbl_val)
-
-                    mat_layout.addLayout(forn_row)
-
-                cont_layout.addWidget(mat_frame)
-
-            cont_layout.addStretch()
-            scroll.setWidget(container)
-            dlg_layout.addWidget(scroll)
-
-            lbl_tot = QLabel(f"Giacenza totale categoria: {totale:.2f} m²")
-            lbl_tot.setStyleSheet("font-size: 13px; font-weight: 600; color: #4a5568;")
-            dlg_layout.addWidget(lbl_tot)
-
-        btn_close = QPushButton("Chiudi")
-        btn_close.setStyleSheet("""
-            QPushButton { background-color: #4a5568; color: #ffffff; min-height: 36px; padding: 8px 20px; }
-            QPushButton:hover { background-color: #2d3748; }
-        """)
-        btn_close.clicked.connect(dialog.accept)
-        dlg_layout.addWidget(btn_close, alignment=Qt.AlignRight)
-
-        dialog.exec_()
-
     def _crea_card_scorta(self, mat_id, nome, giacenza_totale, scorta_massima, n_fornitori, prezzo_min):
         """Crea una card per un materiale (giacenza aggregata su tutti i fornitori)"""
         card = QFrame()
         card.setStyleSheet("""
             QFrame {
                 background-color: #ffffff;
-                border: 1px solid #e2e8f0;
-                border-radius: 10px;
+                border: none;
+                border-bottom: 1px solid #f0f0f0;
             }
-            QFrame:hover {
-                border-color: #a0aec0;
-            }
+            QFrame:hover { background-color: #fafbfc; }
         """)
 
         card_layout = QHBoxLayout(card)
-        card_layout.setContentsMargins(20, 14, 20, 14)
-        card_layout.setSpacing(20)
+        card_layout.setContentsMargins(16, 16, 16, 16)
+        card_layout.setSpacing(24)
 
-        # Info materiale
-        info_layout = QVBoxLayout()
-        info_layout.setSpacing(2)
-
+        # Nome materiale — grande e leggibile
         lbl_nome = QLabel(nome)
-        lbl_nome.setStyleSheet("font-size: 16px; font-weight: 700; color: #2d3748;")
+        lbl_nome.setStyleSheet("font-size: 20px; font-weight: 700; color: #2d3748; min-width: 160px;")
+        card_layout.addWidget(lbl_nome)
 
-        dettagli = f"Giacenza totale: {giacenza_totale:.2f} m²"
-        if scorta_massima > 0:
-            dettagli += f" / {scorta_massima:.2f} m²"
-        if n_fornitori > 0:
-            dettagli += f"  |  {n_fornitori} fornitore/i"
-            if prezzo_min and prezzo_min > 0:
-                dettagli += f"  |  da €{prezzo_min:.2f}/m²"
+        # Giacenza totale
+        lbl_giacenza = QLabel(f"{giacenza_totale:.2f} m²")
+        lbl_giacenza.setStyleSheet("font-size: 18px; font-weight: 600; color: #38a169; min-width: 100px;")
+        lbl_giacenza_label = QLabel("Giacenza")
+        lbl_giacenza_label.setStyleSheet("font-size: 11px; color: #a0aec0; font-weight: 500;")
+        giacenza_col = QVBoxLayout()
+        giacenza_col.setSpacing(2)
+        giacenza_col.addWidget(lbl_giacenza_label)
+        giacenza_col.addWidget(lbl_giacenza)
+        card_layout.addLayout(giacenza_col)
 
-        lbl_dettagli = QLabel(dettagli)
-        lbl_dettagli.setStyleSheet("font-size: 12px; color: #718096;")
+        # Numero fornitori
+        forn_text = f"{n_fornitori}" if n_fornitori > 0 else "—"
+        lbl_forn = QLabel(forn_text)
+        lbl_forn.setStyleSheet("font-size: 18px; font-weight: 600; color: #4a5568; min-width: 40px;")
+        lbl_forn_label = QLabel("Fornitori")
+        lbl_forn_label.setStyleSheet("font-size: 11px; color: #a0aec0; font-weight: 500;")
+        forn_col = QVBoxLayout()
+        forn_col.setSpacing(2)
+        forn_col.addWidget(lbl_forn_label)
+        forn_col.addWidget(lbl_forn)
+        card_layout.addLayout(forn_col)
 
-        info_layout.addWidget(lbl_nome)
-        info_layout.addWidget(lbl_dettagli)
-        card_layout.addLayout(info_layout)
-
-        # Barra scorta aggregata
+        # Barra scorta
         percentuale = (giacenza_totale / scorta_massima * 100) if scorta_massima > 0 else 0
         barra = BarraScorta(percentuale)
-        card_layout.addWidget(barra)
+        barra.setMinimumWidth(160)
+        card_layout.addWidget(barra, 1)
 
-        # Bottone fornitori (drill-down) - sempre visibile, disabilitato se <=1 fornitore
+        # Bottone fornitori (drill-down)
         btn_forn = QPushButton("Fornitori")
         if n_fornitori > 1:
             btn_forn.setStyleSheet("""
                 QPushButton {
                     background-color: #ebf8ff; color: #2b6cb0;
-                    border: 1px solid #bee3f8; min-height: 30px;
-                    padding: 4px 12px; font-size: 12px; font-weight: 600;
+                    border: none; border-radius: 6px;
+                    min-height: 34px; padding: 6px 18px;
+                    font-size: 13px; font-weight: 600;
                 }
                 QPushButton:hover { background-color: #bee3f8; }
             """)
@@ -634,9 +450,10 @@ class MagazzinoWindow(QMainWindow):
         else:
             btn_forn.setStyleSheet("""
                 QPushButton {
-                    background-color: #f7fafc; color: #a0aec0;
-                    border: 1px solid #e2e8f0; min-height: 30px;
-                    padding: 4px 12px; font-size: 12px; font-weight: 600;
+                    background-color: #f7fafc; color: #cbd5e0;
+                    border: none; border-radius: 6px;
+                    min-height: 34px; padding: 6px 18px;
+                    font-size: 13px; font-weight: 600;
                 }
             """)
             btn_forn.setEnabled(False)
@@ -647,8 +464,8 @@ class MagazzinoWindow(QMainWindow):
         btn_storico.setStyleSheet("""
             QPushButton {
                 background-color: #f7fafc; color: #4a5568;
-                border: 1px solid #e2e8f0; min-height: 30px;
-                padding: 4px 12px; font-size: 12px;
+                border: none; border-radius: 6px;
+                min-height: 34px; padding: 6px 18px; font-size: 13px;
             }
             QPushButton:hover { background-color: #edf2f7; }
         """)
@@ -1015,11 +832,21 @@ class MagazzinoWindow(QMainWindow):
         """)
         layout.addWidget(self.lbl_riepilogo_consumi)
 
-        # Tabella consumi
+        # Tabella movimenti individuali
         self.tabella_consumi = QTableWidget()
-        self.tabella_consumi.setColumnCount(4)
-        self.tabella_consumi.setHorizontalHeaderLabels(["Materiale", "Consumato (m²)", "Prezzo Fornitore (€/m²)", "Spesa Totale (€)"])
-        self.tabella_consumi.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.tabella_consumi.setColumnCount(7)
+        self.tabella_consumi.setHorizontalHeaderLabels(
+            ["Data", "Tipo", "Materiale", "Quantità (m²)", "Fornitore", "Note", ""]
+        )
+        self.tabella_consumi.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        self.tabella_consumi.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.tabella_consumi.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
+        self.tabella_consumi.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        self.tabella_consumi.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeToContents)
+        self.tabella_consumi.horizontalHeader().setSectionResizeMode(5, QHeaderView.Stretch)
+        self.tabella_consumi.horizontalHeader().setSectionResizeMode(6, QHeaderView.Fixed)
+        self.tabella_consumi.setColumnWidth(6, 170)
+        self.tabella_consumi.verticalHeader().setVisible(False)
         self.tabella_consumi.setEditTriggers(QTableWidget.NoEditTriggers)
         self.tabella_consumi.setAlternatingRowColors(True)
         self.tabella_consumi.setStyleSheet("""
@@ -1031,43 +858,162 @@ class MagazzinoWindow(QMainWindow):
         layout.addWidget(self.tabella_consumi, 1)
 
     def carica_consumi(self):
-        """Carica e visualizza i consumi per il periodo selezionato"""
+        """Carica e visualizza i movimenti individuali per il periodo selezionato"""
         periodo = self.combo_periodo.currentData() or 'mese_corrente'
         data_inizio, data_fine = self._calcola_date_periodo(periodo)
 
-        consumi = self.db_manager.get_consumi_periodo(data_inizio, data_fine)
+        movimenti = self.db_manager.get_movimenti_periodo(data_inizio, data_fine)
 
-        self.tabella_consumi.setRowCount(len(consumi))
+        self.tabella_consumi.setRowCount(len(movimenti))
 
-        totale_consumato = 0.0
-        totale_spesa = 0.0
+        totale_scarico = 0.0
+        n_scarichi = 0
 
-        for row, consumo in enumerate(consumi):
-            mat_id, nome, prezzo_fornitore, quantita = consumo
-            spesa = quantita * prezzo_fornitore
+        for row, mov in enumerate(movimenti):
+            mov_id, nome, tipo, quantita, data, note, fornitore_nome, mat_id = mov
 
-            totale_consumato += quantita
-            totale_spesa += spesa
+            if tipo == 'scarico':
+                totale_scarico += quantita
+                n_scarichi += 1
 
-            self.tabella_consumi.setItem(row, 0, QTableWidgetItem(nome))
-            self.tabella_consumi.setItem(row, 1, QTableWidgetItem(f"{quantita:.2f}"))
-            self.tabella_consumi.setItem(row, 2, QTableWidgetItem(f"€ {prezzo_fornitore:.2f}"))
+            # Data
+            data_str = data[:10] if len(data) >= 10 else data
+            self.tabella_consumi.setItem(row, 0, QTableWidgetItem(data_str))
 
-            spesa_item = QTableWidgetItem(f"€ {spesa:.2f}")
-            spesa_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            self.tabella_consumi.setItem(row, 3, spesa_item)
+            # Tipo con colore
+            tipo_item = QTableWidgetItem(tipo.upper())
+            tipo_item.setForeground(QColor(56, 161, 105) if tipo == 'carico' else QColor(229, 62, 62))
+            tipo_item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
+            self.tabella_consumi.setItem(row, 1, tipo_item)
+
+            self.tabella_consumi.setItem(row, 2, QTableWidgetItem(nome))
+
+            q_item = QTableWidgetItem(f"{quantita:.2f}")
+            q_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            self.tabella_consumi.setItem(row, 3, q_item)
+
+            self.tabella_consumi.setItem(row, 4, QTableWidgetItem(fornitore_nome or "—"))
+            self.tabella_consumi.setItem(row, 5, QTableWidgetItem(note or ""))
+
+            # Pulsanti Modifica / Elimina
+            btn_frame = QFrame()
+            btn_layout = QHBoxLayout(btn_frame)
+            btn_layout.setContentsMargins(4, 2, 4, 2)
+            btn_layout.setSpacing(6)
+
+            btn_mod = QPushButton("Modifica")
+            btn_mod.setFixedHeight(30)
+            btn_mod.setStyleSheet("""
+                QPushButton { background-color: #edf2f7; color: #2d3748; border: none;
+                              border-radius: 4px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+                QPushButton:hover { background-color: #e2e8f0; }
+            """)
+            btn_mod.clicked.connect(lambda checked, mid=mov_id, q=quantita, n=note or "":
+                                    self._modifica_movimento(mid, q, n))
+
+            btn_del = QPushButton("Elimina")
+            btn_del.setFixedHeight(30)
+            btn_del.setStyleSheet("""
+                QPushButton { background-color: #fff5f5; color: #c53030; border: 1px solid #fed7d7;
+                              border-radius: 4px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+                QPushButton:hover { background-color: #fed7d7; }
+            """)
+            btn_del.clicked.connect(lambda checked, mid=mov_id, mn=nome, t=tipo, q=quantita:
+                                    self._elimina_movimento(mid, mn, t, q))
+
+            btn_layout.addWidget(btn_mod)
+            btn_layout.addWidget(btn_del)
+            self.tabella_consumi.setCellWidget(row, 6, btn_frame)
+            self.tabella_consumi.setRowHeight(row, 44)
 
         # Aggiorna riepilogo
         periodo_testo = self.combo_periodo.currentText()
-        if consumi:
+        if movimenti:
             self.lbl_riepilogo_consumi.setText(
-                f"{periodo_testo}:  {totale_consumato:.2f} m² consumati  |  "
-                f"Spesa totale: € {totale_spesa:.2f}"
+                f"{periodo_testo}:  {len(movimenti)} movimenti  |  "
+                f"Totale scaricato: {totale_scarico:.2f} m²  ({n_scarichi} scarichi)"
             )
         else:
             self.lbl_riepilogo_consumi.setText(
-                f"{periodo_testo}:  Nessun consumo registrato nel periodo selezionato"
+                f"{periodo_testo}:  Nessun movimento registrato nel periodo selezionato"
             )
+
+    def _modifica_movimento(self, movimento_id, quantita_attuale, note_attuale):
+        """Dialog per modificare quantità e note di un movimento"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Modifica Movimento")
+        dialog.setFixedSize(400, 220)
+        dialog.setStyleSheet("""
+            QDialog { background-color: #fafbfc; }
+            QLabel { color: #2d3748; font-size: 14px; font-weight: 500; }
+            QDoubleSpinBox, QLineEdit {
+                border: 1px solid #e2e8f0; border-radius: 6px; padding: 8px 12px;
+                font-size: 14px; background-color: #ffffff; min-height: 18px; }
+            QPushButton { border: none; border-radius: 6px; font-size: 14px;
+                          font-weight: 600; padding: 10px 20px; min-height: 36px; }
+        """)
+
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(14)
+
+        form = QFormLayout()
+        form.setVerticalSpacing(10)
+
+        spin_q = QDoubleSpinBox()
+        spin_q.setDecimals(2)
+        spin_q.setMaximum(99999.99)
+        spin_q.setSuffix(" m²")
+        spin_q.setValue(quantita_attuale)
+        spin_q.setMinimumHeight(36)
+
+        edit_note = QLineEdit()
+        edit_note.setText(note_attuale)
+        edit_note.setPlaceholderText("Note opzionali...")
+
+        form.addRow("Quantità:", spin_q)
+        form.addRow("Note:", edit_note)
+        layout.addLayout(form)
+
+        btns = QHBoxLayout()
+        btn_salva = QPushButton("Salva")
+        btn_salva.setStyleSheet("QPushButton { background-color: #4a5568; color: #ffffff; } QPushButton:hover { background-color: #2d3748; }")
+        btn_annulla = QPushButton("Annulla")
+        btn_annulla.setStyleSheet("QPushButton { background-color: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; } QPushButton:hover { background-color: #edf2f7; }")
+        btns.addWidget(btn_salva)
+        btns.addWidget(btn_annulla)
+        layout.addLayout(btns)
+
+        btn_annulla.clicked.connect(dialog.reject)
+        btn_salva.clicked.connect(dialog.accept)
+
+        if dialog.exec_() == QDialog.Accepted:
+            nuova_q = spin_q.value()
+            if nuova_q <= 0:
+                QMessageBox.warning(self, "Errore", "La quantità deve essere maggiore di 0.")
+                return
+            ok = self.db_manager.modifica_movimento(movimento_id, nuova_q, edit_note.text().strip())
+            if ok:
+                self.carica_consumi()
+                self.carica_scorte()
+            else:
+                QMessageBox.critical(self, "Errore", "Errore durante la modifica del movimento.")
+
+    def _elimina_movimento(self, movimento_id, nome_materiale, tipo, quantita):
+        """Conferma ed elimina un movimento, aggiornando automaticamente la giacenza"""
+        risposta = QMessageBox.question(
+            self, "Elimina Movimento",
+            f"Eliminare il movimento '{tipo.upper()}' di {quantita:.2f} m² per '{nome_materiale}'?\n\n"
+            f"La giacenza in magazzino verrà aggiornata automaticamente.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        )
+        if risposta == QMessageBox.Yes:
+            ok = self.db_manager.elimina_movimento(movimento_id)
+            if ok:
+                self.carica_consumi()
+                self.carica_scorte()
+            else:
+                QMessageBox.critical(self, "Errore", "Errore durante l'eliminazione del movimento.")
 
     def _calcola_date_periodo(self, periodo):
         """Calcola data inizio e fine per il periodo selezionato"""
@@ -1222,23 +1168,23 @@ class MagazzinoWindow(QMainWindow):
         return card
 
     def mostra_scorte_fornitore(self, nome_fornitore):
-        """Mostra le scorte dei materiali di un fornitore in un dialog"""
+        """Mostra le scorte dei materiali di un fornitore in una tabella compatta"""
         scorte = self.db_manager.get_scorte_per_fornitore(nome_fornitore)
 
         dialog = QDialog(self)
         dialog.setWindowTitle(f"Scorte - {nome_fornitore}")
-        dialog.setMinimumSize(700, 500)
+        dialog.setMinimumSize(750, 420)
         dialog.setStyleSheet("""
-            QDialog { background-color: #fafbfc; }
-            QLabel { color: #2d3748; font-family: system-ui, -apple-system, sans-serif; }
+            QDialog { background-color: #fafbfc; font-family: system-ui, -apple-system, sans-serif; }
+            QLabel { color: #2d3748; }
         """)
 
         layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(25, 25, 25, 25)
-        layout.setSpacing(16)
+        layout.setContentsMargins(20, 20, 20, 16)
+        layout.setSpacing(12)
 
-        title = QLabel(f"Materiali forniti da: {nome_fornitore}")
-        title.setStyleSheet("font-size: 18px; font-weight: 700;")
+        title = QLabel(f"Scorte — {nome_fornitore}")
+        title.setStyleSheet("font-size: 17px; font-weight: 700; color: #1a202c;")
         layout.addWidget(title)
 
         if not scorte:
@@ -1247,26 +1193,97 @@ class MagazzinoWindow(QMainWindow):
             lbl_vuoto.setAlignment(Qt.AlignCenter)
             layout.addWidget(lbl_vuoto)
         else:
-            scroll = QScrollArea()
-            scroll.setWidgetResizable(True)
-            scroll.setStyleSheet("QScrollArea { border: none; }")
+            colonne = ["Materiale", "Giacenza (m²)", "Min (m²)", "Max (m²)", "Stato", "Prezzo/m²"]
+            table = QTableWidget(len(scorte), len(colonne))
+            table.setHorizontalHeaderLabels(colonne)
+            table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+            table.setSelectionBehavior(QAbstractItemView.SelectRows)
+            table.setAlternatingRowColors(True)
+            table.verticalHeader().setVisible(False)
+            table.setShowGrid(False)
+            table.setStyleSheet("""
+                QTableWidget {
+                    background-color: #ffffff;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 8px;
+                    font-size: 13px;
+                    color: #2d3748;
+                }
+                QTableWidget::item { padding: 6px 10px; border: none; }
+                QTableWidget::item:selected { background-color: #ebf8ff; color: #2b6cb0; }
+                QTableWidget::item:alternate { background-color: #f7fafc; }
+                QHeaderView::section {
+                    background-color: #edf2f7;
+                    color: #4a5568;
+                    font-weight: 600;
+                    font-size: 12px;
+                    padding: 6px 10px;
+                    border: none;
+                    border-bottom: 1px solid #e2e8f0;
+                }
+            """)
 
-            container = QWidget()
-            cont_layout = QVBoxLayout(container)
-            cont_layout.setContentsMargins(0, 0, 0, 0)
-            cont_layout.setSpacing(8)
+            for row_idx, row_data in enumerate(scorte):
+                mat_id, nome, giacenza, capacita, fornitore, prezzo, scorta_min = row_data
 
-            for mat_id, nome, giacenza, capacita, fornitore, prezzo_fornitore in scorte:
-                card = self._crea_card_scorta(mat_id, nome, giacenza, capacita, 1, prezzo_fornitore)
-                cont_layout.addWidget(card)
+                # Materiale
+                item_nome = QTableWidgetItem(nome)
+                item_nome.setTextAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+                item_nome.setFont(item_nome.font())
+                table.setItem(row_idx, 0, item_nome)
 
-            cont_layout.addStretch()
-            scroll.setWidget(container)
-            layout.addWidget(scroll)
+                # Giacenza
+                item_giac = QTableWidgetItem(f"{giacenza:.2f}")
+                item_giac.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+                table.setItem(row_idx, 1, item_giac)
+
+                # Min
+                item_min = QTableWidgetItem(f"{scorta_min:.2f}" if scorta_min else "—")
+                item_min.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+                item_min.setForeground(QColor("#718096"))
+                table.setItem(row_idx, 2, item_min)
+
+                # Max
+                item_max = QTableWidgetItem(f"{capacita:.2f}" if capacita else "—")
+                item_max.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+                item_max.setForeground(QColor("#718096"))
+                table.setItem(row_idx, 3, item_max)
+
+                # Stato (etichetta colorata)
+                if capacita and capacita > 0:
+                    pct = giacenza / capacita
+                    if pct >= 0.6:
+                        stato, colore_bg, colore_txt = "OK", "#c6f6d5", "#276749"
+                    elif pct >= 0.25:
+                        stato, colore_bg, colore_txt = "Bassa", "#fefcbf", "#744210"
+                    else:
+                        stato, colore_bg, colore_txt = "Critica", "#fed7d7", "#9b2c2c"
+                else:
+                    stato, colore_bg, colore_txt = "N/D", "#edf2f7", "#718096"
+                item_stato = QTableWidgetItem(stato)
+                item_stato.setTextAlignment(Qt.AlignVCenter | Qt.AlignCenter)
+                item_stato.setBackground(QColor(colore_bg))
+                item_stato.setForeground(QColor(colore_txt))
+                table.setItem(row_idx, 4, item_stato)
+
+                # Prezzo
+                item_prezzo = QTableWidgetItem(f"€ {prezzo:.2f}" if prezzo else "—")
+                item_prezzo.setTextAlignment(Qt.AlignVCenter | Qt.AlignRight)
+                table.setItem(row_idx, 5, item_prezzo)
+
+            header = table.horizontalHeader()
+            header.setSectionResizeMode(0, QHeaderView.Stretch)
+            for col in range(1, len(colonne)):
+                header.setSectionResizeMode(col, QHeaderView.ResizeToContents)
+            table.setRowHeight(0, 36)
+            for row_idx in range(len(scorte)):
+                table.setRowHeight(row_idx, 36)
+
+            layout.addWidget(table)
 
         btn_chiudi = QPushButton("Chiudi")
         btn_chiudi.setStyleSheet("""
-            QPushButton { background-color: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; min-height: 36px; min-width: 120px; }
+            QPushButton { background-color: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; min-height: 34px; min-width: 100px; border-radius: 6px; }
             QPushButton:hover { background-color: #edf2f7; }
         """)
         btn_chiudi.clicked.connect(dialog.accept)
