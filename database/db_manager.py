@@ -256,31 +256,31 @@ class DatabaseManager:
         """Restituisce tutti i materiali disponibili"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id, scorta_minima, scorta_massima FROM materiali ORDER BY nome")
+            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, scorta_minima, scorta_massima FROM materiali ORDER BY nome")
             return cursor.fetchall()
 
     def get_materiale_by_id(self, materiale_id):
         """Restituisce un materiale specifico tramite ID"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id, scorta_minima, scorta_massima FROM materiali WHERE id = ?", (materiale_id,))
+            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, scorta_minima, scorta_massima FROM materiali WHERE id = ?", (materiale_id,))
             return cursor.fetchone()
 
     def get_materiale_by_nome(self, nome):
         """Restituisce un materiale specifico tramite nome"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id, scorta_minima, scorta_massima FROM materiali WHERE nome = ?", (nome,))
+            cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, scorta_minima, scorta_massima FROM materiali WHERE nome = ?", (nome,))
             return cursor.fetchone()
 
-    def add_materiale(self, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0, categoria_id=None):
+    def add_materiale(self, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0):
         """Aggiunge un nuovo materiale"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    "INSERT INTO materiali (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, categoria_id)
+                    "INSERT INTO materiali (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza)
                 )
                 conn.commit()
                 return cursor.lastrowid
@@ -646,9 +646,8 @@ class DatabaseManager:
                     minuti_avvolgimento, minuti_pulizia, minuti_rettifica,
                     minuti_imballaggio, tot_mano_opera, subtotale,
                     maggiorazione_25, preventivo_finale, prezzo_cliente,
-                    materiali_utilizzati, note_revisione, storico_modifiche,
-                    categoria, sottocategoria
-                ) VALUES (?, 1, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?)
+                    materiali_utilizzati, note_revisione, storico_modifiche
+                ) VALUES (?, 1, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')
             """, (
                 datetime.now().isoformat(),
                 preventivo_data.get('nome_cliente', ''),
@@ -671,8 +670,6 @@ class DatabaseManager:
                 preventivo_data['prezzo_cliente'],
                 json.dumps(preventivo_data['materiali_utilizzati']),
                 "",
-                preventivo_data.get('categoria', ''),
-                preventivo_data.get('sottocategoria', ''),
             ))
             conn.commit()
             return cursor.lastrowid
@@ -738,8 +735,7 @@ class DatabaseManager:
                         minuti_avvolgimento = ?, minuti_pulizia = ?, minuti_rettifica = ?,
                         minuti_imballaggio = ?, tot_mano_opera = ?, subtotale = ?,
                         maggiorazione_25 = ?, preventivo_finale = ?, prezzo_cliente = ?,
-                        materiali_utilizzati = ?, storico_modifiche = ?,
-                        categoria = ?, sottocategoria = ?
+                        materiali_utilizzati = ?, storico_modifiche = ?
                     WHERE id = ?
                 """, (
                     preventivo_data.get('nome_cliente', ''),
@@ -762,8 +758,6 @@ class DatabaseManager:
                     preventivo_data['prezzo_cliente'],
                     json.dumps(preventivo_data['materiali_utilizzati']),
                     storico_aggiornato,
-                    preventivo_data.get('categoria', ''),
-                    preventivo_data.get('sottocategoria', ''),
                     preventivo_id
                 ))
                 conn.commit()
@@ -899,9 +893,8 @@ class DatabaseManager:
                     minuti_avvolgimento, minuti_pulizia, minuti_rettifica,
                     minuti_imballaggio, tot_mano_opera, subtotale,
                     maggiorazione_25, preventivo_finale, prezzo_cliente,
-                    materiali_utilizzati, note_revisione, storico_modifiche,
-                    categoria, sottocategoria
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?)
+                    materiali_utilizzati, note_revisione, storico_modifiche
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]')
             """, (
                 datetime.now().isoformat(),
                 nuovo_numero_revisione,
@@ -926,8 +919,6 @@ class DatabaseManager:
                 preventivo_data['prezzo_cliente'],
                 json.dumps(preventivo_data['materiali_utilizzati']),
                 note_revisione,
-                preventivo_data.get('categoria', ''),
-                preventivo_data.get('sottocategoria', ''),
             ))
             conn.commit()
             return cursor.lastrowid

@@ -504,8 +504,8 @@ class GestioneMaterialiWindow(QMainWindow):
         mat = current_item.data(Qt.UserRole)
         self.materiale_corrente = mat
         id_mat, nome, spessore, prezzo = mat[:4]
-        scorta_min = mat[9] if len(mat) > 9 else 0.0
-        scorta_max = mat[10] if len(mat) > 10 else 0.0
+        scorta_min = mat[8] if len(mat) > 8 else 0.0
+        scorta_max = mat[9] if len(mat) > 9 else 0.0
 
         fornitori = self.db_manager.get_fornitori_per_materiale(id_mat)
         n_forn = len(fornitori)
