@@ -501,79 +501,43 @@ class TestCategorie(unittest.TestCase):
         self.db = make_db()
 
     def test_add_categoria_ok(self):
-        cid = self.db.add_categoria("CAT_TEST", 10.0, 50.0, 200.0, "note test")
-        self.assertIsInstance(cid, int)
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_add_categoria_duplicata_restituisce_false(self):
-        self.db.add_categoria("CAT_DUP")
-        result = self.db.add_categoria("CAT_DUP")
-        self.assertFalse(result)
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_add_categoria_valori_default(self):
-        cid = self.db.add_categoria("CAT_DEFAULT")
-        self.assertIsInstance(cid, int)
-        row = self.db.get_categoria_by_id(cid)
-        self.assertIsNotNone(row)
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_get_all_categorie(self):
-        self.db.add_categoria("CAT_A")
-        self.db.add_categoria("CAT_B")
-        cats = self.db.get_all_categorie()
-        nomi = [r[1] for r in cats]
-        self.assertIn("CAT_A", nomi)
-        self.assertIn("CAT_B", nomi)
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_get_categoria_by_id_esistente(self):
-        cid = self.db.add_categoria("CAT_ID")
-        row = self.db.get_categoria_by_id(cid)
-        self.assertIsNotNone(row)
-        self.assertEqual(row[1], "CAT_ID")
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_get_categoria_by_id_non_esistente(self):
-        row = self.db.get_categoria_by_id(999999)
-        self.assertIsNone(row)
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_update_categoria_ok(self):
-        cid = self.db.add_categoria("CAT_UPD", 10.0, 50.0)
-        result = self.db.update_categoria(cid, "CAT_UPD_NEW", 20.0, 80.0, 300.0, "new note")
-        self.assertTrue(result)
-        row = self.db.get_categoria_by_id(cid)
-        self.assertEqual(row[1], "CAT_UPD_NEW")
-        self.assertAlmostEqual(row[2], 20.0)
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_update_categoria_id_non_esistente(self):
-        result = self.db.update_categoria(999999, "GHOST", 0.0, 0.0)
-        self.assertFalse(bool(result))
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_delete_categoria_ok(self):
-        cid = self.db.add_categoria("CAT_DEL")
-        result = self.db.delete_categoria(cid)
-        self.assertTrue(result)
-        self.assertIsNone(self.db.get_categoria_by_id(cid))
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_delete_categoria_non_esistente(self):
-        result = self.db.delete_categoria(999999)
-        self.assertFalse(bool(result))
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_delete_categoria_rimuove_riferimento_da_materiali(self):
-        """Eliminare una categoria non deve eliminare i materiali, solo il riferimento."""
-        cid = self.db.add_categoria("CAT_CASCADE")
-        mid = self.db.add_materiale("MAT_IN_CAT", 0.1, 1.0, categoria_id=cid)
-        self.db.delete_categoria(cid)
-        row = self.db.get_materiale_by_id(mid)
-        self.assertIsNotNone(row)  # Il materiale esiste ancora
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_get_materiali_per_categoria(self):
-        cid = self.db.add_categoria("CAT_MATS")
-        self.db.add_materiale("M_CAT_1", 0.1, 1.0, categoria_id=cid)
-        self.db.add_materiale("M_CAT_2", 0.2, 2.0, categoria_id=cid)
-        mats = self.db.get_materiali_per_categoria(cid)
-        self.assertEqual(len(mats), 2)
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_get_materiali_categoria_vuota(self):
-        cid = self.db.add_categoria("CAT_EMPTY")
-        mats = self.db.get_materiali_per_categoria(cid)
-        self.assertEqual(len(mats), 0)
+        self.skipTest("Categoria rimossa dal sistema")
 
 
 # ===========================================================================
@@ -973,13 +937,11 @@ class TestMaterialeModel(unittest.TestCase):
         self.assertEqual(m.nome, "")
         self.assertAlmostEqual(m.spessore, 0.0)
         self.assertAlmostEqual(m.prezzo, 0.0)
-        self.assertIsNone(m.categoria_id)
 
     def test_costruttore_con_valori(self):
-        m = Materiale("HS300", 0.3, 20.0, "CIT", 18.0, 100.0, 50.0, 3)
+        m = Materiale("HS300", 0.3, 20.0, "CIT", 18.0, 100.0, 50.0)
         self.assertEqual(m.nome, "HS300")
         self.assertAlmostEqual(m.spessore, 0.3)
-        self.assertEqual(m.categoria_id, 3)
 
 
 # ===========================================================================

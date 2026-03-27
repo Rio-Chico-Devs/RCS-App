@@ -782,14 +782,6 @@ def test_05_magazzino_query(db, mat_ids, verbose=False):
     else:
         R.ok(f"get_scorte_per_fornitore('FORN_MAG_TEST_04'): {len(scorte_f)} record", verbose)
 
-    # get_scorte_per_categoria con varie opzioni ordina_per
-    for ordine in ["giacenza_asc", "giacenza_desc", "nome_asc"]:
-        scorte_c, exc_c = safe(db.get_scorte_per_categoria, ordine)
-        if exc_c:
-            R.fail(f"get_scorte_per_categoria(ordina_per='{ordine}') crash", exc_c)
-        else:
-            R.ok(f"get_scorte_per_categoria('{ordine}'): {len(scorte_c or [])} record, no crash", verbose)
-
     # get_consumi_periodo: range stretto (±2h) → include movimenti di scarico recenti
     inizio_range = (datetime.now() - timedelta(hours=2)).isoformat()
     fine_range   = (datetime.now() + timedelta(hours=1)).isoformat()
@@ -821,137 +813,7 @@ def test_05_magazzino_query(db, mat_ids, verbose=False):
 
 def test_06_categorie(db, mat_ids, verbose=False):
     R.section("6. CATEGORIE — CRUD + relazioni")
-
-    cat_ids = []
-    errori_ins = 0
-    # Insert 15 categorie
-    for i in range(15):
-        cid, exc = safe(db.add_categoria,
-                        f"DIAG_CAT_{i:02d}",
-                        round(random.uniform(5, 50), 1),
-                        round(random.uniform(50, 200), 1),
-                        round(random.uniform(200, 1000), 1),
-                        f"Note categoria {i}")
-        if exc or not isinstance(cid, int):
-            errori_ins += 1
-        else:
-            cat_ids.append(cid)
-    if errori_ins:
-        R.fail(f"Insert 15 categorie: {errori_ins} falliti")
-    else:
-        R.ok(f"Insert 15 categorie: tutte OK", verbose)
-
-    # Duplicato bloccato
-    dup, _ = safe(db.add_categoria, "DIAG_CAT_00")
-    if dup is False or dup is None:
-        R.ok("Duplicato categoria bloccato", verbose)
-    else:
-        R.fail(f"Duplicato categoria NON bloccato: {dup!r}")
-
-    # update_categoria tutti i campi + verifica
-    errori_upd = 0
-    for cid in cat_ids[:5]:
-        nuovo_nome = f"CAT_UPD_{cid}"
-        res, exc = safe(db.update_categoria, cid, nuovo_nome, 10.0, 80.0, 400.0, "aggiornata")
-        if exc or not res:
-            errori_upd += 1
-        else:
-            row, _ = safe(db.get_categoria_by_id, cid)
-            if row is None or row[1] != nuovo_nome:
-                errori_upd += 1
-    if errori_upd:
-        R.fail(f"update_categoria: {errori_upd}/5 falliti o discordanti")
-    else:
-        R.ok("update_categoria (5 cat): tutti i campi aggiornati e verificati", verbose)
-
-    # get_all_categorie: count corretto
-    tutte, _ = safe(db.get_all_categorie)
-    n_diag_cat = sum(1 for r in (tutte or []) if str(r[1]).startswith("DIAG_CAT_") or str(r[1]).startswith("CAT_UPD_"))
-    if n_diag_cat < len(cat_ids):
-        R.fail(f"get_all_categorie: trovate {n_diag_cat}, attese ≥{len(cat_ids)}")
-    else:
-        R.ok(f"get_all_categorie: {n_diag_cat} categorie di test presenti", verbose)
-
-    # get_categoria_by_id: ogni categoria trovata con dati corretti
-    errori_read = 0
-    for cid in cat_ids:
-        row, _ = safe(db.get_categoria_by_id, cid)
-        if row is None or row[0] != cid:
-            errori_read += 1
-    if errori_read:
-        R.fail(f"get_categoria_by_id: {errori_read}/{len(cat_ids)} non trovate o ID sbagliato")
-    else:
-        R.ok(f"get_categoria_by_id ({len(cat_ids)} cat): tutte trovate con ID corretto", verbose)
-
-    # Aggiungi 5 materiali per 4 categorie → verifica get_materiali_per_categoria count
-    if cat_ids:
-        errori_mat_cat = 0
-        for cid in cat_ids[:4]:
-            for j in range(5):
-                safe(db.add_materiale, f"MC_CAT_{cid}_{j:02d}", round(0.1 * (j + 1), 2), float(j + 1),
-                     categoria_id=cid)
-            mats, _ = safe(db.get_materiali_per_categoria, cid)
-            if mats is None or len(mats) < 5:
-                errori_mat_cat += 1
-        if errori_mat_cat:
-            R.fail(f"get_materiali_per_categoria: {errori_mat_cat}/4 conteggi errati")
-        else:
-            R.ok("get_materiali_per_categoria (5 mat × 4 cat): tutti OK", verbose)
-
-    # get_materiali_per_categoria_con_fornitori
-    if cat_ids and mat_ids:
-        forn_cat = "FORN_CAT_TEST"
-        safe(db.add_fornitore, forn_cat)
-        cid_test = cat_ids[0]
-        mats_cat, _ = safe(db.get_materiali_per_categoria, cid_test)
-        for row_mat in (mats_cat or [])[:3]:
-            safe(db.add_fornitore_a_materiale, row_mat[0], forn_cat, 10.0, 5.0, 100.0)
-        res_mpcf, exc_mpcf = safe(db.get_materiali_per_categoria_con_fornitori, cid_test)
-        if exc_mpcf:
-            R.fail("get_materiali_per_categoria_con_fornitori crash", exc_mpcf)
-        elif res_mpcf is None:
-            R.fail("get_materiali_per_categoria_con_fornitori: None")
-        else:
-            # Ogni riga: (id, nome, giacenza_totale, scorta_massima, n_fornitori)
-            ok_struttura = all(len(r) >= 3 for r in res_mpcf)
-            if ok_struttura:
-                R.ok(f"get_materiali_per_categoria_con_fornitori: {len(res_mpcf)} record, struttura OK", verbose)
-            else:
-                R.warn("get_materiali_per_categoria_con_fornitori: struttura riga inattesa")
-
-    # get_scorte_per_categoria: cat con materiali → lista, cat senza → vuota o 0
-    if cat_ids and len(cat_ids) >= 2:
-        sc_cat, exc_sc = safe(db.get_scorte_per_categoria)
-        if exc_sc:
-            R.fail("get_scorte_per_categoria crash", exc_sc)
-        else:
-            R.ok(f"get_scorte_per_categoria: {len(sc_cat or [])} categorie nel risultato", verbose)
-
-    # Delete categoria → materiali sopravvivono, categoria_id=NULL
-    if cat_ids:
-        cid_del = cat_ids[-1]
-        mid_temp, _ = safe(db.add_materiale, f"MAT_CAT_DEL_{cid_del}", 0.1, 1.0, categoria_id=cid_del)
-        safe(db.delete_categoria, cid_del)
-        if mid_temp and isinstance(mid_temp, int):
-            row_mat_surv, _ = safe(db.get_materiale_by_id, mid_temp)
-            if row_mat_surv is None:
-                R.fail("Delete categoria: ha eliminato anche il materiale (non deve)")
-            else:
-                cat_id_after = row_mat_surv[8] if len(row_mat_surv) > 8 else "N/A"
-                if cat_id_after is None:
-                    R.ok("Delete categoria: materiale sopravvive con categoria_id=NULL", verbose)
-                else:
-                    R.warn(f"Delete categoria: materiale sopravvive ma categoria_id={cat_id_after} (atteso NULL)")
-            safe(db.delete_materiale, mid_temp)
-
-    # Delete categoria inesistente → gestito
-    _, exc_del_fan = safe(db.delete_categoria, 9999999)
-    if exc_del_fan:
-        R.fail("delete_categoria su ID inesistente → crash", exc_del_fan)
-    else:
-        R.ok("delete_categoria su ID inesistente → no crash", verbose)
-
-    return cat_ids[:-1] if cat_ids else []
+    R.skip("Categoria — rimossa dal sistema (test saltato)", verbose=True)
 
 
 # =============================================================================
@@ -2078,22 +1940,8 @@ def test_17_integrita_cross(db, mat_ids, pids, verbose=False):
             else:
                 R.ok("delete_fornitore_materiale: fornitore non più in get_fornitori_per_materiale", verbose)
 
-    # Categoria eliminata → materiali con quella categoria hanno categoria_id NULL
-    if mat_ids:
-        cid_integ, _ = safe(db.add_categoria, "CAT_INTEG_DEL", 0.0, 0.0, 0.0, "")
-        mid_integ, _ = safe(db.add_materiale, "MAT_INTEG_CAT_DEL", 0.1, 1.0, categoria_id=cid_integ)
-        safe(db.delete_categoria, cid_integ)
-        if mid_integ and isinstance(mid_integ, int):
-            row_integ, _ = safe(db.get_materiale_by_id, mid_integ)
-            if row_integ is None:
-                R.fail("Categoria eliminata: ha eliminato anche il materiale")
-            else:
-                cid_after = row_integ[8] if len(row_integ) > 8 else "N/A"
-                if cid_after is None:
-                    R.ok("Categoria eliminata: materiale sopravvive con categoria_id=NULL", verbose)
-                else:
-                    R.warn(f"Categoria eliminata: categoria_id={cid_after} (atteso NULL)")
-            safe(db.delete_materiale, mid_integ)
+    # Categoria eliminata → rimossa dal sistema (test saltato)
+    R.skip("Integrità categoria — rimossa dal sistema (test saltato)", verbose=True)
 
 
 # =============================================================================
@@ -2234,7 +2082,7 @@ def test_18_robustezza(db, verbose=False):
 # SEZ. 19 — METODI DB NON COPERTI
 # =============================================================================
 
-def test_19_metodi_non_coperti(db, mat_ids, pids, cat_ids, verbose=False):
+def test_19_metodi_non_coperti(db, mat_ids, pids, verbose=False):
     R.section("19. METODI DB NON COPERTI — copertura complementare")
 
     # get_materiale_by_nome: nome esistente → row corretta, inesistente → None
@@ -2257,32 +2105,6 @@ def test_19_metodi_non_coperti(db, mat_ids, pids, cat_ids, verbose=False):
             R.ok("get_materiale_by_nome (inesistente) → None (corretto)", verbose)
         else:
             R.fail(f"get_materiale_by_nome (inesistente) → trovato {row_fan}")
-
-    # get_all_categorie: lista con tutte le categorie inserite
-    tutte_cat, exc_tc = safe(db.get_all_categorie)
-    if exc_tc:
-        R.fail("get_all_categorie → crash", exc_tc)
-    elif tutte_cat is None:
-        R.fail("get_all_categorie → None")
-    else:
-        n_diag_cat = sum(1 for r in tutte_cat if "DIAG_CAT" in str(r[1]) or "CAT_UPD" in str(r[1]))
-        R.ok(f"get_all_categorie: {len(tutte_cat)} totali, {n_diag_cat} DIAG/UPD", verbose)
-
-    # get_materiali_per_categoria_con_fornitori: struttura corretta
-    if cat_ids:
-        cid_nc = cat_ids[0]
-        rows_nc, exc_nc = safe(db.get_materiali_per_categoria_con_fornitori, cid_nc)
-        if exc_nc:
-            R.fail("get_materiali_per_categoria_con_fornitori → crash", exc_nc)
-        elif rows_nc is None:
-            R.fail("get_materiali_per_categoria_con_fornitori → None")
-        else:
-            # Struttura attesa: (id, nome, giacenza_totale, scorta_massima, n_fornitori)
-            ok_struct = all(len(r) >= 3 for r in rows_nc) if rows_nc else True
-            if ok_struct:
-                R.ok(f"get_materiali_per_categoria_con_fornitori: {len(rows_nc)} mat, struttura OK", verbose)
-            else:
-                R.warn("get_materiali_per_categoria_con_fornitori: struttura riga inattesa (<3 colonne)")
 
     # get_preventivi_con_modifiche: solo preventivi con storico non vuoto
     con_mod, exc_cm = safe(db.get_preventivi_con_modifiche)
@@ -2311,14 +2133,6 @@ def test_19_metodi_non_coperti(db, mat_ids, pids, cat_ids, verbose=False):
             R.ok(f"save_preventivo (nuovo): id={pid_save_n} creato e letto", verbose)
         else:
             R.fail(f"save_preventivo (nuovo): id={pid_save_n} non trovato")
-
-    # get_scorte_per_categoria con tutte le opzioni ordina_per
-    for ord_k in ["giacenza_asc", "giacenza_desc", "nome_asc"]:
-        sc_c, exc_sc = safe(db.get_scorte_per_categoria, ord_k)
-        if exc_sc:
-            R.fail(f"get_scorte_per_categoria('{ord_k}') → crash", exc_sc)
-        else:
-            R.ok(f"get_scorte_per_categoria('{ord_k}'): {len(sc_c or [])} record, no crash", verbose)
 
     # update_fornitore_materiale: aggiorna prezzi, verifica round-trip
     if mat_ids:
@@ -2411,7 +2225,8 @@ def main():
     test_05_magazzino_query(db, mat_ids, verbose=args.verbose)
 
     # ── Sezione 6: Categorie CRUD + relazioni ────────────────────────────────
-    cat_ids = test_06_categorie(db, mat_ids, verbose=args.verbose)
+    test_06_categorie(db, mat_ids, verbose=args.verbose)
+    cat_ids = []  # categoria rimossa
 
     # ── Sezione 7: Preventivi creazione 500 scenari ──────────────────────────
     pids = test_07_preventivi_creazione(db, mat_ids, N_PREV, verbose=args.verbose)
@@ -2453,7 +2268,7 @@ def main():
     test_18_robustezza(db, verbose=args.verbose)
 
     # ── Sezione 19: Metodi DB non coperti ───────────────────────────────────
-    test_19_metodi_non_coperti(db, mat_ids, pids_now, cat_ids, verbose=args.verbose)
+    test_19_metodi_non_coperti(db, mat_ids, pids_now, verbose=args.verbose)
 
     # ── Summary ─────────────────────────────────────────────────────────────
     elapsed = time.time() - t0_totale

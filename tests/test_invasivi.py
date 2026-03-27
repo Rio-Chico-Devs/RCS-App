@@ -124,11 +124,7 @@ class TestMateriali_Invasivi(unittest.TestCase):
             self.assertIsNone(self.db.get_materiale_by_id(mid))
 
     def test_categoria_id_inesistente_accettata(self):
-        """SQLite non enforza FK di default: categoria_id=9999 viene accettato."""
-        mid = self.db.add_materiale("FK_TEST", 0.1, 1.0, categoria_id=99999)
-        self.assertIsInstance(mid, int)
-        row = self.db.get_materiale_by_id(mid)
-        self.assertIsNotNone(row)
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_update_materiale_completo_tutti_campi(self):
         """update_materiale aggiorna tutti i campi inclusi quelli legacy."""
@@ -136,7 +132,7 @@ class TestMateriali_Invasivi(unittest.TestCase):
         result = self.db.update_materiale(
             mid, "FULL_UPD_MOD", 0.5, 50.0,
             fornitore="FORN_TEST", prezzo_fornitore=45.0,
-            capacita_magazzino=200.0, giacenza=10.0, categoria_id=None
+            capacita_magazzino=200.0, giacenza=10.0
         )
         self.assertTrue(result)
         row = self.db.get_materiale_by_id(mid)
@@ -411,43 +407,19 @@ class TestCategorie_Invasivi(unittest.TestCase):
         self.db = make_db()
 
     def test_update_nome_categoria_duplicato_fallisce(self):
-        self.db.add_categoria("CAT_X")
-        cid2 = self.db.add_categoria("CAT_Y")
-        result = self.db.update_categoria(cid2, "CAT_X", 0.0, 0.0)
-        self.assertFalse(bool(result))
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_delete_categoria_con_materiali_non_elimina_materiali(self):
-        cid = self.db.add_categoria("CAT_MATS_DEL")
-        ids = [self.db.add_materiale(f"M_DEL_{i}", 0.1, 1.0, categoria_id=cid) for i in range(5)]
-        self.db.delete_categoria(cid)
-        for mid in ids:
-            self.assertIsNotNone(self.db.get_materiale_by_id(mid))
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_categoria_con_giacenza_minima_maggiore_di_desiderata(self):
-        """Scenario inverso: giacenza_minima > giacenza_desiderata — accettato dal DB."""
-        cid = self.db.add_categoria("CAT_INV", giacenza_minima=100.0, giacenza_desiderata=50.0)
-        self.assertIsInstance(cid, int)
-        row = self.db.get_categoria_by_id(cid)
-        self.assertAlmostEqual(row[2], 100.0)  # giacenza_minima
-        self.assertAlmostEqual(row[3], 50.0)   # giacenza_desiderata
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_get_materiali_per_categoria_dopo_delete_categoria(self):
-        """Dopo delete categoria, get_materiali_per_categoria con l'id eliminato → lista vuota."""
-        cid = self.db.add_categoria("CAT_AFTER_DEL")
-        self.db.add_materiale("MAT_IN_DEL", 0.1, 1.0, categoria_id=cid)
-        self.db.delete_categoria(cid)
-        mats = self.db.get_materiali_per_categoria(cid)
-        self.assertEqual(len(mats), 0)
+        self.skipTest("Categoria rimossa dal sistema")
 
     def test_bulk_categorie_e_materiali(self):
-        """5 categorie × 10 materiali ciascuna → totale 50 materiali correttamente raggruppati."""
-        for c in range(5):
-            cid = self.db.add_categoria(f"BULK_CAT_{c}")
-            for m in range(10):
-                self.db.add_materiale(f"BULK_MAT_{c}_{m}", 0.1 * (m + 1), float(m + 1),
-                                      categoria_id=cid)
-            mats = self.db.get_materiali_per_categoria(cid)
-            self.assertEqual(len(mats), 10)
+        self.skipTest("Categoria rimossa dal sistema")
 
 
 # ===========================================================================
@@ -734,12 +706,8 @@ class TestIntegrazione(unittest.TestCase):
         Crea categoria → materiale → fornitore → carico → preventivo → verifica.
         Simula un ciclo di vita reale completo.
         """
-        # 1. Categoria
-        cid = self.db.add_categoria("FIBRA_CARBONIO", 20.0, 100.0, 500.0)
-        self.assertIsInstance(cid, int)
-
-        # 2. Materiale in categoria
-        mid = self.db.add_materiale("CF300", 0.3, 55.0, categoria_id=cid)
+        # 1. Materiale
+        mid = self.db.add_materiale("CF300", 0.3, 55.0)
         self.assertIsInstance(mid, int)
 
         # 3. Fornitore
