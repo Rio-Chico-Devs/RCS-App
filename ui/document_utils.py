@@ -407,6 +407,122 @@ class DocumentUtils:
         )
 
     @staticmethod
+    def _svg_tela(idx, giri, lunghezza, sviluppo, nome, posa,
+                  is_conica, con_lato, con_alt, con_lung, sc):
+        """Genera SVG a coordinate assolute per una singola tela.
+        Ritorna (svg_str, height_mm).
+        Tutto in mm nel viewBox; nessuna posizione dipende dal flusso ODT.
+        """
+        def xe(v):
+            return str(v).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
+        SVG_W  = 146.0
+        rh_map = {'8mm': 8.0, '6mm': 6.0, '5mm': 5.0, '4mm': 4.0}
+        rh     = rh_map.get(sc['rect_height'], 8.0)
+        hh_map = {8.0: 4.5, 6.0: 4.0, 5.0: 3.5, 4.0: 3.0}
+        hdr_h  = hh_map.get(rh, 4.5)
+        total_h = hdr_h + rh
+
+        fpt = {'11px': 11, '10px': 10, '9px': 9, '8px': 8, '7px': 7, '6px': 6}
+        fn  = fpt.get(sc['font_nome'], 10)
+        fi  = fpt.get(sc['font_info'], 9)
+        fg  = fpt.get(sc['font_giri'], 9)
+        fs  = max(fi - 2, 5)   # etichette piccole hc/lc
+
+        # X layout (mm)
+        rx1 = 8.0;  rx2 = 128.0;  rcx = (rx1 + rx2) / 2.0
+        gx  = rx1 - 1.0    # giri label, right-aligned
+        hx  = rx2 + 2.0    # sviluppo label, left-aligned
+
+        # Y layout (mm)
+        ry1 = hdr_h
+        ry2 = hdr_h + rh
+        rcy = ry1 + rh * 0.68   # baseline testo nel rettangolo
+        hdy = hdr_h * 0.82       # baseline testo nell'header
+
+        BLUE = '#1A6AAF'
+        RED  = '#C41230'
+        BLK  = '#000000'
+        tri  = 20.0   # larghezza triangolo conicità (mm)
+        sw   = 0.35   # stroke diagonale
+        swb  = 0.5    # stroke bordo rettangolo
+
+        e = []
+
+        # Header: lunghezza centrata sopra il rettangolo
+        e.append(f'<text x="{rcx:.1f}" y="{hdy:.2f}" text-anchor="middle" '
+                 f'font-family="sans-serif" font-size="{fi}pt" font-weight="bold" '
+                 f'fill="{BLK}">{int(lunghezza)} mm</text>')
+
+        # Header: hc labels (BLUE) se conica
+        if is_conica and con_alt > 0:
+            hc = f'hc: {int(con_alt)} mm'
+            if con_lato in ('sinistra', 'entrambi'):
+                e.append(f'<text x="{rx1:.1f}" y="{hdy:.2f}" text-anchor="start" '
+                         f'font-family="sans-serif" font-size="{fs}pt" font-weight="bold" '
+                         f'fill="{BLUE}">{hc}</text>')
+            if con_lato in ('destra', 'entrambi'):
+                e.append(f'<text x="{rx2:.1f}" y="{hdy:.2f}" text-anchor="end" '
+                         f'font-family="sans-serif" font-size="{fs}pt" font-weight="bold" '
+                         f'fill="{BLUE}">{hc}</text>')
+
+        # Bordi rettangolo (top e bottom neri, left/right colorati se conica)
+        tb = f'stroke="{BLK}" stroke-width="{swb}"'
+        e.append(f'<line x1="{rx1}" y1="{ry1:.2f}" x2="{rx2}" y2="{ry1:.2f}" {tb}/>')
+        e.append(f'<line x1="{rx1}" y1="{ry2:.2f}" x2="{rx2}" y2="{ry2:.2f}" {tb}/>')
+        lc = BLUE if is_conica and con_lato in ('sinistra', 'entrambi') else BLK
+        rc = BLUE if is_conica and con_lato in ('destra',   'entrambi') else BLK
+        e.append(f'<line x1="{rx1}" y1="{ry1:.2f}" x2="{rx1}" y2="{ry2:.2f}" '
+                 f'stroke="{lc}" stroke-width="{swb}"/>')
+        e.append(f'<line x1="{rx2}" y1="{ry1:.2f}" x2="{rx2}" y2="{ry2:.2f}" '
+                 f'stroke="{rc}" stroke-width="{swb}"/>')
+
+        # Diagonali RED + etichette lc se conica
+        if is_conica and con_lung > 0:
+            lt = f'lc:{int(con_lung)}'
+            if con_lato in ('sinistra', 'entrambi'):
+                dx2 = rx1 + tri
+                e.append(f'<line x1="{rx1}" y1="{ry1:.2f}" x2="{dx2:.1f}" y2="{ry2:.2f}" '
+                         f'stroke="{RED}" stroke-width="{sw}"/>')
+                mx = (rx1 + dx2) / 2.0 + 1.5
+                my = (ry1 + ry2) / 2.0 + 0.5
+                e.append(f'<text x="{mx:.1f}" y="{my:.2f}" text-anchor="start" '
+                         f'font-family="sans-serif" font-size="{fs}pt" fill="{RED}">{lt}</text>')
+            if con_lato in ('destra', 'entrambi'):
+                dx1 = rx2 - tri
+                e.append(f'<line x1="{dx1:.1f}" y1="{ry2:.2f}" x2="{rx2}" y2="{ry1:.2f}" '
+                         f'stroke="{RED}" stroke-width="{sw}"/>')
+                mx = (dx1 + rx2) / 2.0 - 1.5
+                my = (ry1 + ry2) / 2.0 + 0.5
+                e.append(f'<text x="{mx:.1f}" y="{my:.2f}" text-anchor="end" '
+                         f'font-family="sans-serif" font-size="{fs}pt" fill="{RED}">{lt}</text>')
+
+        # Giri (sinistra del rettangolo)
+        e.append(f'<text x="{gx:.1f}" y="{rcy:.2f}" text-anchor="end" '
+                 f'font-family="sans-serif" font-size="{fg}pt" font-weight="bold" '
+                 f'fill="{BLK}">G{giri}</text>')
+
+        # Nome centrato nel rettangolo
+        e.append(f'<text x="{rcx:.1f}" y="{rcy:.2f}" text-anchor="middle" '
+                 f'font-family="sans-serif" font-size="{fn}pt" font-weight="bold" '
+                 f'fill="{BLK}">{xe(posa)} {xe(nome)}</text>')
+
+        # Sviluppo (destra del rettangolo)
+        e.append(f'<text x="{hx:.1f}" y="{rcy:.2f}" text-anchor="start" '
+                 f'font-family="sans-serif" font-size="{fi}pt" '
+                 f'fill="{BLK}">H {int(sviluppo)} mm</text>')
+
+        svg = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            f'<svg xmlns="http://www.w3.org/2000/svg" '
+            f'viewBox="0 0 {SVG_W:.1f} {total_h:.2f}" '
+            f'width="{SVG_W:.1f}mm" height="{total_h:.2f}mm">\n'
+            + '\n'.join(f'  {el}' for el in e) +
+            '\n</svg>'
+        )
+        return svg, total_h
+
+    @staticmethod
     def _odt_content(preventivo, dati_cliente, sc, svg_files=None):
         """Costruisce content.xml ODT senza dipendenze esterne.
         svg_files: lista opzionale a cui vengono aggiunti (path, svg_content) per le coniche.
