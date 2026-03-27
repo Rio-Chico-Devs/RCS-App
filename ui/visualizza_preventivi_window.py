@@ -823,7 +823,5 @@ class VisualizzaPreventiviWindow(QMainWindow):
     def on_preventivo_modificato(self) -> None:
         """Callback quando un preventivo viene modificato"""
         self.load_clienti_filtro()
-        self.load_categorie_filtro()
-        self.load_sottocategorie_filtro()
         self.load_preventivi()
         self.preventivo_modificato.emit()

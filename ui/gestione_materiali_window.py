@@ -504,8 +504,8 @@ class GestioneMaterialiWindow(QMainWindow):
         mat = current_item.data(Qt.UserRole)
         self.materiale_corrente = mat
         id_mat, nome, spessore, prezzo = mat[:4]
-        scorta_min = mat[9] if len(mat) > 9 else 0.0
-        scorta_max = mat[10] if len(mat) > 10 else 0.0
+        scorta_min = mat[8] if len(mat) > 8 else 0.0
+        scorta_max = mat[9] if len(mat) > 9 else 0.0
 
         fornitori = self.db_manager.get_fornitori_per_materiale(id_mat)
         n_forn = len(fornitori)
@@ -660,17 +660,18 @@ class GestioneMaterialiWindow(QMainWindow):
 
         nome = self.edit_nome.text().strip()
         if not nome:
-            QMessageBox.warning(self, "Errore", "Il nome del materiale è obbligatorio.")
+            QMessageBox.warning(self, "Attenzione", "Il nome del materiale non può essere vuoto.")
             return
-
+        if len(nome) > 100:
+            QMessageBox.warning(self, "Attenzione", "Il nome del materiale non può superare 100 caratteri.")
+            return
         spessore = self.edit_spessore.value()
-        if spessore <= 0:
-            QMessageBox.warning(self, "Errore", "Lo spessore deve essere maggiore di 0.")
-            return
-
         prezzo = self.edit_prezzo.value()
-        if prezzo <= 0:
-            QMessageBox.warning(self, "Errore", "Il prezzo deve essere maggiore di 0.")
+        if spessore <= 0:
+            QMessageBox.warning(self, "Attenzione", "Lo spessore deve essere maggiore di zero.")
+            return
+        if prezzo < 0:
+            QMessageBox.warning(self, "Attenzione", "Il prezzo non può essere negativo.")
             return
 
         try:
@@ -805,17 +806,18 @@ class NuovoMaterialeDialog(QDialog):
     def salva_nuovo_materiale(self):
         nome = self.edit_nome.text().strip()
         if not nome:
-            QMessageBox.warning(self, "Errore", "Il nome del materiale è obbligatorio.")
+            QMessageBox.warning(self, "Attenzione", "Il nome del materiale non può essere vuoto.")
             return
-
+        if len(nome) > 100:
+            QMessageBox.warning(self, "Attenzione", "Il nome del materiale non può superare 100 caratteri.")
+            return
         spessore = self.edit_spessore.value()
-        if spessore <= 0:
-            QMessageBox.warning(self, "Errore", "Lo spessore deve essere maggiore di 0.")
-            return
-
         prezzo = self.edit_prezzo.value()
-        if prezzo <= 0:
-            QMessageBox.warning(self, "Errore", "Il prezzo deve essere maggiore di 0.")
+        if spessore <= 0:
+            QMessageBox.warning(self, "Attenzione", "Lo spessore deve essere maggiore di zero.")
+            return
+        if prezzo < 0:
+            QMessageBox.warning(self, "Attenzione", "Il prezzo non può essere negativo.")
             return
 
         try:

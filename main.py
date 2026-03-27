@@ -14,6 +14,7 @@ from PyQt5.QtCore import QDir
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from ui.main_window import MainWindow
+from utils.logger import setup_logger
 
 
 def _gestisci_eccezione_globale(exc_type, exc_value, exc_traceback):
@@ -42,6 +43,8 @@ sys.excepthook = _gestisci_eccezione_globale
 
 def main():
     """Funzione principale dell'applicazione"""
+    setup_logger()
+
     # Crea l'applicazione Qt
     app = QApplication(sys.argv)
 

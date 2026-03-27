@@ -7,7 +7,7 @@ Uso riservato esclusivamente a RCS
 
 Version: 1.0.0
 Last Updated: 23/09/2025
-Author: Antonio VB + Claude
+Author: Antonio VB
 """
 
 from PyQt5.QtWidgets import QMessageBox
@@ -17,91 +17,6 @@ import json
 
 class PreventivoBusinessLogic:
     """Classe per gestire la logica di business dei preventivi"""
-    
-    @staticmethod
-    def carica_preventivo_dal_database(window_instance, preventivo_id):
-        """Carica un preventivo esistente dal database"""
-        preventivo_data = window_instance.db_manager.get_preventivo_by_id(preventivo_id)
-        if not preventivo_data:
-            QMessageBox.critical(window_instance, "Errore", "Preventivo non trovato nel database.")
-            return
-        
-        # Carica dati base
-        window_instance.preventivo.costo_totale_materiali = preventivo_data[4]  # costo_totale_materiali
-        window_instance.preventivo.minuti_taglio = preventivo_data[5]
-        window_instance.preventivo.minuti_avvolgimento = preventivo_data[6]
-        window_instance.preventivo.minuti_pulizia = preventivo_data[7]
-        window_instance.preventivo.minuti_rettifica = preventivo_data[8]
-        window_instance.preventivo.minuti_imballaggio = preventivo_data[9]
-        window_instance.preventivo.costo_orario = preventivo_data[10]
-        window_instance.preventivo.costi_accessori = preventivo_data[11]
-        window_instance.preventivo.costo_totale_manodopera = preventivo_data[12]
-        window_instance.preventivo.costo_totale_finale = preventivo_data[13]
-        
-        # Carica dati cliente se disponibili
-        if len(preventivo_data) > 14:
-            window_instance.nome_cliente_data = preventivo_data[14] or ""
-            window_instance.numero_ordine_data = preventivo_data[15] or ""
-            window_instance.descrizione_data = preventivo_data[16] or ""
-            window_instance.codice_data = preventivo_data[17] or ""
-        else:
-            window_instance.nome_cliente_data = ""
-            window_instance.numero_ordine_data = ""
-            window_instance.descrizione_data = ""
-            window_instance.codice_data = ""
-        
-        # Gestione revisioni
-        if len(preventivo_data) > 18:
-            window_instance.preventivo_originale_id = preventivo_data[18]
-            if not window_instance.preventivo_originale_id:
-                window_instance.preventivo_originale_id = preventivo_id
-        else:
-            window_instance.preventivo_originale_id = preventivo_id
-        
-        # Carica materiali
-        try:
-            materiali_json = preventivo_data[3]
-            if materiali_json:
-                materiali_data = json.loads(materiali_json)
-                window_instance.preventivo.materiali_calcolati = []
-                
-                for mat_data in materiali_data:
-                    materiale = MaterialeCalcolato(
-                        nome=mat_data['nome'],
-                        diametro_interno=mat_data['diametro_interno'],
-                        spessore=mat_data['spessore'],
-                        costo_al_kg=mat_data['costo_al_kg'],
-                        densita=mat_data['densita']
-                    )
-                    
-                    # Imposta valori calcolati
-                    if 'giri' in mat_data:
-                        materiale.giri = mat_data['giri']
-                    if 'sviluppo' in mat_data:
-                        materiale.sviluppo = mat_data['sviluppo']
-                    if 'diametro_finale' in mat_data:
-                        materiale.diametro_finale = mat_data['diametro_finale']
-                    if 'peso_totale' in mat_data:
-                        materiale.peso_totale = mat_data['peso_totale']
-                    if 'costo_totale' in mat_data:
-                        materiale.costo_totale = mat_data['costo_totale']
-                    
-                    # Gestione tessitura
-                    if 'tessitura' in mat_data:
-                        materiale.tessitura = mat_data['tessitura']
-                    if 'lunghezza_trama' in mat_data:
-                        materiale.lunghezza_trama = mat_data['lunghezza_trama']
-                    if 'lunghezza_ordito' in mat_data:
-                        materiale.lunghezza_ordito = mat_data['lunghezza_ordito']
-                    if 'spessore_trama' in mat_data:
-                        materiale.spessore_trama = mat_data['spessore_trama']
-                    if 'spessore_ordito' in mat_data:
-                        materiale.spessore_ordito = mat_data['spessore_ordito']
-                    
-                    window_instance.preventivo.materiali_calcolati.append(materiale)
-                    
-        except (json.JSONDecodeError, KeyError) as e:
-            print(f"Errore nel caricamento materiali: {e}")
     
     @staticmethod
     def aggiungi_materiale(window_instance):
@@ -294,131 +209,39 @@ class PreventivoBusinessLogic:
             if not window_instance.preventivo.materiali_calcolati:
                 QMessageBox.warning(window_instance, "Attenzione", "Aggiungi almeno un materiale prima di salvare il preventivo.")
                 return
-            
+
             # Recupera dati cliente
             dati_cliente = PreventivoBusinessLogic.get_dati_cliente(window_instance)
-            
-            # Aggiorna totali finali
-            window_instance.preventivo.ricalcola_costo_totale_materiali()
-            
-            # Calcola manodopera
-            minuti_totali = (window_instance.preventivo.minuti_taglio + 
-                            window_instance.preventivo.minuti_avvolgimento + 
-                            window_instance.preventivo.minuti_pulizia + 
-                            window_instance.preventivo.minuti_rettifica + 
-                            window_instance.preventivo.minuti_imballaggio)
-            ore_totali = minuti_totali / 60
-            window_instance.preventivo.costo_totale_manodopera = ore_totali * window_instance.preventivo.costo_orario
-            
-            # Calcola totale finale
-            window_instance.preventivo.costo_totale_finale = (window_instance.preventivo.costo_totale_materiali + 
-                                                             window_instance.preventivo.costo_totale_manodopera + 
-                                                             window_instance.preventivo.costi_accessori)
-            
-            # Converte materiali in JSON
-            materiali_data = []
-            for materiale in window_instance.preventivo.materiali_calcolati:
-                mat_dict = {
-                    'nome': materiale.nome,
-                    'diametro_interno': materiale.diametro_interno,
-                    'spessore': materiale.spessore,
-                    'costo_al_kg': materiale.costo_al_kg,
-                    'densita': materiale.densita,
-                    'giri': materiale.giri,
-                    'sviluppo': materiale.sviluppo,
-                    'diametro_finale': materiale.diametro_finale,
-                    'peso_totale': materiale.peso_totale,
-                    'costo_totale': materiale.costo_totale
-                }
-                
-                # Aggiungi dati tessitura se presenti
-                if hasattr(materiale, 'tessitura'):
-                    mat_dict['tessitura'] = materiale.tessitura
-                if hasattr(materiale, 'lunghezza_trama'):
-                    mat_dict['lunghezza_trama'] = materiale.lunghezza_trama
-                if hasattr(materiale, 'lunghezza_ordito'):
-                    mat_dict['lunghezza_ordito'] = materiale.lunghezza_ordito
-                if hasattr(materiale, 'spessore_trama'):
-                    mat_dict['spessore_trama'] = materiale.spessore_trama
-                if hasattr(materiale, 'spessore_ordito'):
-                    mat_dict['spessore_ordito'] = materiale.spessore_ordito
-                
-                materiali_data.append(mat_dict)
-            
-            materiali_json = json.dumps(materiali_data)
-            
+
+            # Ricalcola tutti i totali
+            window_instance.preventivo.ricalcola_tutto()
+
+            # Costruisci il dizionario dati per il DB
+            preventivo_data = window_instance.preventivo.to_dict()
+            preventivo_data.update(dati_cliente)
+
             if window_instance.modalita == 'revisione':
-                # Salva come nuova revisione
-                preventivo_id = window_instance.db_manager.salva_preventivo(
-                    materiali_json,
-                    window_instance.preventivo.costo_totale_materiali,
-                    window_instance.preventivo.minuti_taglio,
-                    window_instance.preventivo.minuti_avvolgimento,
-                    window_instance.preventivo.minuti_pulizia,
-                    window_instance.preventivo.minuti_rettifica,
-                    window_instance.preventivo.minuti_imballaggio,
-                    window_instance.preventivo.costo_orario,
-                    window_instance.preventivo.costi_accessori,
-                    window_instance.preventivo.costo_totale_manodopera,
-                    window_instance.preventivo.costo_totale_finale,
-                    dati_cliente['nome_cliente'],
-                    dati_cliente['numero_ordine'],
-                    dati_cliente['descrizione'],
-                    dati_cliente['codice'],
-                    window_instance.preventivo_originale_id,  # ID originale per revisione
-                    window_instance.note_revisione
+                preventivo_id = window_instance.db_manager.add_revisione_preventivo(
+                    window_instance.preventivo_originale_id,
+                    preventivo_data,
+                    getattr(window_instance, 'note_revisione', '')
                 )
-                
                 QMessageBox.information(window_instance, "Successo", f"Revisione salvata con successo! ID: {preventivo_id}")
-                
+
             elif window_instance.modalita == 'modifica':
-                # Aggiorna preventivo esistente
-                window_instance.db_manager.aggiorna_preventivo(
+                window_instance.db_manager.update_preventivo(
                     window_instance.preventivo_id,
-                    materiali_json,
-                    window_instance.preventivo.costo_totale_materiali,
-                    window_instance.preventivo.minuti_taglio,
-                    window_instance.preventivo.minuti_avvolgimento,
-                    window_instance.preventivo.minuti_pulizia,
-                    window_instance.preventivo.minuti_rettifica,
-                    window_instance.preventivo.minuti_imballaggio,
-                    window_instance.preventivo.costo_orario,
-                    window_instance.preventivo.costi_accessori,
-                    window_instance.preventivo.costo_totale_manodopera,
-                    window_instance.preventivo.costo_totale_finale,
-                    dati_cliente['nome_cliente'],
-                    dati_cliente['numero_ordine'],
-                    dati_cliente['descrizione'],
-                    dati_cliente['codice']
+                    preventivo_data
                 )
-                
                 QMessageBox.information(window_instance, "Successo", "Preventivo aggiornato con successo!")
-                
+
             else:
-                # Nuovo preventivo
-                preventivo_id = window_instance.db_manager.salva_preventivo(
-                    materiali_json,
-                    window_instance.preventivo.costo_totale_materiali,
-                    window_instance.preventivo.minuti_taglio,
-                    window_instance.preventivo.minuti_avvolgimento,
-                    window_instance.preventivo.minuti_pulizia,
-                    window_instance.preventivo.minuti_rettifica,
-                    window_instance.preventivo.minuti_imballaggio,
-                    window_instance.preventivo.costo_orario,
-                    window_instance.preventivo.costi_accessori,
-                    window_instance.preventivo.costo_totale_manodopera,
-                    window_instance.preventivo.costo_totale_finale,
-                    dati_cliente['nome_cliente'],
-                    dati_cliente['numero_ordine'],
-                    dati_cliente['descrizione'],
-                    dati_cliente['codice']
-                )
-                
+                preventivo_id = window_instance.db_manager.add_preventivo(preventivo_data)
                 QMessageBox.information(window_instance, "Successo", f"Preventivo salvato con successo! ID: {preventivo_id}")
-            
+
             window_instance.preventivo_salvato.emit()
             window_instance.close()
-            
+
         except Exception as e:
             QMessageBox.critical(window_instance, "Errore", f"Errore nel salvataggio: {str(e)}")
     

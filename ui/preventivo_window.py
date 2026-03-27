@@ -356,7 +356,8 @@ class PreventivoWindow(QMainWindow):
         # Carica i dati se esistenti
         if hasattr(self, 'nome_cliente_data'):
             self._set_combo_cliente(self.nome_cliente_data)
-            self.edit_numero_ordine.setText(self.numero_ordine_data)
+            if hasattr(self, 'numero_ordine_data'):
+                self.edit_numero_ordine.setText(self.numero_ordine_data or "")
             self.edit_descrizione.setText(self.descrizione_data)
             self.edit_codice.setText(self.codice_data)
             if hasattr(self, 'misura_data'):
@@ -1323,6 +1324,8 @@ class PreventivoWindow(QMainWindow):
     
     def materiale_modificato(self, materiale_calcolato, indice):
         """Gestisce modifica materiale"""
+        if indice is None or indice < 0 or indice >= len(self.preventivo.materiali_calcolati):
+            return
         self.preventivo.materiali_calcolati[indice] = materiale_calcolato
         self.ricalcola_diametri_successivi(indice)
         self.preventivo.ricalcola_costo_totale_materiali()

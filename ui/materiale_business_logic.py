@@ -7,7 +7,7 @@ Uso riservato esclusivamente a RCS
 
 Version: 1.0.0
 Last Updated: 23/09/2025
-Author: Antonio VB + Claude
+Author: Antonio VB
 """
 
 from PyQt5.QtWidgets import QMessageBox, QHBoxLayout, QLabel, QWidget

@@ -14,6 +14,9 @@ class Preventivo:
         self.preventivo_finale = 0.0
         self.prezzo_cliente = 0.0
         self.scarto_totale_mm2 = 0.0  # Somma scarti di tutti i materiali
+        self.costo_orario = 0.0
+        self.costo_totale_manodopera = 0.0  # Usato dalla UI per visualizzare il costo
+        self.costo_totale_finale = 0.0      # Usato dalla UI per visualizzare il totale
     
     def aggiungi_materiale(self, materiale_calcolato):
         """Aggiunge un materiale calcolato al preventivo"""
