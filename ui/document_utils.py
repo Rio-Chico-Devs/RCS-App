@@ -428,7 +428,14 @@ class DocumentUtils:
         cpad = '0.2cm'  if num_mat <= 10 else ('0.12cm' if num_mat <= 17 else '0.08cm')
         npad = '0.1cm'  if num_mat <= 10 else ('0.05cm' if num_mat <= 17 else '0.02cm')
 
-        pad_cm_val = float(pad.replace('cm', ''))
+        pad_cm_val  = float(pad.replace('cm', ''))
+        npad_cm_val = float(npad.replace('cm', ''))
+        # Altezza riga header adattiva: con pochi materiali il font è più grande
+        header_row_h = '0.5cm' if num_mat <= 10 else ('0.45cm' if num_mat <= 17 else ('0.4cm' if num_mat <= 25 else '0.35cm'))
+        # Tab destro per hc: allineato al bordo destro della cella trave
+        # TM: TCN(2cm)+TCW(12cm)+TCN(2cm)=16cm; THL: TCFI(3.5cm)+TCHL_L(12.5cm)=16cm
+        # bordo destro trave in coord. cella header = (2+12) - 3.5 - npad = 10.5 - npad
+        plrr_right_tab = 10.5 - npad_cm_val
 
         NS = (
             'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
@@ -522,7 +529,7 @@ class DocumentUtils:
             f'<style:style style:name="TCHL_L" style:family="table-column">'
             f'<style:table-column-properties style:column-width="12.5cm"/></style:style>'
             f'<style:style style:name="RFI" style:family="table-row">'
-            f'<style:table-row-properties style:row-height="0.35cm" style:use-optimal-row-height="false"/></style:style>'
+            f'<style:table-row-properties style:row-height="{header_row_h}" style:use-optimal-row-height="false"/></style:style>'
             f'<style:style style:name="CFI" style:family="table-cell">'
             f'<style:table-cell-properties fo:border="none" fo:padding="0.05cm"/></style:style>'
             f'<style:style style:name="THL" style:family="table">'
@@ -560,7 +567,7 @@ class DocumentUtils:
             f'<style:paragraph-properties fo:margin-top="0cm" fo:margin-bottom="0cm">'
             f'<style:tab-stops>'
             f'<style:tab-stop style:position="4.5cm" style:type="center"/>'
-            f'<style:tab-stop style:position="12.3cm" style:type="right"/>'
+            f'<style:tab-stop style:position="{plrr_right_tab:.2f}cm" style:type="right"/>'
             f'</style:tab-stops>'
             f'</style:paragraph-properties>'
             f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
