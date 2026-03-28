@@ -892,34 +892,55 @@ class DocumentUtils:
                         + ''.join(lines) + '</svg>'
                     )
 
-                # Calcola taglio_info (misure conica) da mostrare PRIMA della lunghezza
-                taglio_info_html = ''
+                # Etichette hc (sopra il rettangolo, all'angolo) e lc (dentro il rettangolo, vicino al triangolo)
+                hc_sopra_html = ''
+                lc_dentro_html = ''
                 if is_conica and con_lung > 0:
-                    taglio_info_html = f'L:{con_lung:.0f}'
-                    if con_alt > 0:
-                        taglio_info_html += f' / h:{con_alt:.0f}'
-                    taglio_info_html += ' mm'
+                    lc_text = f'lc: {con_lung:.0f}mm'
+                    hc_text = f'hc: {con_alt:.0f}mm' if con_alt > 0 else ''
+                    hc_parts = []
+                    lc_parts = []
+                    if con_lato in ('sinistra', 'entrambi'):
+                        if hc_text:
+                            hc_parts.append(
+                                f'<div style="position:absolute;left:0;top:0;font-size:{s["font_info"]};line-height:1;">'
+                                f'<strong>{hc_text}</strong></div>'
+                            )
+                        lc_parts.append(
+                            f'<span style="position:absolute;left:3mm;top:50%;transform:translateY(-50%);'
+                            f'font-size:{s["font_info"]};z-index:2;">{lc_text}</span>'
+                        )
+                    if con_lato in ('destra', 'entrambi'):
+                        if hc_text:
+                            hc_parts.append(
+                                f'<div style="position:absolute;right:0;top:0;font-size:{s["font_info"]};line-height:1;">'
+                                f'<strong>{hc_text}</strong></div>'
+                            )
+                        lc_parts.append(
+                            f'<span style="position:absolute;right:3mm;top:50%;transform:translateY(-50%);'
+                            f'font-size:{s["font_info"]};z-index:2;">{lc_text}</span>'
+                        )
+                    hc_sopra_html = ''.join(hc_parts)
+                    lc_dentro_html = ''.join(lc_parts)
 
                 figura_html = (
                     f'<div style="width: 80mm; height: {s["rect_height"]}; border: 2px solid #000; display: flex; '
                     f'align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; '
                     f'position: relative; flex-shrink: 0; overflow: hidden;">'
-                    + diag_svg +
+                    + diag_svg
+                    + lc_dentro_html +
                     f'<input type="text" placeholder="Orient." style="width: {s["orient_width"]}; border: none; '
                     f'font-size: {s["orient_font"]}; background: transparent; position: relative; z-index: 1;">'
                     f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 43%; z-index: 1;">{posa} {nome}</strong>'
                     f'</div>'
                 )
 
-                # Riga 1 sopra rettangolo: per conica taglio_info a sinistra e lunghezza centrata (abs);
-                # per normale solo lunghezza centrata. Entrambe testo libero fuori da qualsiasi casella.
-                # Stesse proprietà box del rettangolo (border 2px + padding 0 3mm)
-                # così text-align:center produce lo stesso centro di left:50% nel rettangolo
+                # Riga sopra rettangolo: hc agli angoli + lunghezza centrata
                 _box = 'width: 80mm; border: 2px solid transparent; padding: 0 3mm; flex-shrink: 0; font-size: {fi}; box-sizing: content-box;'.format(fi=s['font_info'])
-                if taglio_info_html:
+                if hc_sopra_html:
                     sopra_rettangolo_html = (
                         f'<div style="{_box} position: relative;">'
-                        f'<div style="position: absolute; left: 0; top: 0;"><strong>{taglio_info_html}</strong></div>'
+                        + hc_sopra_html +
                         f'<div style="text-align: center;"><strong>{lunghezza}mm</strong></div>'
                         f'</div>'
                     )
