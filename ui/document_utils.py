@@ -30,7 +30,10 @@ v1.3.0 (03/10/2025):
 
 import os
 from datetime import datetime
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox, QFileDialog
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
+                             QMessageBox, QFileDialog, QLabel, QFrame)
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 
 class DocumentUtils:
     """Utilità per generazione documenti di produzione"""
@@ -40,20 +43,71 @@ class DocumentUtils:
         """Mostra dialog per selezione formato documento"""
         dialog = QDialog(parent)
         dialog.setWindowTitle("Genera Documento")
-        dialog.setFixedSize(350, 120)
+        dialog.setFixedSize(420, 220)
+        dialog.setStyleSheet("background-color: #f5f5f5;")
 
         layout = QVBoxLayout(dialog)
-        layout.addWidget(QPushButton("Seleziona formato per il documento:"))
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(14)
 
-        buttons_layout = QHBoxLayout()
-        btn_html = QPushButton("HTML")
-        btn_odt = QPushButton("ODT (OpenOffice)")
+        # Titolo
+        title = QLabel("Seleziona il formato del documento")
+        title_font = QFont()
+        title_font.setPointSize(11)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        # Separatore
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setStyleSheet("color: #cccccc;")
+        layout.addWidget(line)
+
+        # Sottotitolo
+        sub = QLabel("Scegli il formato in cui esportare la scheda di taglio:")
+        sub.setAlignment(Qt.AlignCenter)
+        sub.setStyleSheet("color: #555555; font-size: 10px;")
+        sub.setWordWrap(True)
+        layout.addWidget(sub)
+
+        # Bottoni formato
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(12)
+
+        btn_style = (
+            "QPushButton {"
+            "  background-color: #2c3e50; color: white;"
+            "  border-radius: 6px; padding: 10px 18px;"
+            "  font-size: 11px; font-weight: bold;"
+            "}"
+            "QPushButton:hover { background-color: #3d5166; }"
+            "QPushButton:pressed { background-color: #1a252f; }"
+        )
+
+        btn_html = QPushButton("HTML\n(Anteprima web)")
+        btn_odt  = QPushButton("ODT\n(OpenOffice / LibreOffice)")
+        btn_html.setStyleSheet(btn_style)
+        btn_odt.setStyleSheet(btn_style)
+        btn_html.setMinimumHeight(52)
+        btn_odt.setMinimumHeight(52)
+        btn_layout.addWidget(btn_html)
+        btn_layout.addWidget(btn_odt)
+        layout.addLayout(btn_layout)
+
+        # Annulla
         btn_cancel = QPushButton("Annulla")
-
-        buttons_layout.addWidget(btn_html)
-        buttons_layout.addWidget(btn_odt)
-        buttons_layout.addWidget(btn_cancel)
-        layout.addLayout(buttons_layout)
+        btn_cancel.setStyleSheet(
+            "QPushButton { background-color: transparent; color: #888888;"
+            " border: 1px solid #cccccc; border-radius: 4px; padding: 5px 14px; font-size: 10px; }"
+            "QPushButton:hover { background-color: #e8e8e8; }"
+        )
+        btn_cancel.setFixedHeight(28)
+        cancel_layout = QHBoxLayout()
+        cancel_layout.addStretch()
+        cancel_layout.addWidget(btn_cancel)
+        layout.addLayout(cancel_layout)
 
         formato_scelto = None
 
@@ -67,13 +121,10 @@ class DocumentUtils:
             formato_scelto = 'odt'
             dialog.accept()
 
-        def on_cancel():
-            dialog.reject()
-
         btn_html.clicked.connect(on_html)
         btn_odt.clicked.connect(on_odt)
-        btn_cancel.clicked.connect(on_cancel)
-        
+        btn_cancel.clicked.connect(dialog.reject)
+
         if dialog.exec_() == QDialog.Accepted:
             return formato_scelto
         return None
