@@ -477,6 +477,14 @@ class DocumentUtils:
             f'<style:tab-stops><style:tab-stop style:position="{0.43 * 12.0 - pad_cm_val:.3f}cm" style:type="left"/></style:tab-stops>'
             f'</style:paragraph-properties>'
             f'<style:text-properties fo:font-size="{ft_nome}" fo:font-weight="bold"/></style:style>'
+            f'<style:style style:name="PCL_R" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="start" fo:margin-top="0cm" fo:margin-bottom="0cm">'
+            f'<style:tab-stops>'
+            f'<style:tab-stop style:position="{0.43 * 12.0 - pad_cm_val:.3f}cm" style:type="left"/>'
+            f'<style:tab-stop style:position="11.5cm" style:type="right"/>'
+            f'</style:tab-stops>'
+            f'</style:paragraph-properties>'
+            f'<style:text-properties fo:font-size="{ft_nome}" fo:font-weight="bold"/></style:style>'
             f'<style:style style:name="TI" style:family="table">'
             f'<style:table-properties style:width="17.7cm" table:align="margins"/></style:style>'
             f'<style:style style:name="TCI" style:family="table-column">'
@@ -642,44 +650,50 @@ class DocumentUtils:
                     # Bordo blu sul lato della conicità
                     cell_style = {'sinistra': 'CMB_BL', 'destra': 'CMB_BR',
                                   'entrambi': 'CMB_BLR'}.get(con_lato, 'CMB')
-                    center_cell = (
-                        f'<table:table-cell table:style-name="{cell_style}">'
-                        f'<text:p text:style-name="PCL">'
-                        + lines_xml +
-                        f'<text:tab/>{posa} {nome}'
-                        f'</text:p>'
-                        f'</table:table-cell>'
-                    )
 
-                    # Etichette hc (blu) e lc (rosso) nell'header
+                    # hc (blu) nell'header sopra l'angolo, lc (rosso) dentro la cella della trave
                     hc_sp = (f'<text:span text:style-name="TBLUE">hc: {int(con_alt)} mm</text:span>'
                              if con_alt > 0 else '')
                     lc_sp = f'<text:span text:style-name="TRED">lc: {int(con_lung)} mm</text:span>'
-                    sep   = '  ' if hc_sp else ''
-                    left_tag  = f'{hc_sp}{sep}{lc_sp}'
-                    right_tag = f'{lc_sp}{sep}{hc_sp}'
 
+                    # Header: solo hc all'angolo corretto, lunghezza centrata
                     if con_lato == 'sinistra':
-                        # hc/lc a sinistra (sopra il bordo blu sinistro), lunghezza centrata
                         lun_cell_xml = (
                             f'<text:p text:style-name="PLR">'
-                            f'{left_tag}<text:tab/>{int(lunghezza)} mm'
+                            f'{hc_sp}<text:tab/>{int(lunghezza)} mm'
                             f'</text:p>'
                         )
                     elif con_lato == 'destra':
-                        # lunghezza centrata, hc/lc a destra (sopra il bordo blu destro)
                         lun_cell_xml = (
                             f'<text:p text:style-name="PLRR">'
-                            f'<text:tab/>{int(lunghezza)} mm<text:tab/>{right_tag}'
+                            f'<text:tab/>{int(lunghezza)} mm<text:tab/>{hc_sp}'
                             f'</text:p>'
                         )
                     else:  # entrambi
-                        # hc/lc su entrambi i lati, lunghezza al centro
                         lun_cell_xml = (
                             f'<text:p text:style-name="PLRR">'
-                            f'{left_tag}<text:tab/>{int(lunghezza)} mm<text:tab/>{right_tag}'
+                            f'{hc_sp}<text:tab/>{int(lunghezza)} mm<text:tab/>{hc_sp}'
                             f'</text:p>'
                         )
+
+                    # Cella trave: lc vicino al triangolo (sinistra, destra o entrambi)
+                    if con_lato == 'sinistra':
+                        cell_content = f'{lines_xml}{lc_sp}<text:tab/>{posa} {nome}'
+                        cell_para_style = 'PCL'
+                    elif con_lato == 'destra':
+                        cell_content = f'{lines_xml}<text:tab/>{posa} {nome}<text:tab/>{lc_sp}'
+                        cell_para_style = 'PCL_R'
+                    else:  # entrambi
+                        cell_content = f'{lines_xml}{lc_sp}<text:tab/>{posa} {nome}<text:tab/>{lc_sp}'
+                        cell_para_style = 'PCL_R'
+
+                    center_cell = (
+                        f'<table:table-cell table:style-name="{cell_style}">'
+                        f'<text:p text:style-name="{cell_para_style}">'
+                        + cell_content +
+                        f'</text:p>'
+                        f'</table:table-cell>'
+                    )
                 else:
                     center_cell = (
                         f'<table:table-cell table:style-name="CMB">'
