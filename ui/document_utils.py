@@ -407,126 +407,8 @@ class DocumentUtils:
         )
 
     @staticmethod
-    def _svg_tela(idx, giri, lunghezza, sviluppo, nome, posa,
-                  is_conica, con_lato, con_alt, con_lung, sc):
-        """Genera SVG a coordinate assolute per una singola tela.
-        Ritorna (svg_str, height_mm).
-        Tutto in mm nel viewBox; nessuna posizione dipende dal flusso ODT.
-        """
-        def xe(v):
-            return str(v).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-
-        SVG_W  = 146.0
-        rh_map = {'8mm': 8.0, '6mm': 6.0, '5mm': 5.0, '4mm': 4.0}
-        rh     = rh_map.get(sc['rect_height'], 8.0)
-        hh_map = {8.0: 4.5, 6.0: 4.0, 5.0: 3.5, 4.0: 3.0}
-        hdr_h  = hh_map.get(rh, 4.5)
-        total_h = hdr_h + rh
-
-        fpt = {'11px': 11, '10px': 10, '9px': 9, '8px': 8, '7px': 7, '6px': 6}
-        fn  = fpt.get(sc['font_nome'], 10)
-        fi  = fpt.get(sc['font_info'], 9)
-        fg  = fpt.get(sc['font_giri'], 9)
-        fs  = max(fi - 2, 5)   # etichette piccole hc/lc
-
-        # X layout (mm)
-        rx1 = 8.0;  rx2 = 128.0;  rcx = (rx1 + rx2) / 2.0
-        gx  = rx1 - 1.0    # giri label, right-aligned
-        hx  = rx2 + 2.0    # sviluppo label, left-aligned
-
-        # Y layout (mm)
-        ry1 = hdr_h
-        ry2 = hdr_h + rh
-        rcy = ry1 + rh * 0.68   # baseline testo nel rettangolo
-        hdy = hdr_h * 0.82       # baseline testo nell'header
-
-        BLUE = '#1A6AAF'
-        RED  = '#C41230'
-        BLK  = '#000000'
-        tri  = 20.0   # larghezza triangolo conicità (mm)
-        sw   = 0.35   # stroke diagonale
-        swb  = 0.5    # stroke bordo rettangolo
-
-        e = []
-
-        # Header: lunghezza centrata sopra il rettangolo
-        e.append(f'<text x="{rcx:.1f}" y="{hdy:.2f}" text-anchor="middle" '
-                 f'font-family="sans-serif" font-size="{fi}pt" font-weight="bold" '
-                 f'fill="{BLK}">{int(lunghezza)} mm</text>')
-
-        # Header: hc labels (BLUE) se conica
-        if is_conica and con_alt > 0:
-            hc = f'hc: {int(con_alt)} mm'
-            if con_lato in ('sinistra', 'entrambi'):
-                e.append(f'<text x="{rx1:.1f}" y="{hdy:.2f}" text-anchor="start" '
-                         f'font-family="sans-serif" font-size="{fs}pt" font-weight="bold" '
-                         f'fill="{BLUE}">{hc}</text>')
-            if con_lato in ('destra', 'entrambi'):
-                e.append(f'<text x="{rx2:.1f}" y="{hdy:.2f}" text-anchor="end" '
-                         f'font-family="sans-serif" font-size="{fs}pt" font-weight="bold" '
-                         f'fill="{BLUE}">{hc}</text>')
-
-        # Bordi rettangolo (top e bottom neri, left/right colorati se conica)
-        tb = f'stroke="{BLK}" stroke-width="{swb}"'
-        e.append(f'<line x1="{rx1}" y1="{ry1:.2f}" x2="{rx2}" y2="{ry1:.2f}" {tb}/>')
-        e.append(f'<line x1="{rx1}" y1="{ry2:.2f}" x2="{rx2}" y2="{ry2:.2f}" {tb}/>')
-        lc = BLUE if is_conica and con_lato in ('sinistra', 'entrambi') else BLK
-        rc = BLUE if is_conica and con_lato in ('destra',   'entrambi') else BLK
-        e.append(f'<line x1="{rx1}" y1="{ry1:.2f}" x2="{rx1}" y2="{ry2:.2f}" '
-                 f'stroke="{lc}" stroke-width="{swb}"/>')
-        e.append(f'<line x1="{rx2}" y1="{ry1:.2f}" x2="{rx2}" y2="{ry2:.2f}" '
-                 f'stroke="{rc}" stroke-width="{swb}"/>')
-
-        # Diagonali RED + etichette lc se conica
-        if is_conica and con_lung > 0:
-            lt = f'lc:{int(con_lung)}'
-            if con_lato in ('sinistra', 'entrambi'):
-                dx2 = rx1 + tri
-                e.append(f'<line x1="{rx1}" y1="{ry1:.2f}" x2="{dx2:.1f}" y2="{ry2:.2f}" '
-                         f'stroke="{RED}" stroke-width="{sw}"/>')
-                mx = (rx1 + dx2) / 2.0 + 1.5
-                my = (ry1 + ry2) / 2.0 + 0.5
-                e.append(f'<text x="{mx:.1f}" y="{my:.2f}" text-anchor="start" '
-                         f'font-family="sans-serif" font-size="{fs}pt" fill="{RED}">{lt}</text>')
-            if con_lato in ('destra', 'entrambi'):
-                dx1 = rx2 - tri
-                e.append(f'<line x1="{dx1:.1f}" y1="{ry2:.2f}" x2="{rx2}" y2="{ry1:.2f}" '
-                         f'stroke="{RED}" stroke-width="{sw}"/>')
-                mx = (dx1 + rx2) / 2.0 - 1.5
-                my = (ry1 + ry2) / 2.0 + 0.5
-                e.append(f'<text x="{mx:.1f}" y="{my:.2f}" text-anchor="end" '
-                         f'font-family="sans-serif" font-size="{fs}pt" fill="{RED}">{lt}</text>')
-
-        # Giri (sinistra del rettangolo)
-        e.append(f'<text x="{gx:.1f}" y="{rcy:.2f}" text-anchor="end" '
-                 f'font-family="sans-serif" font-size="{fg}pt" font-weight="bold" '
-                 f'fill="{BLK}">G{giri}</text>')
-
-        # Nome centrato nel rettangolo
-        e.append(f'<text x="{rcx:.1f}" y="{rcy:.2f}" text-anchor="middle" '
-                 f'font-family="sans-serif" font-size="{fn}pt" font-weight="bold" '
-                 f'fill="{BLK}">{xe(posa)} {xe(nome)}</text>')
-
-        # Sviluppo (destra del rettangolo)
-        e.append(f'<text x="{hx:.1f}" y="{rcy:.2f}" text-anchor="start" '
-                 f'font-family="sans-serif" font-size="{fi}pt" '
-                 f'fill="{BLK}">H {int(sviluppo)} mm</text>')
-
-        svg = (
-            '<?xml version="1.0" encoding="UTF-8"?>\n'
-            f'<svg xmlns="http://www.w3.org/2000/svg" '
-            f'viewBox="0 0 {SVG_W:.1f} {total_h:.2f}" '
-            f'width="{SVG_W:.1f}mm" height="{total_h:.2f}mm">\n'
-            + '\n'.join(f'  {el}' for el in e) +
-            '\n</svg>'
-        )
-        return svg, total_h
-
-    @staticmethod
     def _odt_content(preventivo, dati_cliente, sc, svg_files=None):
-        """Costruisce content.xml ODT senza dipendenze esterne.
-        svg_files: lista opzionale a cui vengono aggiunti (path, svg_content) per le coniche.
-        """
+        """Costruisce content.xml ODT senza dipendenze esterne."""
         def x(v):
             if v is None:
                 return ''
@@ -643,6 +525,37 @@ class DocumentUtils:
             f'<style:graphic-properties draw:stroke="solid" svg:stroke-color="#000000" svg:stroke-width="0.04cm"'
             f' draw:fill="none" fo:wrap="run-through" style:run-through="foreground"'
             f' draw:wrap-influence-on-position="once-concurrent"/></style:style>'
+            f'<style:style style:name="DiagRed" style:family="graphic">'
+            f'<style:graphic-properties draw:stroke="solid" svg:stroke-color="#C41230" svg:stroke-width="0.05cm"'
+            f' draw:fill="none" fo:wrap="run-through" style:run-through="foreground"'
+            f' draw:wrap-influence-on-position="once-concurrent"/></style:style>'
+            f'<style:style style:name="TBLUE" style:family="text">'
+            f'<style:text-properties fo:color="#1A6AAF" fo:font-weight="bold"/></style:style>'
+            f'<style:style style:name="TRED" style:family="text">'
+            f'<style:text-properties fo:color="#C41230" fo:font-weight="bold"/></style:style>'
+            f'<style:style style:name="CMB_BL" style:family="table-cell">'
+            f'<style:table-cell-properties '
+            f'fo:border-left="2.5pt solid #1A6AAF" fo:border-right="1.5pt solid #000000" '
+            f'fo:border-top="1.5pt solid #000000" fo:border-bottom="1.5pt solid #000000" '
+            f'fo:padding="{pad}"/></style:style>'
+            f'<style:style style:name="CMB_BR" style:family="table-cell">'
+            f'<style:table-cell-properties '
+            f'fo:border-left="1.5pt solid #000000" fo:border-right="2.5pt solid #1A6AAF" '
+            f'fo:border-top="1.5pt solid #000000" fo:border-bottom="1.5pt solid #000000" '
+            f'fo:padding="{pad}"/></style:style>'
+            f'<style:style style:name="CMB_BLR" style:family="table-cell">'
+            f'<style:table-cell-properties '
+            f'fo:border-left="2.5pt solid #1A6AAF" fo:border-right="2.5pt solid #1A6AAF" '
+            f'fo:border-top="1.5pt solid #000000" fo:border-bottom="1.5pt solid #000000" '
+            f'fo:padding="{pad}"/></style:style>'
+            f'<style:style style:name="PLRR" style:family="paragraph">'
+            f'<style:paragraph-properties fo:margin-top="0cm" fo:margin-bottom="0cm">'
+            f'<style:tab-stops>'
+            f'<style:tab-stop style:position="4.5cm" style:type="center"/>'
+            f'<style:tab-stop style:position="12.3cm" style:type="right"/>'
+            f'</style:tab-stops>'
+            f'</style:paragraph-properties>'
+            f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
             f'{ops_col_styles}'
             f'</office:automatic-styles>'
         )
@@ -704,60 +617,78 @@ class DocumentUtils:
                     giri=1; lunghezza=1000; sviluppo=100; nome=f'Materiale {i+1}'
                     is_conica=False; con_lato='sinistra'; con_alt=0.0; con_lung=0.0; posa='=='
 
-                # Calcola taglio_info (misure conica) da mostrare PRIMA della lunghezza
-                taglio_info = ''
                 if is_conica and con_lung > 0:
-                    taglio_info = f'L:{con_lung:.0f}'
-                    if con_alt > 0:
-                        taglio_info += f' / h:{con_alt:.0f}'
-                    taglio_info += ' mm'
-
-                if is_conica and con_lung > 0:
-                    # Linea diagonale ODF nativa con y1/y2 corretti per toccare i bordi del rettangolo
-                    d_cm = 1.5   # larghezza orizzontale della diagonale
-                    cw_cm = 11.7  # larghezza contenuto cella (12cm - padding)
-                    h_i = rect_h_cm
-                    # y1 negativo per toccare il bordo superiore, y2 per toccare il bordo inferiore
-                    diag_y1 = f'-{pad_cm_val:.2f}cm'
-                    diag_y2 = f'{h_i - pad_cm_val:.2f}cm'
+                    # Diagonale rossa — bordi y1/y2 toccano i bordi della cella
+                    d_cm  = 1.5
+                    cw_cm = 11.7
+                    h_i   = rect_h_cm
+                    dy1   = f'-{pad_cm_val:.2f}cm'
+                    dy2   = f'{h_i - pad_cm_val:.2f}cm'
                     lines_xml = ''
                     if con_lato in ('sinistra', 'entrambi'):
                         lines_xml += (
-                            f'<draw:line draw:style-name="DiagLine" text:anchor-type="paragraph"'
-                            f' svg:x1="0cm" svg:y1="{diag_y1}" svg:x2="{d_cm}cm" svg:y2="{diag_y2}"'
+                            f'<draw:line draw:style-name="DiagRed" text:anchor-type="paragraph"'
+                            f' svg:x1="0cm" svg:y1="{dy1}" svg:x2="{d_cm}cm" svg:y2="{dy2}"'
                             f' draw:z-index="{i * 2}"><text:p/></draw:line>'
                         )
                     if con_lato in ('destra', 'entrambi'):
                         lines_xml += (
-                            f'<draw:line draw:style-name="DiagLine" text:anchor-type="paragraph"'
-                            f' svg:x1="{cw_cm - d_cm:.1f}cm" svg:y1="{diag_y2}"'
-                            f' svg:x2="{cw_cm}cm" svg:y2="{diag_y1}"'
+                            f'<draw:line draw:style-name="DiagRed" text:anchor-type="paragraph"'
+                            f' svg:x1="{cw_cm - d_cm:.1f}cm" svg:y1="{dy2}"'
+                            f' svg:x2="{cw_cm}cm" svg:y2="{dy1}"'
                             f' draw:z-index="{i * 2 + 1}"><text:p/></draw:line>'
                         )
+
+                    # Bordo blu sul lato della conicità
+                    cell_style = {'sinistra': 'CMB_BL', 'destra': 'CMB_BR',
+                                  'entrambi': 'CMB_BLR'}.get(con_lato, 'CMB')
                     center_cell = (
-                        f'<table:table-cell table:style-name="CMB">'
+                        f'<table:table-cell table:style-name="{cell_style}">'
                         f'<text:p text:style-name="PCL">'
                         + lines_xml +
                         f'<text:tab/>{posa} {nome}'
                         f'</text:p>'
                         f'</table:table-cell>'
                     )
+
+                    # Etichette hc (blu) e lc (rosso) nell'header
+                    hc_sp = (f'<text:span text:style-name="TBLUE">hc: {int(con_alt)} mm</text:span>'
+                             if con_alt > 0 else '')
+                    lc_sp = f'<text:span text:style-name="TRED">lc: {int(con_lung)} mm</text:span>'
+                    sep   = '  ' if hc_sp else ''
+                    left_tag  = f'{hc_sp}{sep}{lc_sp}'
+                    right_tag = f'{lc_sp}{sep}{hc_sp}'
+
+                    if con_lato == 'sinistra':
+                        # hc/lc a sinistra (sopra il bordo blu sinistro), lunghezza centrata
+                        lun_cell_xml = (
+                            f'<text:p text:style-name="PLR">'
+                            f'{left_tag}<text:tab/>{int(lunghezza)} mm'
+                            f'</text:p>'
+                        )
+                    elif con_lato == 'destra':
+                        # lunghezza centrata, hc/lc a destra (sopra il bordo blu destro)
+                        lun_cell_xml = (
+                            f'<text:p text:style-name="PLRR">'
+                            f'<text:tab/>{int(lunghezza)} mm<text:tab/>{right_tag}'
+                            f'</text:p>'
+                        )
+                    else:  # entrambi
+                        # hc/lc su entrambi i lati, lunghezza al centro
+                        lun_cell_xml = (
+                            f'<text:p text:style-name="PLRR">'
+                            f'{left_tag}<text:tab/>{int(lunghezza)} mm<text:tab/>{right_tag}'
+                            f'</text:p>'
+                        )
                 else:
                     center_cell = (
                         f'<table:table-cell table:style-name="CMB">'
                         f'<text:p text:style-name="PCL"><text:tab/>{posa} {nome}</text:p>'
                         f'</table:table-cell>'
                     )
-
-                # header_line: TCFI vuota (campo editabile), TCHL_L = misure taglio (sx) + lunghezza (dx)
-                if taglio_info:
                     lun_cell_xml = (
-                        f'<text:p text:style-name="PLR">'
-                        f'{taglio_info}<text:tab/>{int(lunghezza)} mm'
-                        f'</text:p>'
+                        f'<text:p text:style-name="PLR"><text:tab/>{int(lunghezza)} mm</text:p>'
                     )
-                else:
-                    lun_cell_xml = f'<text:p text:style-name="PLR"><text:tab/>{int(lunghezza)} mm</text:p>'
                 header_line = (
                     f'<table:table table:name="HL{i}" table:style-name="THL">'
                     f'<table:table-column table:style-name="TCFI"/>'
