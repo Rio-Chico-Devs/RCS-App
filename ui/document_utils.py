@@ -30,7 +30,10 @@ v1.3.0 (03/10/2025):
 
 import os
 from datetime import datetime
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QPushButton, QMessageBox, QFileDialog
+from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
+                             QMessageBox, QFileDialog, QLabel, QFrame)
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QFont
 
 class DocumentUtils:
     """Utilità per generazione documenti di produzione"""
@@ -40,20 +43,71 @@ class DocumentUtils:
         """Mostra dialog per selezione formato documento"""
         dialog = QDialog(parent)
         dialog.setWindowTitle("Genera Documento")
-        dialog.setFixedSize(350, 120)
+        dialog.setFixedSize(420, 220)
+        dialog.setStyleSheet("background-color: #f5f5f5;")
 
         layout = QVBoxLayout(dialog)
-        layout.addWidget(QPushButton("Seleziona formato per il documento:"))
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(14)
 
-        buttons_layout = QHBoxLayout()
-        btn_html = QPushButton("HTML")
-        btn_odt = QPushButton("ODT (OpenOffice)")
+        # Titolo
+        title = QLabel("Seleziona il formato del documento")
+        title_font = QFont()
+        title_font.setPointSize(11)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
+        # Separatore
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setStyleSheet("color: #cccccc;")
+        layout.addWidget(line)
+
+        # Sottotitolo
+        sub = QLabel("Scegli il formato in cui esportare la scheda di taglio:")
+        sub.setAlignment(Qt.AlignCenter)
+        sub.setStyleSheet("color: #555555; font-size: 10px;")
+        sub.setWordWrap(True)
+        layout.addWidget(sub)
+
+        # Bottoni formato
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(12)
+
+        btn_style = (
+            "QPushButton {"
+            "  background-color: #2c3e50; color: white;"
+            "  border-radius: 6px; padding: 10px 18px;"
+            "  font-size: 11px; font-weight: bold;"
+            "}"
+            "QPushButton:hover { background-color: #3d5166; }"
+            "QPushButton:pressed { background-color: #1a252f; }"
+        )
+
+        btn_html = QPushButton("HTML\n(Anteprima web)")
+        btn_odt  = QPushButton("ODT\n(OpenOffice / LibreOffice)")
+        btn_html.setStyleSheet(btn_style)
+        btn_odt.setStyleSheet(btn_style)
+        btn_html.setMinimumHeight(52)
+        btn_odt.setMinimumHeight(52)
+        btn_layout.addWidget(btn_html)
+        btn_layout.addWidget(btn_odt)
+        layout.addLayout(btn_layout)
+
+        # Annulla
         btn_cancel = QPushButton("Annulla")
-
-        buttons_layout.addWidget(btn_html)
-        buttons_layout.addWidget(btn_odt)
-        buttons_layout.addWidget(btn_cancel)
-        layout.addLayout(buttons_layout)
+        btn_cancel.setStyleSheet(
+            "QPushButton { background-color: transparent; color: #888888;"
+            " border: 1px solid #cccccc; border-radius: 4px; padding: 5px 14px; font-size: 10px; }"
+            "QPushButton:hover { background-color: #e8e8e8; }"
+        )
+        btn_cancel.setFixedHeight(28)
+        cancel_layout = QHBoxLayout()
+        cancel_layout.addStretch()
+        cancel_layout.addWidget(btn_cancel)
+        layout.addLayout(cancel_layout)
 
         formato_scelto = None
 
@@ -67,13 +121,10 @@ class DocumentUtils:
             formato_scelto = 'odt'
             dialog.accept()
 
-        def on_cancel():
-            dialog.reject()
-
         btn_html.clicked.connect(on_html)
         btn_odt.clicked.connect(on_odt)
-        btn_cancel.clicked.connect(on_cancel)
-        
+        btn_cancel.clicked.connect(dialog.reject)
+
         if dialog.exec_() == QDialog.Accepted:
             return formato_scelto
         return None
@@ -408,9 +459,7 @@ class DocumentUtils:
 
     @staticmethod
     def _odt_content(preventivo, dati_cliente, sc, svg_files=None):
-        """Costruisce content.xml ODT senza dipendenze esterne.
-        svg_files: lista opzionale a cui vengono aggiunti (path, svg_content) per le coniche.
-        """
+        """Costruisce content.xml ODT senza dipendenze esterne."""
         def x(v):
             if v is None:
                 return ''
@@ -430,7 +479,14 @@ class DocumentUtils:
         cpad = '0.2cm'  if num_mat <= 10 else ('0.12cm' if num_mat <= 17 else '0.08cm')
         npad = '0.1cm'  if num_mat <= 10 else ('0.05cm' if num_mat <= 17 else '0.02cm')
 
-        pad_cm_val = float(pad.replace('cm', ''))
+        pad_cm_val  = float(pad.replace('cm', ''))
+        npad_cm_val = float(npad.replace('cm', ''))
+        # Altezza riga header adattiva: con pochi materiali il font è più grande
+        header_row_h = '0.5cm' if num_mat <= 10 else ('0.45cm' if num_mat <= 17 else ('0.4cm' if num_mat <= 25 else '0.35cm'))
+        # Tab destro per hc: allineato al bordo destro della cella trave
+        # TM: TCN(2cm)+TCW(12cm)+TCN(2cm)=16cm; THL: TCFI(3.5cm)+TCHL_L(12.5cm)=16cm
+        # bordo destro trave in coord. cella header = (2+12) - 3.5 - npad = 10.5 - npad
+        plrr_right_tab = 10.5 - npad_cm_val
 
         NS = (
             'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
@@ -479,6 +535,14 @@ class DocumentUtils:
             f'<style:tab-stops><style:tab-stop style:position="{0.43 * 12.0 - pad_cm_val:.3f}cm" style:type="left"/></style:tab-stops>'
             f'</style:paragraph-properties>'
             f'<style:text-properties fo:font-size="{ft_nome}" fo:font-weight="bold"/></style:style>'
+            f'<style:style style:name="PCL_R" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="start" fo:margin-top="0cm" fo:margin-bottom="0cm">'
+            f'<style:tab-stops>'
+            f'<style:tab-stop style:position="{0.43 * 12.0 - pad_cm_val:.3f}cm" style:type="left"/>'
+            f'<style:tab-stop style:position="11.5cm" style:type="right"/>'
+            f'</style:tab-stops>'
+            f'</style:paragraph-properties>'
+            f'<style:text-properties fo:font-size="{ft_nome}" fo:font-weight="bold"/></style:style>'
             f'<style:style style:name="TI" style:family="table">'
             f'<style:table-properties style:width="17.7cm" table:align="margins"/></style:style>'
             f'<style:style style:name="TCI" style:family="table-column">'
@@ -516,7 +580,7 @@ class DocumentUtils:
             f'<style:style style:name="TCHL_L" style:family="table-column">'
             f'<style:table-column-properties style:column-width="12.5cm"/></style:style>'
             f'<style:style style:name="RFI" style:family="table-row">'
-            f'<style:table-row-properties style:row-height="0.35cm" style:use-optimal-row-height="false"/></style:style>'
+            f'<style:table-row-properties style:row-height="{header_row_h}" style:use-optimal-row-height="false"/></style:style>'
             f'<style:style style:name="CFI" style:family="table-cell">'
             f'<style:table-cell-properties fo:border="none" fo:padding="0.05cm"/></style:style>'
             f'<style:style style:name="THL" style:family="table">'
@@ -527,6 +591,37 @@ class DocumentUtils:
             f'<style:graphic-properties draw:stroke="solid" svg:stroke-color="#000000" svg:stroke-width="0.04cm"'
             f' draw:fill="none" fo:wrap="run-through" style:run-through="foreground"'
             f' draw:wrap-influence-on-position="once-concurrent"/></style:style>'
+            f'<style:style style:name="DiagRed" style:family="graphic">'
+            f'<style:graphic-properties draw:stroke="solid" svg:stroke-color="#C41230" svg:stroke-width="0.05cm"'
+            f' draw:fill="none" fo:wrap="run-through" style:run-through="foreground"'
+            f' draw:wrap-influence-on-position="once-concurrent"/></style:style>'
+            f'<style:style style:name="TBLUE" style:family="text">'
+            f'<style:text-properties fo:color="#1A6AAF" fo:font-weight="bold"/></style:style>'
+            f'<style:style style:name="TRED" style:family="text">'
+            f'<style:text-properties fo:color="#C41230" fo:font-weight="bold"/></style:style>'
+            f'<style:style style:name="CMB_BL" style:family="table-cell">'
+            f'<style:table-cell-properties '
+            f'fo:border-left="2.5pt solid #1A6AAF" fo:border-right="1.5pt solid #000000" '
+            f'fo:border-top="1.5pt solid #000000" fo:border-bottom="1.5pt solid #000000" '
+            f'fo:padding="{pad}"/></style:style>'
+            f'<style:style style:name="CMB_BR" style:family="table-cell">'
+            f'<style:table-cell-properties '
+            f'fo:border-left="1.5pt solid #000000" fo:border-right="2.5pt solid #1A6AAF" '
+            f'fo:border-top="1.5pt solid #000000" fo:border-bottom="1.5pt solid #000000" '
+            f'fo:padding="{pad}"/></style:style>'
+            f'<style:style style:name="CMB_BLR" style:family="table-cell">'
+            f'<style:table-cell-properties '
+            f'fo:border-left="2.5pt solid #1A6AAF" fo:border-right="2.5pt solid #1A6AAF" '
+            f'fo:border-top="1.5pt solid #000000" fo:border-bottom="1.5pt solid #000000" '
+            f'fo:padding="{pad}"/></style:style>'
+            f'<style:style style:name="PLRR" style:family="paragraph">'
+            f'<style:paragraph-properties fo:margin-top="0cm" fo:margin-bottom="0cm">'
+            f'<style:tab-stops>'
+            f'<style:tab-stop style:position="4.5cm" style:type="center"/>'
+            f'<style:tab-stop style:position="{plrr_right_tab:.2f}cm" style:type="right"/>'
+            f'</style:tab-stops>'
+            f'</style:paragraph-properties>'
+            f'<style:text-properties fo:font-size="{ft_info}" fo:font-weight="bold"/></style:style>'
             f'{ops_col_styles}'
             f'</office:automatic-styles>'
         )
@@ -588,41 +683,72 @@ class DocumentUtils:
                     giri=1; lunghezza=1000; sviluppo=100; nome=f'Materiale {i+1}'
                     is_conica=False; con_lato='sinistra'; con_alt=0.0; con_lung=0.0; posa='=='
 
-                # Calcola taglio_info (misure conica) da mostrare PRIMA della lunghezza
-                taglio_info = ''
                 if is_conica and con_lung > 0:
-                    taglio_info = f'L:{con_lung:.0f}'
-                    if con_alt > 0:
-                        taglio_info += f' / h:{con_alt:.0f}'
-                    taglio_info += ' mm'
-
-                if is_conica and con_lung > 0:
-                    # Linea diagonale ODF nativa con y1/y2 corretti per toccare i bordi del rettangolo
-                    d_cm = 1.5   # larghezza orizzontale della diagonale
-                    cw_cm = 11.7  # larghezza contenuto cella (12cm - padding)
-                    h_i = rect_h_cm
-                    # y1 negativo per toccare il bordo superiore, y2 per toccare il bordo inferiore
-                    diag_y1 = f'-{pad_cm_val:.2f}cm'
-                    diag_y2 = f'{h_i - pad_cm_val:.2f}cm'
+                    # Diagonale rossa — bordi y1/y2 toccano i bordi della cella
+                    d_cm  = 1.5
+                    cw_cm = 11.7
+                    h_i   = rect_h_cm
+                    dy1   = f'-{pad_cm_val:.2f}cm'
+                    dy2   = f'{h_i - pad_cm_val:.2f}cm'
                     lines_xml = ''
                     if con_lato in ('sinistra', 'entrambi'):
                         lines_xml += (
-                            f'<draw:line draw:style-name="DiagLine" text:anchor-type="paragraph"'
-                            f' svg:x1="0cm" svg:y1="{diag_y1}" svg:x2="{d_cm}cm" svg:y2="{diag_y2}"'
+                            f'<draw:line draw:style-name="DiagRed" text:anchor-type="paragraph"'
+                            f' svg:x1="0cm" svg:y1="{dy1}" svg:x2="{d_cm}cm" svg:y2="{dy2}"'
                             f' draw:z-index="{i * 2}"><text:p/></draw:line>'
                         )
                     if con_lato in ('destra', 'entrambi'):
                         lines_xml += (
-                            f'<draw:line draw:style-name="DiagLine" text:anchor-type="paragraph"'
-                            f' svg:x1="{cw_cm - d_cm:.1f}cm" svg:y1="{diag_y2}"'
-                            f' svg:x2="{cw_cm}cm" svg:y2="{diag_y1}"'
+                            f'<draw:line draw:style-name="DiagRed" text:anchor-type="paragraph"'
+                            f' svg:x1="{cw_cm - d_cm:.1f}cm" svg:y1="{dy2}"'
+                            f' svg:x2="{cw_cm}cm" svg:y2="{dy1}"'
                             f' draw:z-index="{i * 2 + 1}"><text:p/></draw:line>'
                         )
+
+                    # Bordo blu sul lato della conicità
+                    cell_style = {'sinistra': 'CMB_BL', 'destra': 'CMB_BR',
+                                  'entrambi': 'CMB_BLR'}.get(con_lato, 'CMB')
+
+                    # hc (blu) nell'header sopra l'angolo, lc (rosso) dentro la cella della trave
+                    hc_sp = (f'<text:span text:style-name="TBLUE">hc: {int(con_alt)} mm</text:span>'
+                             if con_alt > 0 else '')
+                    lc_sp = f'<text:span text:style-name="TRED">lc: {int(con_lung)} mm</text:span>'
+
+                    # Header: solo hc all'angolo corretto, lunghezza centrata
+                    if con_lato == 'sinistra':
+                        lun_cell_xml = (
+                            f'<text:p text:style-name="PLR">'
+                            f'{hc_sp}<text:tab/>{int(lunghezza)} mm'
+                            f'</text:p>'
+                        )
+                    elif con_lato == 'destra':
+                        lun_cell_xml = (
+                            f'<text:p text:style-name="PLRR">'
+                            f'<text:tab/>{int(lunghezza)} mm<text:tab/>{hc_sp}'
+                            f'</text:p>'
+                        )
+                    else:  # entrambi
+                        lun_cell_xml = (
+                            f'<text:p text:style-name="PLRR">'
+                            f'{hc_sp}<text:tab/>{int(lunghezza)} mm<text:tab/>{hc_sp}'
+                            f'</text:p>'
+                        )
+
+                    # Cella trave: lc vicino al triangolo (sinistra, destra o entrambi)
+                    if con_lato == 'sinistra':
+                        cell_content = f'{lines_xml}{lc_sp}<text:tab/>{posa} {nome}'
+                        cell_para_style = 'PCL'
+                    elif con_lato == 'destra':
+                        cell_content = f'{lines_xml}<text:tab/>{posa} {nome}<text:tab/>{lc_sp}'
+                        cell_para_style = 'PCL_R'
+                    else:  # entrambi
+                        cell_content = f'{lines_xml}{lc_sp}<text:tab/>{posa} {nome}<text:tab/>{lc_sp}'
+                        cell_para_style = 'PCL_R'
+
                     center_cell = (
-                        f'<table:table-cell table:style-name="CMB">'
-                        f'<text:p text:style-name="PCL">'
-                        + lines_xml +
-                        f'<text:tab/>{posa} {nome}'
+                        f'<table:table-cell table:style-name="{cell_style}">'
+                        f'<text:p text:style-name="{cell_para_style}">'
+                        + cell_content +
                         f'</text:p>'
                         f'</table:table-cell>'
                     )
@@ -632,16 +758,9 @@ class DocumentUtils:
                         f'<text:p text:style-name="PCL"><text:tab/>{posa} {nome}</text:p>'
                         f'</table:table-cell>'
                     )
-
-                # header_line: TCFI vuota (campo editabile), TCHL_L = misure taglio (sx) + lunghezza (dx)
-                if taglio_info:
                     lun_cell_xml = (
-                        f'<text:p text:style-name="PLR">'
-                        f'{taglio_info}<text:tab/>{int(lunghezza)} mm'
-                        f'</text:p>'
+                        f'<text:p text:style-name="PLR"><text:tab/>{int(lunghezza)} mm</text:p>'
                     )
-                else:
-                    lun_cell_xml = f'<text:p text:style-name="PLR"><text:tab/>{int(lunghezza)} mm</text:p>'
                 header_line = (
                     f'<table:table table:name="HL{i}" table:style-name="THL">'
                     f'<table:table-column table:style-name="TCFI"/>'
@@ -845,34 +964,55 @@ class DocumentUtils:
                         + ''.join(lines) + '</svg>'
                     )
 
-                # Calcola taglio_info (misure conica) da mostrare PRIMA della lunghezza
-                taglio_info_html = ''
+                # Etichette hc (sopra il rettangolo, all'angolo) e lc (dentro il rettangolo, vicino al triangolo)
+                hc_sopra_html = ''
+                lc_dentro_html = ''
                 if is_conica and con_lung > 0:
-                    taglio_info_html = f'L:{con_lung:.0f}'
-                    if con_alt > 0:
-                        taglio_info_html += f' / h:{con_alt:.0f}'
-                    taglio_info_html += ' mm'
+                    lc_text = f'lc: {con_lung:.0f}mm'
+                    hc_text = f'hc: {con_alt:.0f}mm' if con_alt > 0 else ''
+                    hc_parts = []
+                    lc_parts = []
+                    if con_lato in ('sinistra', 'entrambi'):
+                        if hc_text:
+                            hc_parts.append(
+                                f'<div style="position:absolute;left:0;top:0;font-size:{s["font_info"]};line-height:1;">'
+                                f'<strong>{hc_text}</strong></div>'
+                            )
+                        lc_parts.append(
+                            f'<span style="position:absolute;left:3mm;top:50%;transform:translateY(-50%);'
+                            f'font-size:{s["font_info"]};z-index:2;">{lc_text}</span>'
+                        )
+                    if con_lato in ('destra', 'entrambi'):
+                        if hc_text:
+                            hc_parts.append(
+                                f'<div style="position:absolute;right:0;top:0;font-size:{s["font_info"]};line-height:1;">'
+                                f'<strong>{hc_text}</strong></div>'
+                            )
+                        lc_parts.append(
+                            f'<span style="position:absolute;right:3mm;top:50%;transform:translateY(-50%);'
+                            f'font-size:{s["font_info"]};z-index:2;">{lc_text}</span>'
+                        )
+                    hc_sopra_html = ''.join(hc_parts)
+                    lc_dentro_html = ''.join(lc_parts)
 
                 figura_html = (
                     f'<div style="width: 80mm; height: {s["rect_height"]}; border: 2px solid #000; display: flex; '
                     f'align-items: center; justify-content: space-between; background: #fff; padding: 0 3mm; '
                     f'position: relative; flex-shrink: 0; overflow: hidden;">'
-                    + diag_svg +
+                    + diag_svg
+                    + lc_dentro_html +
                     f'<input type="text" placeholder="Orient." style="width: {s["orient_width"]}; border: none; '
                     f'font-size: {s["orient_font"]}; background: transparent; position: relative; z-index: 1;">'
                     f'<strong style="font-size: {s["font_nome"]}; position: absolute; left: 43%; z-index: 1;">{posa} {nome}</strong>'
                     f'</div>'
                 )
 
-                # Riga 1 sopra rettangolo: per conica taglio_info a sinistra e lunghezza centrata (abs);
-                # per normale solo lunghezza centrata. Entrambe testo libero fuori da qualsiasi casella.
-                # Stesse proprietà box del rettangolo (border 2px + padding 0 3mm)
-                # così text-align:center produce lo stesso centro di left:50% nel rettangolo
+                # Riga sopra rettangolo: hc agli angoli + lunghezza centrata
                 _box = 'width: 80mm; border: 2px solid transparent; padding: 0 3mm; flex-shrink: 0; font-size: {fi}; box-sizing: content-box;'.format(fi=s['font_info'])
-                if taglio_info_html:
+                if hc_sopra_html:
                     sopra_rettangolo_html = (
                         f'<div style="{_box} position: relative;">'
-                        f'<div style="position: absolute; left: 0; top: 0;"><strong>{taglio_info_html}</strong></div>'
+                        + hc_sopra_html +
                         f'<div style="text-align: center;"><strong>{lunghezza}mm</strong></div>'
                         f'</div>'
                     )
