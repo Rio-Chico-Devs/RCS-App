@@ -578,19 +578,27 @@ class MagazzinoWindow(QMainWindow):
         self.scorte_layout.addStretch()
 
     def stampa_inventario(self):
-        """Stampa inventario con QPainter direttamente su QPrintPreviewDialog (A4 landscape)"""
+        """Genera PDF inventario, lo salva su disco e lo apre con il viewer di sistema"""
+        import os, sys
         from datetime import datetime as _dt
-        from PyQt5.QtPrintSupport import QPrinter, QPrintPreviewDialog
+        from PyQt5.QtWidgets import QFileDialog
+        from PyQt5.QtPrintSupport import QPrinter
         from PyQt5.QtGui import QPainter, QFont, QColor, QPen, QBrush
         from PyQt5.QtCore import Qt, QRectF
 
         now = _dt.now().strftime("%d/%m/%Y %H:%M")
+        nome_default = f"Inventario_Magazzino_{_dt.now().strftime('%Y%m%d_%H%M')}"
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Salva Inventario PDF", nome_default, "PDF (*.pdf)"
+        )
+        if not file_path:
+            return
+
         scorte = self.db_manager.get_scorte('nome')
 
-        # Prepara i dati: lista di (is_sub, [colonne])
         headers = ["Materiale", "Giac. Tot (m²)", "Sc. Min", "Sc. Max",
                    "% Agg.", "Fornitore", "Giac. Forn (m²)", "Min Forn", "% Forn"]
-        # Proporzioni colonne (somma = 1.0)
         col_ratios = [0.19, 0.10, 0.09, 0.09, 0.07, 0.18, 0.12, 0.09, 0.07]
 
         data_rows = []
@@ -607,16 +615,21 @@ class MagazzinoWindow(QMainWindow):
                     data_rows.append((True, ["", "", "", "", "",
                                              forn_nome, f"{giacenza:.2f}", f"{s_min:.2f}", pct_f]))
 
-        def render(printer):
+        try:
+            printer = QPrinter(QPrinter.HighResolution)
+            printer.setOutputFormat(QPrinter.PdfFormat)
+            printer.setOutputFileName(file_path)
+            printer.setOrientation(QPrinter.Landscape)
+            printer.setPageSize(QPrinter.A4)
+
             painter = QPainter(printer)
             pr = printer.pageRect()
             pw, ph = pr.width(), pr.height()
 
-            mx, my = pw * 0.03, ph * 0.04       # margini
-            uw = pw - 2 * mx                     # larghezza utile
-            uh = ph - 2 * my                     # altezza utile
+            mx, my = pw * 0.03, ph * 0.04
+            uw = pw - 2 * mx
 
-            # ── Titolo ───────────────────────────────────────────────
+            # ── Titolo ────────────────────────────────────────────────
             title_h = ph * 0.07
             font_t = QFont("Arial", 1)
             font_t.setPointSizeF(title_h * 0.42)
@@ -625,23 +638,21 @@ class MagazzinoWindow(QMainWindow):
             painter.setPen(QColor("#2d3748"))
             painter.drawText(QRectF(mx, my, uw * 0.65, title_h),
                              Qt.AlignLeft | Qt.AlignVCenter,
-                             "Inventario Magazzino — RCS")
+                             "Inventario Magazzino — Software Aziendale RCS")
 
             font_d = QFont("Arial", 1)
             font_d.setPointSizeF(title_h * 0.28)
             painter.setFont(font_d)
             painter.setPen(QColor("#718096"))
             painter.drawText(QRectF(mx + uw * 0.65, my, uw * 0.35, title_h),
-                             Qt.AlignRight | Qt.AlignVCenter,
-                             f"Generato il {now}")
+                             Qt.AlignRight | Qt.AlignVCenter, f"Generato il {now}")
 
-            # ── Calcola altezza righe per riempire il foglio ─────────
+            # ── Calcola altezze righe per riempire il foglio ──────────
             table_top = my + title_h + ph * 0.01
             table_h = ph - table_top - my
-            total_rows = 1 + len(data_rows)       # header + dati
+            total_rows = 1 + len(data_rows)
             row_h = table_h / total_rows
 
-            # Font proporzionale all'altezza riga
             fs = max(row_h * 0.38, 1.0)
             font_hdr = QFont("Arial", 1)
             font_hdr.setPointSizeF(fs)
@@ -652,32 +663,31 @@ class MagazzinoWindow(QMainWindow):
             font_sub.setPointSizeF(max(fs * 0.88, 1.0))
 
             col_ws = [uw * r for r in col_ratios]
-            right_cols = {1, 2, 3, 4, 6, 7, 8}   # colonne allineate a destra
+            right_cols = {1, 2, 3, 4, 6, 7, 8}
 
             def draw_row(y, cols, is_header=False, is_sub=False):
                 x = mx
                 bg = QColor("#edf2f7") if is_header else (QColor("#f7fafc") if is_sub else QColor("#ffffff"))
                 painter.fillRect(QRectF(x, y, uw, row_h), QBrush(bg))
-
-                pen_border = QPen(QColor("#cbd5e0"), 0.4)
-                painter.setPen(pen_border)
+                pen_b = QPen(QColor("#cbd5e0"), 0.4)
+                painter.setPen(pen_b)
                 painter.drawRect(QRectF(x, y, uw, row_h))
-
                 cx = x
                 for i, (val, cw) in enumerate(zip(cols, col_ws)):
-                    painter.setPen(pen_border)
-                    painter.drawLine(QRectF(cx, y, 0, row_h).toRect().topLeft(),
-                                     QRectF(cx, y, 0, row_h).toRect().bottomLeft())
-
-                    font = font_hdr if is_header else (font_sub if is_sub else font_body)
-                    if not is_header and not is_sub and i == 0:
-                        f2 = QFont(font_body)
-                        f2.setBold(True)
-                        painter.setFont(f2)
+                    painter.setPen(pen_b)
+                    painter.drawLine(int(cx), int(y), int(cx), int(y + row_h))
+                    if is_header:
+                        painter.setFont(font_hdr)
+                        painter.setPen(QColor("#2d3748"))
+                    elif is_sub:
+                        painter.setFont(font_sub)
+                        painter.setPen(QColor("#4a5568"))
                     else:
-                        painter.setFont(font)
-
-                    painter.setPen(QColor("#2d3748") if not is_sub else QColor("#4a5568"))
+                        f2 = QFont(font_body)
+                        if i == 0:
+                            f2.setBold(True)
+                        painter.setFont(f2)
+                        painter.setPen(QColor("#2d3748"))
                     pad = 3
                     indent = 10 if (is_sub and i == 5) else 0
                     text = ("  ↳ " + val) if (is_sub and i == 5 and val) else val
@@ -685,28 +695,30 @@ class MagazzinoWindow(QMainWindow):
                     painter.drawText(QRectF(cx + pad + indent, y, cw - pad * 2 - indent, row_h), align, text)
                     cx += cw
 
-            # ── Disegna intestazione ──────────────────────────────────
             y = table_top
             draw_row(y, headers, is_header=True)
             y += row_h
-
-            # ── Disegna righe dati ────────────────────────────────────
             for is_sub, cols in data_rows:
                 draw_row(y, cols, is_sub=is_sub)
                 y += row_h
 
             painter.end()
 
-        try:
-            printer = QPrinter(QPrinter.HighResolution)
-            printer.setOrientation(QPrinter.Landscape)
-            printer.setPageSize(QPrinter.A4)
-            preview = QPrintPreviewDialog(printer, self)
-            preview.setWindowTitle("Anteprima Stampa Inventario")
-            preview.paintRequested.connect(render)
-            preview.exec_()
+            # ── Apri il PDF con il viewer di sistema ──────────────────
+            try:
+                if sys.platform == 'win32':
+                    os.startfile(file_path)
+                elif sys.platform == 'darwin':
+                    import subprocess
+                    subprocess.Popen(['open', file_path])
+                else:
+                    import subprocess
+                    subprocess.Popen(['xdg-open', file_path])
+            except Exception:
+                pass
+
         except Exception as e:
-            QMessageBox.warning(self, "Stampa", f"Impossibile stampare:\n{str(e)}")
+            QMessageBox.warning(self, "Errore", f"Impossibile generare il PDF:\n{str(e)}")
 
     def mostra_storico(self, materiale_id, nome_materiale):
         """Mostra lo storico movimenti di un materiale"""
