@@ -584,12 +584,12 @@ class MagazzinoWindow(QMainWindow):
         scorte = self.db_manager.get_scorte('nome')
 
         # Costruisci la tabella HTML
-        td = 'style="border:1px solid #cbd5e0; padding:5px 8px; font-size:10px;"'
-        td_num = 'style="border:1px solid #cbd5e0; padding:5px 8px; font-size:10px; text-align:right;"'
-        td_sub = 'style="border:1px solid #cbd5e0; padding:4px 8px 4px 22px; font-size:9px; color:#4a5568; background:#f7fafc;"'
-        td_sub_num = 'style="border:1px solid #cbd5e0; padding:4px 8px; font-size:9px; color:#4a5568; text-align:right; background:#f7fafc;"'
-        th = 'style="border:1px solid #a0aec0; padding:6px 8px; background:#edf2f7; font-size:10px; text-align:left;"'
-        th_num = 'style="border:1px solid #a0aec0; padding:6px 8px; background:#edf2f7; font-size:10px; text-align:right;"'
+        td = 'style="border:1px solid #cbd5e0; padding:8px 12px; font-size:14px;"'
+        td_num = 'style="border:1px solid #cbd5e0; padding:8px 12px; font-size:14px; text-align:right;"'
+        td_sub = 'style="border:1px solid #cbd5e0; padding:6px 12px 6px 28px; font-size:13px; color:#4a5568; background:#f7fafc;"'
+        td_sub_num = 'style="border:1px solid #cbd5e0; padding:6px 12px; font-size:13px; color:#4a5568; text-align:right; background:#f7fafc;"'
+        th = 'style="border:1px solid #a0aec0; padding:10px 12px; background:#edf2f7; font-size:14px; font-weight:bold; text-align:left;"'
+        th_num = 'style="border:1px solid #a0aec0; padding:10px 12px; background:#edf2f7; font-size:14px; font-weight:bold; text-align:right;"'
 
         rows_html = ""
         for row in scorte:
@@ -629,9 +629,9 @@ class MagazzinoWindow(QMainWindow):
             </tr>"""
 
         html = f"""
-        <html><body style="font-family: Arial, sans-serif; margin: 10px;">
-        <h2 style="font-size:13px; margin-bottom:2px;">Inventario Magazzino — Software Aziendale RCS</h2>
-        <p style="font-size:9px; color:#718096; margin-top:0;">Generato il {now}</p>
+        <html><body style="font-family: Arial, sans-serif; margin: 0; padding: 0;">
+        <h2 style="font-size:18px; margin-bottom:4px; margin-top:0;">Inventario Magazzino — Software Aziendale RCS</h2>
+        <p style="font-size:12px; color:#718096; margin-top:0; margin-bottom:8px;">Generato il {now}</p>
         <table style="border-collapse:collapse; width:100%;">
           <thead>
             <tr>
@@ -653,13 +653,17 @@ class MagazzinoWindow(QMainWindow):
         try:
             from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
             from PyQt5.QtGui import QTextDocument
+            from PyQt5.QtCore import QSizeF
             printer = QPrinter(QPrinter.HighResolution)
             printer.setOrientation(QPrinter.Landscape)
             printer.setPageSize(QPrinter.A4)
+            printer.setPageMargins(10, 10, 10, 10, QPrinter.Millimeter)
             pdlg = QPrintDialog(printer, self)
             if pdlg.exec_() == QPrintDialog.Accepted:
                 doc = QTextDocument()
                 doc.setHtml(html)
+                page_rect = printer.pageRect(QPrinter.Point)
+                doc.setPageSize(QSizeF(page_rect.width(), page_rect.height()))
                 doc.print_(printer)
         except Exception as e:
             QMessageBox.warning(self, "Stampa", f"Impossibile stampare:\n{str(e)}")
