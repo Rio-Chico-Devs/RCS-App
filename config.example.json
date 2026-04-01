@@ -1,0 +1,9 @@
+{
+  "_istruzioni": [
+    "Rinomina questo file in 'config.json' e mettilo nella stessa cartella dell'exe.",
+    "Cambia 'db_path' con il percorso di rete del database sul PC server.",
+    "Esempio percorso rete Windows: \\\\NOME-PC-SERVER\\RCS\\materiali.db",
+    "Se config.json non esiste, l'app usa il database locale nella cartella 'data'."
+  ],
+  "db_path": "\\\\NOME-PC-SERVER\\RCS\\materiali.db"
+}
