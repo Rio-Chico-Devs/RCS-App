@@ -578,12 +578,10 @@ class MagazzinoWindow(QMainWindow):
         self.scorte_layout.addStretch()
 
     def stampa_inventario(self):
-        """Genera ODT inventario su un singolo foglio A4 orizzontale.
+        """Genera ODT inventario in formato A4 orizzontale.
 
-        Fasi:
-        1. Raccolta dati (tutte le righe)
-        2. Calcolo adattivo di font e altezza righe per riempire esattamente il foglio
-        3. Generazione del file ODT con tabella unica
+        Font e righe a dimensione fissa leggibile; la tabella si estende
+        su quante pagine servono senza comprimere nulla.
         """
         import os, sys, zipfile
         from datetime import datetime as _dt
@@ -619,22 +617,12 @@ class MagazzinoWindow(QMainWindow):
                     data_rows.append((True, ["", "", "", "", "",
                                              forn_nome, f"{giacenza:.2f}", f"{s_min:.2f}", pct_f]))
 
-        # ── Fase 2: calcolo adattivo dimensioni ───────────────────────
-        # A4 landscape: 29.7 x 21 cm — margini 1cm top/bottom, 1.5cm left/right
-        usable_w_cm = 26.7   # 29.7 - 2*1.5
-        usable_h_cm = 19.0   # 21 - 2*1  (titolo ~1.5cm lascia ~17.5cm per tabella)
-        title_h_cm = 1.5
-        table_h_cm = usable_h_cm - title_h_cm
-
-        total_rows = 1 + len(data_rows)   # header + righe dati
-        row_h_cm = table_h_cm / total_rows
-        padding_cm = min(0.10, row_h_cm * 0.15)
-        text_h_cm = max(row_h_cm - 2 * padding_cm, 0.10)
-        # 1pt ≈ 0.0353 cm  →  font_pt = text_h_cm / 0.0353
-        font_pt = max(5.5, min(11.0, text_h_cm / 0.0353))
-        font_pt_sub = max(5.0, font_pt * 0.88)
-        row_h_str = f"{row_h_cm:.4f}cm"
-        pad_str = f"{padding_cm:.4f}cm"
+        # ── Dimensioni fisse leggibili (nessun limite di pagina) ─────
+        usable_w_cm = 26.7   # A4 landscape: 29.7 - 2*1.5 cm margini
+        font_pt     = 10.0
+        font_pt_sub = 9.0
+        pad_str     = "0.12cm"
+        row_h_str   = "0.65cm"   # altezza riga confortevole, si ripete su più pagine
 
         col_widths = [f"{r * usable_w_cm:.3f}cm" for r in col_ratios]
 
