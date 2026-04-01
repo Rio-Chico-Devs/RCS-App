@@ -397,116 +397,98 @@ class MagazzinoWindow(QMainWindow):
         self.scorte_layout.addStretch()
 
     def _crea_card_scorta(self, mat_id, nome, giacenza_totale, scorta_massima, scorta_minima, n_fornitori, prezzo_min):
-        """Card verticale: riga materiale aggregata + righe fornitori inline collassabili"""
+        """Crea una card per un materiale (giacenza aggregata su tutti i fornitori)"""
         card = QFrame()
         card.setStyleSheet("""
             QFrame {
                 background-color: #ffffff;
                 border: none;
-                border-bottom: 1px solid #e2e8f0;
+                border-bottom: 1px solid #f0f0f0;
             }
+            QFrame:hover { background-color: #fafbfc; }
         """)
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(16, 12, 16, 12)
-        card_layout.setSpacing(0)
 
-        # ── Riga principale (materiale aggregato) ─────────────────────
-        header = QHBoxLayout()
-        header.setSpacing(20)
+        card_layout = QHBoxLayout(card)
+        card_layout.setContentsMargins(16, 16, 16, 16)
+        card_layout.setSpacing(24)
 
+        # Nome materiale
         lbl_nome = QLabel(nome)
-        lbl_nome.setStyleSheet("font-size: 18px; font-weight: 700; color: #2d3748; min-width: 150px;")
-        header.addWidget(lbl_nome)
+        lbl_nome.setStyleSheet("font-size: 20px; font-weight: 700; color: #2d3748; min-width: 160px;")
+        card_layout.addWidget(lbl_nome)
 
-        giac_col = QVBoxLayout()
-        giac_col.setSpacing(1)
-        lbl_giac_lbl = QLabel("Giacenza")
-        lbl_giac_lbl.setStyleSheet("font-size: 11px; color: #a0aec0; font-weight: 500;")
-        lbl_giac_val = QLabel(f"{giacenza_totale:.2f} m²")
-        lbl_giac_val.setStyleSheet("font-size: 16px; font-weight: 600; color: #38a169; min-width: 90px;")
-        giac_col.addWidget(lbl_giac_lbl)
-        giac_col.addWidget(lbl_giac_val)
-        header.addLayout(giac_col)
+        # Giacenza totale
+        lbl_giacenza = QLabel(f"{giacenza_totale:.2f} m²")
+        lbl_giacenza.setStyleSheet("font-size: 18px; font-weight: 600; color: #38a169; min-width: 100px;")
+        lbl_giacenza_label = QLabel("Giacenza")
+        lbl_giacenza_label.setStyleSheet("font-size: 11px; color: #a0aec0; font-weight: 500;")
+        giacenza_col = QVBoxLayout()
+        giacenza_col.setSpacing(2)
+        giacenza_col.addWidget(lbl_giacenza_label)
+        giacenza_col.addWidget(lbl_giacenza)
+        card_layout.addLayout(giacenza_col)
 
+        # Numero fornitori
+        forn_text = f"{n_fornitori}" if n_fornitori > 0 else "—"
+        lbl_forn = QLabel(forn_text)
+        lbl_forn.setStyleSheet("font-size: 18px; font-weight: 600; color: #4a5568; min-width: 40px;")
+        lbl_forn_label = QLabel("Fornitori")
+        lbl_forn_label.setStyleSheet("font-size: 11px; color: #a0aec0; font-weight: 500;")
+        forn_col = QVBoxLayout()
+        forn_col.setSpacing(2)
+        forn_col.addWidget(lbl_forn_label)
+        forn_col.addWidget(lbl_forn)
+        card_layout.addLayout(forn_col)
+
+        # Scorta minima (se impostata)
         if scorta_minima > 0 or scorta_massima > 0:
-            lbl_soglie = QLabel(f"min {scorta_minima:.1f} / max {scorta_massima:.1f} m²")
-            lbl_soglie.setStyleSheet("font-size: 12px; color: #718096; min-width: 150px;")
-            header.addWidget(lbl_soglie)
+            lbl_min_val = QLabel(f"min {scorta_minima:.1f} / max {scorta_massima:.1f} m²")
+            lbl_min_val.setStyleSheet("font-size: 12px; color: #718096; min-width: 140px;")
+            card_layout.addWidget(lbl_min_val)
 
+        # Barra scorta
         percentuale = (giacenza_totale / scorta_massima * 100) if scorta_massima > 0 else 0
         barra = BarraScorta(percentuale)
-        barra.setMinimumWidth(200)
-        header.addWidget(barra, 1)
+        barra.setMinimumWidth(160)
+        card_layout.addWidget(barra, 1)
 
+        # Bottone fornitori (drill-down)
+        btn_forn = QPushButton("Fornitori")
+        if n_fornitori > 1:
+            btn_forn.setStyleSheet("""
+                QPushButton {
+                    background-color: #ebf8ff; color: #2b6cb0;
+                    border: none; border-radius: 6px;
+                    min-height: 34px; padding: 6px 18px;
+                    font-size: 13px; font-weight: 600;
+                }
+                QPushButton:hover { background-color: #bee3f8; }
+            """)
+            btn_forn.clicked.connect(lambda checked, mid=mat_id, mn=nome: self._mostra_fornitori_materiale(mid, mn))
+        else:
+            btn_forn.setStyleSheet("""
+                QPushButton {
+                    background-color: #f7fafc; color: #cbd5e0;
+                    border: none; border-radius: 6px;
+                    min-height: 34px; padding: 6px 18px;
+                    font-size: 13px; font-weight: 600;
+                }
+            """)
+            btn_forn.setEnabled(False)
+        card_layout.addWidget(btn_forn)
+
+        # Bottone storico
         btn_storico = QPushButton("Storico")
         btn_storico.setStyleSheet("""
-            QPushButton { background-color: #f7fafc; color: #4a5568; border: none;
-                          border-radius: 6px; min-height: 32px; padding: 4px 14px; font-size: 12px; }
+            QPushButton {
+                background-color: #f7fafc; color: #4a5568;
+                border: none; border-radius: 6px;
+                min-height: 34px; padding: 6px 18px; font-size: 13px;
+            }
             QPushButton:hover { background-color: #edf2f7; }
         """)
         btn_storico.clicked.connect(lambda checked, mid=mat_id, mn=nome: self.mostra_storico(mid, mn))
-        header.addWidget(btn_storico)
-
-        # Bottone toggle fornitori (solo se ci sono fornitori)
-        btn_toggle = None
-        if n_fornitori > 0:
-            fornitori = self.db_manager.get_fornitori_per_materiale(mat_id)
-            btn_toggle = QPushButton(f"▼  {n_fornitori} fornitore/i")
-            btn_toggle.setStyleSheet("""
-                QPushButton { background-color: #ebf8ff; color: #2b6cb0; border: none;
-                              border-radius: 6px; min-height: 32px; padding: 4px 14px;
-                              font-size: 12px; font-weight: 600; }
-                QPushButton:hover { background-color: #bee3f8; }
-            """)
-            header.addWidget(btn_toggle)
-
-        card_layout.addLayout(header)
-
-        # ── Sezione fornitori (collassabile) ──────────────────────────
-        if n_fornitori > 0 and btn_toggle is not None:
-            forn_section = QFrame()
-            forn_section.setStyleSheet("""
-                QFrame { background-color: #f7fbff; border-left: 3px solid #bee3f8;
-                         margin-left: 12px; margin-top: 6px; border-radius: 0px; }
-            """)
-            forn_layout = QVBoxLayout(forn_section)
-            forn_layout.setContentsMargins(12, 8, 12, 8)
-            forn_layout.setSpacing(6)
-
-            for mf in fornitori:
-                mf_id, forn_nome, prezzo_forn, s_min, s_max, giacenza = mf
-                row = QHBoxLayout()
-                row.setSpacing(16)
-
-                lbl_fn = QLabel(f"↳  {forn_nome}")
-                lbl_fn.setStyleSheet("font-size: 13px; font-weight: 600; color: #4a5568; min-width: 160px;")
-                row.addWidget(lbl_fn)
-
-                lbl_fg = QLabel(f"{giacenza:.2f} m²")
-                lbl_fg.setStyleSheet("font-size: 13px; color: #38a169; min-width: 80px;")
-                row.addWidget(lbl_fg)
-
-                if s_min > 0 or s_max > 0:
-                    lbl_fs = QLabel(f"min {s_min:.1f} / max {s_max:.1f}")
-                    lbl_fs.setStyleSheet("font-size: 11px; color: #a0aec0; min-width: 130px;")
-                    row.addWidget(lbl_fs)
-
-                pct_forn = (giacenza / s_max * 100) if s_max > 0 else 0
-                barra_f = BarraScorta(pct_forn)
-                barra_f.setMinimumWidth(160)
-                row.addWidget(barra_f, 1)
-
-                forn_layout.addLayout(row)
-
-            forn_section.setVisible(False)
-            card_layout.addWidget(forn_section)
-
-            def _toggle(checked, sec=forn_section, btn=btn_toggle, nf=n_fornitori):
-                visible = not sec.isVisible()
-                sec.setVisible(visible)
-                btn.setText(f"{'▲' if visible else '▼'}  {nf} fornitore/i")
-
-            btn_toggle.clicked.connect(_toggle)
+        card_layout.addWidget(btn_storico)
 
         return card
 
@@ -596,43 +578,82 @@ class MagazzinoWindow(QMainWindow):
         self.scorte_layout.addStretch()
 
     def stampa_inventario(self):
-        """Genera e mostra un report stampabile dell'inventario attuale"""
-        scorte = self.db_manager.get_scorte('nome')
+        """Genera report inventario come tabella HTML e lo mostra in anteprima stampabile"""
         from datetime import datetime as _dt
         now = _dt.now().strftime("%d/%m/%Y %H:%M")
+        scorte = self.db_manager.get_scorte('nome')
 
-        lines = []
-        lines.append("=" * 60)
-        lines.append("  INVENTARIO MAGAZZINO  –  Software Aziendale RCS")
-        lines.append(f"  Generato il: {now}")
-        lines.append("=" * 60)
-        lines.append("")
+        # Costruisci la tabella HTML
+        td = 'style="border:1px solid #cbd5e0; padding:5px 8px; font-size:10px;"'
+        td_num = 'style="border:1px solid #cbd5e0; padding:5px 8px; font-size:10px; text-align:right;"'
+        td_sub = 'style="border:1px solid #cbd5e0; padding:4px 8px 4px 22px; font-size:9px; color:#4a5568; background:#f7fafc;"'
+        td_sub_num = 'style="border:1px solid #cbd5e0; padding:4px 8px; font-size:9px; color:#4a5568; text-align:right; background:#f7fafc;"'
+        th = 'style="border:1px solid #a0aec0; padding:6px 8px; background:#edf2f7; font-size:10px; text-align:left;"'
+        th_num = 'style="border:1px solid #a0aec0; padding:6px 8px; background:#edf2f7; font-size:10px; text-align:right;"'
 
+        rows_html = ""
         for row in scorte:
             mat_id, nome, giacenza_totale, scorta_massima, n_fornitori, prezzo_min = row[:6]
             scorta_minima = row[6] if len(row) > 6 else 0.0
+            pct = f"{(giacenza_totale / scorta_massima * 100):.0f}%" if scorta_massima > 0 else "—"
 
-            lines.append(f"  {nome}")
-            lines.append(f"    Giacenza totale : {giacenza_totale:.2f} m²")
-            if scorta_minima > 0 or scorta_massima > 0:
-                lines.append(f"    Scorta min/max  : {scorta_minima:.2f} / {scorta_massima:.2f} m²")
-            lines.append(f"    Fornitori       : {n_fornitori}")
+            rows_html += f"""
+            <tr>
+              <td {td}><b>{nome}</b></td>
+              <td {td_num}><b>{giacenza_totale:.2f}</b></td>
+              <td {td_num}>{scorta_minima:.2f}</td>
+              <td {td_num}>{scorta_massima:.2f}</td>
+              <td {td_num}>{pct}</td>
+              <td {td}>—</td>
+              <td {td_num}>—</td>
+              <td {td_num}>—</td>
+              <td {td_num}>—</td>
+            </tr>"""
 
-            if n_fornitori > 1:
+            if n_fornitori > 0:
                 fornitori = self.db_manager.get_fornitori_per_materiale(mat_id)
                 for mf in fornitori:
                     _, forn_nome, _, s_min, s_max, giacenza = mf
-                    lines.append(f"      • {forn_nome}: {giacenza:.2f} m²  (min {s_min:.1f} / max {s_max:.1f})")
+                    pct_f = f"{(giacenza / s_max * 100):.0f}%" if s_max > 0 else "—"
+                    rows_html += f"""
+            <tr>
+              <td {td_sub}></td>
+              <td {td_sub_num}></td>
+              <td {td_sub_num}></td>
+              <td {td_sub_num}></td>
+              <td {td_sub_num}></td>
+              <td {td_sub}>↳ {forn_nome}</td>
+              <td {td_sub_num}>{giacenza:.2f}</td>
+              <td {td_sub_num}>{s_min:.2f}</td>
+              <td {td_sub_num}>{pct_f}</td>
+            </tr>"""
 
-            lines.append("")
+        html = f"""
+        <html><body style="font-family: Arial, sans-serif; margin: 10px;">
+        <h2 style="font-size:13px; margin-bottom:2px;">Inventario Magazzino — Software Aziendale RCS</h2>
+        <p style="font-size:9px; color:#718096; margin-top:0;">Generato il {now}</p>
+        <table style="border-collapse:collapse; width:100%;">
+          <thead>
+            <tr>
+              <th {th}>Materiale</th>
+              <th {th_num}>Giac. Tot (m²)</th>
+              <th {th_num}>Scorta Min</th>
+              <th {th_num}>Scorta Max</th>
+              <th {th_num}>% Agg.</th>
+              <th {th}>Fornitore</th>
+              <th {th_num}>Giac. Forn (m²)</th>
+              <th {th_num}>Min Forn</th>
+              <th {th_num}>% Forn</th>
+            </tr>
+          </thead>
+          <tbody>{rows_html}</tbody>
+        </table>
+        </body></html>"""
 
-        lines.append("=" * 60)
-        testo = "\n".join(lines)
-
-        # Dialog di anteprima con pulsante stampa
+        # Dialog anteprima
         dialog = QDialog(self)
-        dialog.setWindowTitle("Stampa Inventario")
-        dialog.setMinimumSize(620, 500)
+        dialog.setWindowTitle("Anteprima Stampa Inventario")
+        dialog.setMinimumSize(900, 600)
         dialog.setStyleSheet("QDialog { background-color: #fafbfc; }")
 
         dlg_layout = QVBoxLayout(dialog)
@@ -643,15 +664,13 @@ class MagazzinoWindow(QMainWindow):
         title_lbl.setStyleSheet("font-size: 16px; font-weight: 700; color: #2d3748;")
         dlg_layout.addWidget(title_lbl)
 
-        text_edit = QTextEdit()
-        text_edit.setReadOnly(True)
-        text_edit.setPlainText(testo)
-        text_edit.setStyleSheet("""
-            QTextEdit { font-family: monospace; font-size: 13px;
-                        border: 1px solid #e2e8f0; border-radius: 6px;
-                        background-color: #ffffff; color: #2d3748; }
+        preview = QTextEdit()
+        preview.setReadOnly(True)
+        preview.setHtml(html)
+        preview.setStyleSheet("""
+            QTextEdit { border: 1px solid #e2e8f0; border-radius: 6px; background-color: #ffffff; }
         """)
-        dlg_layout.addWidget(text_edit)
+        dlg_layout.addWidget(preview)
 
         btn_row = QHBoxLayout()
         btn_row.addStretch()
@@ -676,10 +695,12 @@ class MagazzinoWindow(QMainWindow):
                 from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
                 from PyQt5.QtGui import QTextDocument
                 printer = QPrinter(QPrinter.HighResolution)
+                printer.setOrientation(QPrinter.Landscape)
+                printer.setPageSize(QPrinter.A4)
                 pdlg = QPrintDialog(printer, dialog)
                 if pdlg.exec_() == QPrintDialog.Accepted:
                     doc = QTextDocument()
-                    doc.setPlainText(testo)
+                    doc.setHtml(html)
                     doc.print_(printer)
             except Exception as e:
                 QMessageBox.warning(dialog, "Stampa", f"Impossibile stampare:\n{str(e)}")
