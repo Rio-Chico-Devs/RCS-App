@@ -578,232 +578,141 @@ class MagazzinoWindow(QMainWindow):
         self.scorte_layout.addStretch()
 
     def stampa_inventario(self):
-        """Genera ODT inventario in formato A4 orizzontale.
-
-        Font e righe a dimensione fissa leggibile; la tabella si estende
-        su quante pagine servono senza comprimere nulla.
-        """
-        import os, sys, zipfile
+        """Genera report inventario come tabella HTML e lo mostra in anteprima stampabile"""
         from datetime import datetime as _dt
-        from PyQt5.QtWidgets import QFileDialog
-
         now = _dt.now().strftime("%d/%m/%Y %H:%M")
-        nome_default = f"Inventario_Magazzino_{_dt.now().strftime('%Y%m%d_%H%M')}"
-
-        file_path, _ = QFileDialog.getSaveFileName(
-            self, "Salva Inventario ODT", nome_default, "ODT (*.odt)"
-        )
-        if not file_path:
-            return
-
-        # ── Fase 1: raccolta dati ─────────────────────────────────────
         scorte = self.db_manager.get_scorte('nome')
-        headers = ["Materiale", "Giac. Tot (m²)", "Sc. Min", "Sc. Max",
-                   "% Agg.", "Fornitore", "Giac. Forn (m²)", "Min Forn", "% Forn"]
-        col_ratios = [0.19, 0.10, 0.09, 0.09, 0.07, 0.18, 0.12, 0.09, 0.07]
-        right_cols = {1, 2, 3, 4, 6, 7, 8}
 
-        data_rows = []
+        # Costruisci la tabella HTML
+        td = 'style="border:1px solid #cbd5e0; padding:5px 8px; font-size:10px;"'
+        td_num = 'style="border:1px solid #cbd5e0; padding:5px 8px; font-size:10px; text-align:right;"'
+        td_sub = 'style="border:1px solid #cbd5e0; padding:4px 8px 4px 22px; font-size:9px; color:#4a5568; background:#f7fafc;"'
+        td_sub_num = 'style="border:1px solid #cbd5e0; padding:4px 8px; font-size:9px; color:#4a5568; text-align:right; background:#f7fafc;"'
+        th = 'style="border:1px solid #a0aec0; padding:6px 8px; background:#edf2f7; font-size:10px; text-align:left;"'
+        th_num = 'style="border:1px solid #a0aec0; padding:6px 8px; background:#edf2f7; font-size:10px; text-align:right;"'
+
+        rows_html = ""
         for row in scorte:
             mat_id, nome, giacenza_totale, scorta_massima, n_fornitori, prezzo_min = row[:6]
             scorta_minima = row[6] if len(row) > 6 else 0.0
-            pct = f"{giacenza_totale / scorta_massima * 100:.0f}%" if scorta_massima > 0 else "—"
-            data_rows.append((False, [nome, f"{giacenza_totale:.2f}", f"{scorta_minima:.2f}",
-                                      f"{scorta_massima:.2f}", pct, "", "", "", ""]))
+            pct = f"{(giacenza_totale / scorta_massima * 100):.0f}%" if scorta_massima > 0 else "—"
+
+            rows_html += f"""
+            <tr>
+              <td {td}><b>{nome}</b></td>
+              <td {td_num}><b>{giacenza_totale:.2f}</b></td>
+              <td {td_num}>{scorta_minima:.2f}</td>
+              <td {td_num}>{scorta_massima:.2f}</td>
+              <td {td_num}>{pct}</td>
+              <td {td}>—</td>
+              <td {td_num}>—</td>
+              <td {td_num}>—</td>
+              <td {td_num}>—</td>
+            </tr>"""
+
             if n_fornitori > 0:
-                for mf in self.db_manager.get_fornitori_per_materiale(mat_id):
+                fornitori = self.db_manager.get_fornitori_per_materiale(mat_id)
+                for mf in fornitori:
                     _, forn_nome, _, s_min, s_max, giacenza = mf
-                    pct_f = f"{giacenza / s_max * 100:.0f}%" if s_max > 0 else "—"
-                    data_rows.append((True, ["", "", "", "", "",
-                                             forn_nome, f"{giacenza:.2f}", f"{s_min:.2f}", pct_f]))
+                    pct_f = f"{(giacenza / s_max * 100):.0f}%" if s_max > 0 else "—"
+                    rows_html += f"""
+            <tr>
+              <td {td_sub}></td>
+              <td {td_sub_num}></td>
+              <td {td_sub_num}></td>
+              <td {td_sub_num}></td>
+              <td {td_sub_num}></td>
+              <td {td_sub}>↳ {forn_nome}</td>
+              <td {td_sub_num}>{giacenza:.2f}</td>
+              <td {td_sub_num}>{s_min:.2f}</td>
+              <td {td_sub_num}>{pct_f}</td>
+            </tr>"""
 
-        # ── Dimensioni fisse leggibili (nessun limite di pagina) ─────
-        usable_w_cm = 26.7   # A4 landscape: 29.7 - 2*1.5 cm margini
-        font_pt     = 10.0
-        font_pt_sub = 9.0
-        pad_str     = "0.12cm"
-        row_h_str   = "0.65cm"   # altezza riga confortevole, si ripete su più pagine
+        html = f"""
+        <html><body style="font-family: Arial, sans-serif; margin: 10px;">
+        <h2 style="font-size:13px; margin-bottom:2px;">Inventario Magazzino — Software Aziendale RCS</h2>
+        <p style="font-size:9px; color:#718096; margin-top:0;">Generato il {now}</p>
+        <table style="border-collapse:collapse; width:100%;">
+          <thead>
+            <tr>
+              <th {th}>Materiale</th>
+              <th {th_num}>Giac. Tot (m²)</th>
+              <th {th_num}>Scorta Min</th>
+              <th {th_num}>Scorta Max</th>
+              <th {th_num}>% Agg.</th>
+              <th {th}>Fornitore</th>
+              <th {th_num}>Giac. Forn (m²)</th>
+              <th {th_num}>Min Forn</th>
+              <th {th_num}>% Forn</th>
+            </tr>
+          </thead>
+          <tbody>{rows_html}</tbody>
+        </table>
+        </body></html>"""
 
-        col_widths = [f"{r * usable_w_cm:.3f}cm" for r in col_ratios]
+        # Dialog anteprima
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Anteprima Stampa Inventario")
+        dialog.setMinimumSize(900, 600)
+        dialog.setStyleSheet("QDialog { background-color: #fafbfc; }")
 
-        # ── Fase 3: costruzione ODT ───────────────────────────────────
-        def xe(v):
-            return str(v).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
+        dlg_layout = QVBoxLayout(dialog)
+        dlg_layout.setContentsMargins(20, 20, 20, 20)
+        dlg_layout.setSpacing(12)
 
-        NS = (
-            'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
-            'xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" '
-            'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" '
-            'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '
-            'xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"'
-        )
+        title_lbl = QLabel("Anteprima Inventario")
+        title_lbl.setStyleSheet("font-size: 16px; font-weight: 700; color: #2d3748;")
+        dlg_layout.addWidget(title_lbl)
 
-        col_styles = ''.join(
-            f'<style:style style:name="IC{i}" style:family="table-column">'
-            f'<style:table-column-properties style:column-width="{w}"/></style:style>'
-            for i, w in enumerate(col_widths)
-        )
+        preview = QTextEdit()
+        preview.setReadOnly(True)
+        preview.setHtml(html)
+        preview.setStyleSheet("""
+            QTextEdit { border: 1px solid #e2e8f0; border-radius: 6px; background-color: #ffffff; }
+        """)
+        dlg_layout.addWidget(preview)
 
-        auto_styles = (
-            f'<office:automatic-styles>'
-            f'<style:style style:name="TInv" style:family="table">'
-            f'<style:table-properties style:width="{usable_w_cm:.3f}cm" table:align="margins"/></style:style>'
-            f'{col_styles}'
-            f'<style:style style:name="RInv" style:family="table-row">'
-            f'<style:table-row-properties style:row-height="{row_h_str}"'
-            f' style:use-optimal-row-height="false"/></style:style>'
-            f'<style:style style:name="CHInv" style:family="table-cell">'
-            f'<style:table-cell-properties fo:border="0.5pt solid #2d3748" fo:padding="{pad_str}"'
-            f' fo:background-color="#edf2f7" fo:vertical-align="middle"/></style:style>'
-            f'<style:style style:name="CDInv" style:family="table-cell">'
-            f'<style:table-cell-properties fo:border="0.4pt solid #cbd5e0" fo:padding="{pad_str}"'
-            f' fo:vertical-align="middle"/></style:style>'
-            f'<style:style style:name="CSInv" style:family="table-cell">'
-            f'<style:table-cell-properties fo:border="0.4pt solid #cbd5e0" fo:padding="{pad_str}"'
-            f' fo:background-color="#f7fafc" fo:vertical-align="middle"/></style:style>'
-            f'<style:style style:name="PHdr" style:family="paragraph">'
-            f'<style:paragraph-properties fo:text-align="center"'
-            f' fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
-            f'<style:text-properties fo:font-size="{font_pt:.2f}pt"'
-            f' fo:font-weight="bold" fo:color="#2d3748"/></style:style>'
-            f'<style:style style:name="PMain" style:family="paragraph">'
-            f'<style:paragraph-properties fo:text-align="start"'
-            f' fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
-            f'<style:text-properties fo:font-size="{font_pt:.2f}pt"'
-            f' fo:font-weight="bold" fo:color="#2d3748"/></style:style>'
-            f'<style:style style:name="PNum" style:family="paragraph">'
-            f'<style:paragraph-properties fo:text-align="end"'
-            f' fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
-            f'<style:text-properties fo:font-size="{font_pt:.2f}pt" fo:color="#2d3748"/></style:style>'
-            f'<style:style style:name="PSub" style:family="paragraph">'
-            f'<style:paragraph-properties fo:text-align="start"'
-            f' fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
-            f'<style:text-properties fo:font-size="{font_pt_sub:.2f}pt" fo:color="#4a5568"/></style:style>'
-            f'<style:style style:name="PSubN" style:family="paragraph">'
-            f'<style:paragraph-properties fo:text-align="end"'
-            f' fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
-            f'<style:text-properties fo:font-size="{font_pt_sub:.2f}pt" fo:color="#4a5568"/></style:style>'
-            f'<style:style style:name="PTit" style:family="paragraph">'
-            f'<style:paragraph-properties fo:text-align="start"'
-            f' fo:margin-top="0cm" fo:margin-bottom="0.2cm"/>'
-            f'<style:text-properties fo:font-size="13pt" fo:font-weight="bold"'
-            f' fo:color="#2d3748"/></style:style>'
-            f'<style:style style:name="PSub2" style:family="paragraph">'
-            f'<style:paragraph-properties fo:text-align="end"'
-            f' fo:margin-top="-0.5cm" fo:margin-bottom="0.2cm"/>'
-            f'<style:text-properties fo:font-size="8pt" fo:color="#718096"/></style:style>'
-            f'</office:automatic-styles>'
-        )
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
 
-        def make_cell(val, cell_style, para_style):
-            return (
-                f'<table:table-cell table:style-name="{cell_style}">'
-                f'<text:p text:style-name="{para_style}">{xe(val)}</text:p>'
-                f'</table:table-cell>'
-            )
+        btn_chiudi = QPushButton("Chiudi")
+        btn_chiudi.setStyleSheet("""
+            QPushButton { background-color: #f7fafc; color: #4a5568;
+                          border: 1px solid #e2e8f0; min-height: 36px; min-width: 100px; }
+            QPushButton:hover { background-color: #edf2f7; }
+        """)
+        btn_chiudi.clicked.connect(dialog.reject)
 
-        hdr_cells = ''.join(make_cell(h, 'CHInv', 'PHdr') for h in headers)
-        header_row = f'<table:table-row table:style-name="RInv">{hdr_cells}</table:table-row>'
+        btn_stampa_doc = QPushButton("Stampa")
+        btn_stampa_doc.setStyleSheet("""
+            QPushButton { background-color: #4a5568; color: #ffffff;
+                          min-height: 36px; min-width: 100px; }
+            QPushButton:hover { background-color: #2d3748; }
+        """)
 
-        data_xml_parts = []
-        for is_sub, cols in data_rows:
-            cell_st = 'CSInv' if is_sub else 'CDInv'
-            cells = ''
-            for i, val in enumerate(cols):
-                if is_sub:
-                    display = f'↳ {val}' if (i == 5 and val) else val
-                    para_st = 'PSubN' if i in right_cols else 'PSub'
-                else:
-                    display = val
-                    if i == 0:
-                        para_st = 'PMain'
-                    elif i in right_cols:
-                        para_st = 'PNum'
-                    else:
-                        para_st = 'PHdr'
-                cells += make_cell(display, cell_st, para_st)
-            data_xml_parts.append(f'<table:table-row table:style-name="RInv">{cells}</table:table-row>')
-
-        col_defs = ''.join(f'<table:table-column table:style-name="IC{i}"/>' for i in range(len(col_widths)))
-        inv_table = (
-            f'<table:table table:name="Inventario" table:style-name="TInv">'
-            f'{col_defs}'
-            f'{header_row}'
-            + ''.join(data_xml_parts) +
-            f'</table:table>'
-        )
-
-        content_xml = (
-            '<?xml version="1.0" encoding="UTF-8"?>'
-            f'<office:document-content {NS}>'
-            f'{auto_styles}'
-            f'<office:body><office:text>'
-            f'<text:p text:style-name="PTit">Inventario Magazzino \u2014 Software Aziendale RCS</text:p>'
-            f'<text:p text:style-name="PSub2">Generato il {xe(now)}</text:p>'
-            f'{inv_table}'
-            f'</office:text></office:body>'
-            f'</office:document-content>'
-        )
-
-        styles_xml = (
-            '<?xml version="1.0" encoding="UTF-8"?>\n'
-            '<office:document-styles\n'
-            '    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"\n'
-            '    xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"\n'
-            '    xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0">\n'
-            '  <office:styles>\n'
-            '    <style:style style:name="Standard" style:family="paragraph" style:class="text"/>\n'
-            '  </office:styles>\n'
-            '  <office:automatic-styles>\n'
-            '    <style:page-layout style:name="pm1">\n'
-            '      <style:page-layout-properties\n'
-            '          fo:page-width="29.7cm" fo:page-height="21cm"\n'
-            '          style:print-orientation="landscape"\n'
-            '          fo:margin-top="1cm" fo:margin-bottom="1cm"\n'
-            '          fo:margin-left="1.5cm" fo:margin-right="1.5cm"/>\n'
-            '    </style:page-layout>\n'
-            '  </office:automatic-styles>\n'
-            '  <office:master-styles>\n'
-            '    <style:master-page style:name="Standard" style:page-layout-name="pm1"/>\n'
-            '  </office:master-styles>\n'
-            '</office:document-styles>'
-        )
-
-        manifest_xml = (
-            '<?xml version="1.0" encoding="UTF-8"?>\n'
-            '<manifest:manifest\n'
-            '    xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"\n'
-            '    manifest:version="1.2">\n'
-            '  <manifest:file-entry manifest:media-type="application/vnd.oasis.opendocument.text"'
-            ' manifest:full-path="/"/>\n'
-            '  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="content.xml"/>\n'
-            '  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="styles.xml"/>\n'
-            '</manifest:manifest>'
-        )
-
-        try:
-            mi = zipfile.ZipInfo('mimetype')
-            mi.compress_type = zipfile.ZIP_STORED
-            with zipfile.ZipFile(file_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-                zf.writestr(mi, 'application/vnd.oasis.opendocument.text')
-                zf.writestr('META-INF/manifest.xml', manifest_xml)
-                zf.writestr('styles.xml', styles_xml)
-                zf.writestr('content.xml', content_xml)
-
+        def _esegui_stampa():
             try:
-                if sys.platform == 'win32':
-                    os.startfile(file_path)
-                elif sys.platform == 'darwin':
-                    import subprocess
-                    subprocess.Popen(['open', file_path])
-                else:
-                    import subprocess
-                    subprocess.Popen(['xdg-open', file_path])
-            except Exception:
-                pass
+                from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
+                from PyQt5.QtGui import QTextDocument
+                printer = QPrinter(QPrinter.HighResolution)
+                printer.setOrientation(QPrinter.Landscape)
+                printer.setPageSize(QPrinter.A4)
+                pdlg = QPrintDialog(printer, dialog)
+                if pdlg.exec_() == QPrintDialog.Accepted:
+                    doc = QTextDocument()
+                    doc.setHtml(html)
+                    doc.print_(printer)
+            except Exception as e:
+                QMessageBox.warning(dialog, "Stampa", f"Impossibile stampare:\n{str(e)}")
 
-        except Exception as e:
-            QMessageBox.warning(self, "Errore", f"Impossibile generare l'ODT:\n{str(e)}")
+        btn_stampa_doc.clicked.connect(_esegui_stampa)
+
+        btn_row.addWidget(btn_chiudi)
+        btn_row.addSpacing(8)
+        btn_row.addWidget(btn_stampa_doc)
+        dlg_layout.addLayout(btn_row)
+
+        dialog.exec_()
 
     def mostra_storico(self, materiale_id, nome_materiale):
         """Mostra lo storico movimenti di un materiale"""
