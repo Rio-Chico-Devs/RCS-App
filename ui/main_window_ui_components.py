@@ -31,9 +31,8 @@ class MainWindowUIComponents:
     @staticmethod
     def init_ui(window_instance):
         """Inizializzazione completa dell'interfaccia MainWindow"""
-        # Design system unificato - finestra massimizzata con controlli
+        # Design system unificato
         window_instance.setWindowTitle("Software Aziendale RCS")
-        window_instance.showMaximized()
         
         # Applica stili globali
         MainWindowUIComponents.apply_global_styles(window_instance)

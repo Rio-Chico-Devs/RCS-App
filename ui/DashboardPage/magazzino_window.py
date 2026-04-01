@@ -578,93 +578,133 @@ class MagazzinoWindow(QMainWindow):
         self.scorte_layout.addStretch()
 
     def stampa_inventario(self):
-        """Genera report inventario come tabella HTML e lo mostra in anteprima stampabile"""
+        """Stampa inventario con QPainter direttamente su QPrintPreviewDialog (A4 landscape)"""
         from datetime import datetime as _dt
+        from PyQt5.QtPrintSupport import QPrinter, QPrintPreviewDialog
+        from PyQt5.QtGui import QPainter, QFont, QColor, QPen, QBrush
+        from PyQt5.QtCore import Qt, QRectF
+
         now = _dt.now().strftime("%d/%m/%Y %H:%M")
         scorte = self.db_manager.get_scorte('nome')
 
-        # Costruisci la tabella HTML
-        td = 'style="border:1px solid #cbd5e0; padding:8px 12px; font-size:14px;"'
-        td_num = 'style="border:1px solid #cbd5e0; padding:8px 12px; font-size:14px; text-align:right;"'
-        td_sub = 'style="border:1px solid #cbd5e0; padding:6px 12px 6px 28px; font-size:13px; color:#4a5568; background:#f7fafc;"'
-        td_sub_num = 'style="border:1px solid #cbd5e0; padding:6px 12px; font-size:13px; color:#4a5568; text-align:right; background:#f7fafc;"'
-        th = 'style="border:1px solid #a0aec0; padding:10px 12px; background:#edf2f7; font-size:14px; font-weight:bold; text-align:left;"'
-        th_num = 'style="border:1px solid #a0aec0; padding:10px 12px; background:#edf2f7; font-size:14px; font-weight:bold; text-align:right;"'
+        # Prepara i dati: lista di (is_sub, [colonne])
+        headers = ["Materiale", "Giac. Tot (m²)", "Sc. Min", "Sc. Max",
+                   "% Agg.", "Fornitore", "Giac. Forn (m²)", "Min Forn", "% Forn"]
+        # Proporzioni colonne (somma = 1.0)
+        col_ratios = [0.19, 0.10, 0.09, 0.09, 0.07, 0.18, 0.12, 0.09, 0.07]
 
-        rows_html = ""
+        data_rows = []
         for row in scorte:
             mat_id, nome, giacenza_totale, scorta_massima, n_fornitori, prezzo_min = row[:6]
             scorta_minima = row[6] if len(row) > 6 else 0.0
-            pct = f"{(giacenza_totale / scorta_massima * 100):.0f}%" if scorta_massima > 0 else "—"
-
-            rows_html += f"""
-            <tr>
-              <td {td}><b>{nome}</b></td>
-              <td {td_num}><b>{giacenza_totale:.2f}</b></td>
-              <td {td_num}>{scorta_minima:.2f}</td>
-              <td {td_num}>{scorta_massima:.2f}</td>
-              <td {td_num}>{pct}</td>
-              <td {td}>—</td>
-              <td {td_num}>—</td>
-              <td {td_num}>—</td>
-              <td {td_num}>—</td>
-            </tr>"""
-
+            pct = f"{giacenza_totale / scorta_massima * 100:.0f}%" if scorta_massima > 0 else "—"
+            data_rows.append((False, [nome, f"{giacenza_totale:.2f}", f"{scorta_minima:.2f}",
+                                      f"{scorta_massima:.2f}", pct, "", "", "", ""]))
             if n_fornitori > 0:
-                fornitori = self.db_manager.get_fornitori_per_materiale(mat_id)
-                for mf in fornitori:
+                for mf in self.db_manager.get_fornitori_per_materiale(mat_id):
                     _, forn_nome, _, s_min, s_max, giacenza = mf
-                    pct_f = f"{(giacenza / s_max * 100):.0f}%" if s_max > 0 else "—"
-                    rows_html += f"""
-            <tr>
-              <td {td_sub}></td>
-              <td {td_sub_num}></td>
-              <td {td_sub_num}></td>
-              <td {td_sub_num}></td>
-              <td {td_sub_num}></td>
-              <td {td_sub}>↳ {forn_nome}</td>
-              <td {td_sub_num}>{giacenza:.2f}</td>
-              <td {td_sub_num}>{s_min:.2f}</td>
-              <td {td_sub_num}>{pct_f}</td>
-            </tr>"""
+                    pct_f = f"{giacenza / s_max * 100:.0f}%" if s_max > 0 else "—"
+                    data_rows.append((True, ["", "", "", "", "",
+                                             forn_nome, f"{giacenza:.2f}", f"{s_min:.2f}", pct_f]))
 
-        html = f"""
-        <html><body style="font-family: Arial, sans-serif; margin: 0; padding: 0;">
-        <h2 style="font-size:18px; margin-bottom:4px; margin-top:0;">Inventario Magazzino — Software Aziendale RCS</h2>
-        <p style="font-size:12px; color:#718096; margin-top:0; margin-bottom:8px;">Generato il {now}</p>
-        <table style="border-collapse:collapse; width:100%;">
-          <thead>
-            <tr>
-              <th {th}>Materiale</th>
-              <th {th_num}>Giac. Tot (m²)</th>
-              <th {th_num}>Scorta Min</th>
-              <th {th_num}>Scorta Max</th>
-              <th {th_num}>% Agg.</th>
-              <th {th}>Fornitore</th>
-              <th {th_num}>Giac. Forn (m²)</th>
-              <th {th_num}>Min Forn</th>
-              <th {th_num}>% Forn</th>
-            </tr>
-          </thead>
-          <tbody>{rows_html}</tbody>
-        </table>
-        </body></html>"""
+        def render(printer):
+            painter = QPainter(printer)
+            pr = printer.pageRect()
+            pw, ph = pr.width(), pr.height()
+
+            mx, my = pw * 0.03, ph * 0.04       # margini
+            uw = pw - 2 * mx                     # larghezza utile
+            uh = ph - 2 * my                     # altezza utile
+
+            # ── Titolo ───────────────────────────────────────────────
+            title_h = ph * 0.07
+            font_t = QFont("Arial", 1)
+            font_t.setPointSizeF(title_h * 0.42)
+            font_t.setBold(True)
+            painter.setFont(font_t)
+            painter.setPen(QColor("#2d3748"))
+            painter.drawText(QRectF(mx, my, uw * 0.65, title_h),
+                             Qt.AlignLeft | Qt.AlignVCenter,
+                             "Inventario Magazzino — RCS")
+
+            font_d = QFont("Arial", 1)
+            font_d.setPointSizeF(title_h * 0.28)
+            painter.setFont(font_d)
+            painter.setPen(QColor("#718096"))
+            painter.drawText(QRectF(mx + uw * 0.65, my, uw * 0.35, title_h),
+                             Qt.AlignRight | Qt.AlignVCenter,
+                             f"Generato il {now}")
+
+            # ── Calcola altezza righe per riempire il foglio ─────────
+            table_top = my + title_h + ph * 0.01
+            table_h = ph - table_top - my
+            total_rows = 1 + len(data_rows)       # header + dati
+            row_h = table_h / total_rows
+
+            # Font proporzionale all'altezza riga
+            fs = max(row_h * 0.38, 1.0)
+            font_hdr = QFont("Arial", 1)
+            font_hdr.setPointSizeF(fs)
+            font_hdr.setBold(True)
+            font_body = QFont("Arial", 1)
+            font_body.setPointSizeF(fs)
+            font_sub = QFont("Arial", 1)
+            font_sub.setPointSizeF(max(fs * 0.88, 1.0))
+
+            col_ws = [uw * r for r in col_ratios]
+            right_cols = {1, 2, 3, 4, 6, 7, 8}   # colonne allineate a destra
+
+            def draw_row(y, cols, is_header=False, is_sub=False):
+                x = mx
+                bg = QColor("#edf2f7") if is_header else (QColor("#f7fafc") if is_sub else QColor("#ffffff"))
+                painter.fillRect(QRectF(x, y, uw, row_h), QBrush(bg))
+
+                pen_border = QPen(QColor("#cbd5e0"), 0.4)
+                painter.setPen(pen_border)
+                painter.drawRect(QRectF(x, y, uw, row_h))
+
+                cx = x
+                for i, (val, cw) in enumerate(zip(cols, col_ws)):
+                    painter.setPen(pen_border)
+                    painter.drawLine(QRectF(cx, y, 0, row_h).toRect().topLeft(),
+                                     QRectF(cx, y, 0, row_h).toRect().bottomLeft())
+
+                    font = font_hdr if is_header else (font_sub if is_sub else font_body)
+                    if not is_header and not is_sub and i == 0:
+                        f2 = QFont(font_body)
+                        f2.setBold(True)
+                        painter.setFont(f2)
+                    else:
+                        painter.setFont(font)
+
+                    painter.setPen(QColor("#2d3748") if not is_sub else QColor("#4a5568"))
+                    pad = 3
+                    indent = 10 if (is_sub and i == 5) else 0
+                    text = ("  ↳ " + val) if (is_sub and i == 5 and val) else val
+                    align = (Qt.AlignRight if i in right_cols else Qt.AlignLeft) | Qt.AlignVCenter
+                    painter.drawText(QRectF(cx + pad + indent, y, cw - pad * 2 - indent, row_h), align, text)
+                    cx += cw
+
+            # ── Disegna intestazione ──────────────────────────────────
+            y = table_top
+            draw_row(y, headers, is_header=True)
+            y += row_h
+
+            # ── Disegna righe dati ────────────────────────────────────
+            for is_sub, cols in data_rows:
+                draw_row(y, cols, is_sub=is_sub)
+                y += row_h
+
+            painter.end()
 
         try:
-            from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
-            from PyQt5.QtGui import QTextDocument
-            from PyQt5.QtCore import QSizeF
             printer = QPrinter(QPrinter.HighResolution)
             printer.setOrientation(QPrinter.Landscape)
             printer.setPageSize(QPrinter.A4)
-            printer.setPageMargins(10, 10, 10, 10, QPrinter.Millimeter)
-            pdlg = QPrintDialog(printer, self)
-            if pdlg.exec_() == QPrintDialog.Accepted:
-                doc = QTextDocument()
-                doc.setHtml(html)
-                page_rect = printer.pageRect(QPrinter.Point)
-                doc.setPageSize(QSizeF(page_rect.width(), page_rect.height()))
-                doc.print_(printer)
+            preview = QPrintPreviewDialog(printer, self)
+            preview.setWindowTitle("Anteprima Stampa Inventario")
+            preview.paintRequested.connect(render)
+            preview.exec_()
         except Exception as e:
             QMessageBox.warning(self, "Stampa", f"Impossibile stampare:\n{str(e)}")
 
