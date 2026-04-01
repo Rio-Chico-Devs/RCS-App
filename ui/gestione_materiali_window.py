@@ -686,10 +686,15 @@ class GestioneMaterialiWindow(QMainWindow):
             if success:
                 self.db_manager.update_materiale_scorte(self.materiale_corrente[0], scorta_min, scorta_max)
                 self.carica_materiali()
-                # Aggiorna materiale_corrente con dati freschi dal DB
+                # Aggiorna materiale_corrente e ri-popola i campi con i dati salvati
                 fresh = self.db_manager.get_materiale_by_id(self.materiale_corrente[0])
                 if fresh:
                     self.materiale_corrente = fresh
+                    self.edit_nome.setText(fresh[1])
+                    self.edit_spessore.setValue(fresh[2])
+                    self.edit_prezzo.setValue(fresh[3])
+                    self.edit_scorta_min_mat.setValue(fresh[8] if len(fresh) > 8 else 0.0)
+                    self.edit_scorta_max_mat.setValue(fresh[9] if len(fresh) > 9 else 0.0)
                 self.materiali_modificati.emit()
             else:
                 QMessageBox.critical(self, "Errore", "Nome materiale già esistente o errore nel database.")

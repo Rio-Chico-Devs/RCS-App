@@ -397,98 +397,116 @@ class MagazzinoWindow(QMainWindow):
         self.scorte_layout.addStretch()
 
     def _crea_card_scorta(self, mat_id, nome, giacenza_totale, scorta_massima, scorta_minima, n_fornitori, prezzo_min):
-        """Crea una card per un materiale (giacenza aggregata su tutti i fornitori)"""
+        """Card verticale: riga materiale aggregata + righe fornitori inline collassabili"""
         card = QFrame()
         card.setStyleSheet("""
             QFrame {
                 background-color: #ffffff;
                 border: none;
-                border-bottom: 1px solid #f0f0f0;
+                border-bottom: 1px solid #e2e8f0;
             }
-            QFrame:hover { background-color: #fafbfc; }
         """)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(16, 12, 16, 12)
+        card_layout.setSpacing(0)
 
-        card_layout = QHBoxLayout(card)
-        card_layout.setContentsMargins(16, 16, 16, 16)
-        card_layout.setSpacing(24)
+        # ── Riga principale (materiale aggregato) ─────────────────────
+        header = QHBoxLayout()
+        header.setSpacing(20)
 
-        # Nome materiale — grande e leggibile
         lbl_nome = QLabel(nome)
-        lbl_nome.setStyleSheet("font-size: 20px; font-weight: 700; color: #2d3748; min-width: 160px;")
-        card_layout.addWidget(lbl_nome)
+        lbl_nome.setStyleSheet("font-size: 18px; font-weight: 700; color: #2d3748; min-width: 150px;")
+        header.addWidget(lbl_nome)
 
-        # Giacenza totale
-        lbl_giacenza = QLabel(f"{giacenza_totale:.2f} m²")
-        lbl_giacenza.setStyleSheet("font-size: 18px; font-weight: 600; color: #38a169; min-width: 100px;")
-        lbl_giacenza_label = QLabel("Giacenza")
-        lbl_giacenza_label.setStyleSheet("font-size: 11px; color: #a0aec0; font-weight: 500;")
-        giacenza_col = QVBoxLayout()
-        giacenza_col.setSpacing(2)
-        giacenza_col.addWidget(lbl_giacenza_label)
-        giacenza_col.addWidget(lbl_giacenza)
-        card_layout.addLayout(giacenza_col)
+        giac_col = QVBoxLayout()
+        giac_col.setSpacing(1)
+        lbl_giac_lbl = QLabel("Giacenza")
+        lbl_giac_lbl.setStyleSheet("font-size: 11px; color: #a0aec0; font-weight: 500;")
+        lbl_giac_val = QLabel(f"{giacenza_totale:.2f} m²")
+        lbl_giac_val.setStyleSheet("font-size: 16px; font-weight: 600; color: #38a169; min-width: 90px;")
+        giac_col.addWidget(lbl_giac_lbl)
+        giac_col.addWidget(lbl_giac_val)
+        header.addLayout(giac_col)
 
-        # Numero fornitori
-        forn_text = f"{n_fornitori}" if n_fornitori > 0 else "—"
-        lbl_forn = QLabel(forn_text)
-        lbl_forn.setStyleSheet("font-size: 18px; font-weight: 600; color: #4a5568; min-width: 40px;")
-        lbl_forn_label = QLabel("Fornitori")
-        lbl_forn_label.setStyleSheet("font-size: 11px; color: #a0aec0; font-weight: 500;")
-        forn_col = QVBoxLayout()
-        forn_col.setSpacing(2)
-        forn_col.addWidget(lbl_forn_label)
-        forn_col.addWidget(lbl_forn)
-        card_layout.addLayout(forn_col)
-
-        # Scorta minima (se impostata)
         if scorta_minima > 0 or scorta_massima > 0:
-            lbl_min_val = QLabel(f"min {scorta_minima:.1f} / max {scorta_massima:.1f} m²")
-            lbl_min_val.setStyleSheet("font-size: 12px; color: #718096; min-width: 140px;")
-            card_layout.addWidget(lbl_min_val)
+            lbl_soglie = QLabel(f"min {scorta_minima:.1f} / max {scorta_massima:.1f} m²")
+            lbl_soglie.setStyleSheet("font-size: 12px; color: #718096; min-width: 150px;")
+            header.addWidget(lbl_soglie)
 
-        # Barra scorta (percentuale rispetto alla scorta_massima aggregata)
         percentuale = (giacenza_totale / scorta_massima * 100) if scorta_massima > 0 else 0
         barra = BarraScorta(percentuale)
-        barra.setMinimumWidth(160)
-        card_layout.addWidget(barra, 1)
+        barra.setMinimumWidth(200)
+        header.addWidget(barra, 1)
 
-        # Bottone fornitori (drill-down)
-        btn_forn = QPushButton("Fornitori")
-        if n_fornitori > 1:
-            btn_forn.setStyleSheet("""
-                QPushButton {
-                    background-color: #ebf8ff; color: #2b6cb0;
-                    border: none; border-radius: 6px;
-                    min-height: 34px; padding: 6px 18px;
-                    font-size: 13px; font-weight: 600;
-                }
-                QPushButton:hover { background-color: #bee3f8; }
-            """)
-            btn_forn.clicked.connect(lambda checked, mid=mat_id, mn=nome: self._mostra_fornitori_materiale(mid, mn))
-        else:
-            btn_forn.setStyleSheet("""
-                QPushButton {
-                    background-color: #f7fafc; color: #cbd5e0;
-                    border: none; border-radius: 6px;
-                    min-height: 34px; padding: 6px 18px;
-                    font-size: 13px; font-weight: 600;
-                }
-            """)
-            btn_forn.setEnabled(False)
-        card_layout.addWidget(btn_forn)
-
-        # Bottone storico
         btn_storico = QPushButton("Storico")
         btn_storico.setStyleSheet("""
-            QPushButton {
-                background-color: #f7fafc; color: #4a5568;
-                border: none; border-radius: 6px;
-                min-height: 34px; padding: 6px 18px; font-size: 13px;
-            }
+            QPushButton { background-color: #f7fafc; color: #4a5568; border: none;
+                          border-radius: 6px; min-height: 32px; padding: 4px 14px; font-size: 12px; }
             QPushButton:hover { background-color: #edf2f7; }
         """)
         btn_storico.clicked.connect(lambda checked, mid=mat_id, mn=nome: self.mostra_storico(mid, mn))
-        card_layout.addWidget(btn_storico)
+        header.addWidget(btn_storico)
+
+        # Bottone toggle fornitori (solo se ci sono fornitori)
+        btn_toggle = None
+        if n_fornitori > 0:
+            fornitori = self.db_manager.get_fornitori_per_materiale(mat_id)
+            btn_toggle = QPushButton(f"▼  {n_fornitori} fornitore/i")
+            btn_toggle.setStyleSheet("""
+                QPushButton { background-color: #ebf8ff; color: #2b6cb0; border: none;
+                              border-radius: 6px; min-height: 32px; padding: 4px 14px;
+                              font-size: 12px; font-weight: 600; }
+                QPushButton:hover { background-color: #bee3f8; }
+            """)
+            header.addWidget(btn_toggle)
+
+        card_layout.addLayout(header)
+
+        # ── Sezione fornitori (collassabile) ──────────────────────────
+        if n_fornitori > 0 and btn_toggle is not None:
+            forn_section = QFrame()
+            forn_section.setStyleSheet("""
+                QFrame { background-color: #f7fbff; border-left: 3px solid #bee3f8;
+                         margin-left: 12px; margin-top: 6px; border-radius: 0px; }
+            """)
+            forn_layout = QVBoxLayout(forn_section)
+            forn_layout.setContentsMargins(12, 8, 12, 8)
+            forn_layout.setSpacing(6)
+
+            for mf in fornitori:
+                mf_id, forn_nome, prezzo_forn, s_min, s_max, giacenza = mf
+                row = QHBoxLayout()
+                row.setSpacing(16)
+
+                lbl_fn = QLabel(f"↳  {forn_nome}")
+                lbl_fn.setStyleSheet("font-size: 13px; font-weight: 600; color: #4a5568; min-width: 160px;")
+                row.addWidget(lbl_fn)
+
+                lbl_fg = QLabel(f"{giacenza:.2f} m²")
+                lbl_fg.setStyleSheet("font-size: 13px; color: #38a169; min-width: 80px;")
+                row.addWidget(lbl_fg)
+
+                if s_min > 0 or s_max > 0:
+                    lbl_fs = QLabel(f"min {s_min:.1f} / max {s_max:.1f}")
+                    lbl_fs.setStyleSheet("font-size: 11px; color: #a0aec0; min-width: 130px;")
+                    row.addWidget(lbl_fs)
+
+                pct_forn = (giacenza / s_max * 100) if s_max > 0 else 0
+                barra_f = BarraScorta(pct_forn)
+                barra_f.setMinimumWidth(160)
+                row.addWidget(barra_f, 1)
+
+                forn_layout.addLayout(row)
+
+            forn_section.setVisible(False)
+            card_layout.addWidget(forn_section)
+
+            def _toggle(checked, sec=forn_section, btn=btn_toggle, nf=n_fornitori):
+                visible = not sec.isVisible()
+                sec.setVisible(visible)
+                btn.setText(f"{'▲' if visible else '▼'}  {nf} fornitore/i")
+
+            btn_toggle.clicked.connect(_toggle)
 
         return card
 
