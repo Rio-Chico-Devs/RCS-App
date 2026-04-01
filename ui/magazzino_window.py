@@ -650,69 +650,19 @@ class MagazzinoWindow(QMainWindow):
         </table>
         </body></html>"""
 
-        # Dialog anteprima
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Anteprima Stampa Inventario")
-        dialog.setMinimumSize(900, 600)
-        dialog.setStyleSheet("QDialog { background-color: #fafbfc; }")
-
-        dlg_layout = QVBoxLayout(dialog)
-        dlg_layout.setContentsMargins(20, 20, 20, 20)
-        dlg_layout.setSpacing(12)
-
-        title_lbl = QLabel("Anteprima Inventario")
-        title_lbl.setStyleSheet("font-size: 16px; font-weight: 700; color: #2d3748;")
-        dlg_layout.addWidget(title_lbl)
-
-        preview = QTextEdit()
-        preview.setReadOnly(True)
-        preview.setHtml(html)
-        preview.setStyleSheet("""
-            QTextEdit { border: 1px solid #e2e8f0; border-radius: 6px; background-color: #ffffff; }
-        """)
-        dlg_layout.addWidget(preview)
-
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
-
-        btn_chiudi = QPushButton("Chiudi")
-        btn_chiudi.setStyleSheet("""
-            QPushButton { background-color: #f7fafc; color: #4a5568;
-                          border: 1px solid #e2e8f0; min-height: 36px; min-width: 100px; }
-            QPushButton:hover { background-color: #edf2f7; }
-        """)
-        btn_chiudi.clicked.connect(dialog.reject)
-
-        btn_stampa_doc = QPushButton("Stampa")
-        btn_stampa_doc.setStyleSheet("""
-            QPushButton { background-color: #4a5568; color: #ffffff;
-                          min-height: 36px; min-width: 100px; }
-            QPushButton:hover { background-color: #2d3748; }
-        """)
-
-        def _esegui_stampa():
-            try:
-                from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
-                from PyQt5.QtGui import QTextDocument
-                printer = QPrinter(QPrinter.HighResolution)
-                printer.setOrientation(QPrinter.Landscape)
-                printer.setPageSize(QPrinter.A4)
-                pdlg = QPrintDialog(printer, dialog)
-                if pdlg.exec_() == QPrintDialog.Accepted:
-                    doc = QTextDocument()
-                    doc.setHtml(html)
-                    doc.print_(printer)
-            except Exception as e:
-                QMessageBox.warning(dialog, "Stampa", f"Impossibile stampare:\n{str(e)}")
-
-        btn_stampa_doc.clicked.connect(_esegui_stampa)
-
-        btn_row.addWidget(btn_chiudi)
-        btn_row.addSpacing(8)
-        btn_row.addWidget(btn_stampa_doc)
-        dlg_layout.addLayout(btn_row)
-
-        dialog.exec_()
+        try:
+            from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
+            from PyQt5.QtGui import QTextDocument
+            printer = QPrinter(QPrinter.HighResolution)
+            printer.setOrientation(QPrinter.Landscape)
+            printer.setPageSize(QPrinter.A4)
+            pdlg = QPrintDialog(printer, self)
+            if pdlg.exec_() == QPrintDialog.Accepted:
+                doc = QTextDocument()
+                doc.setHtml(html)
+                doc.print_(printer)
+        except Exception as e:
+            QMessageBox.warning(self, "Stampa", f"Impossibile stampare:\n{str(e)}")
 
     def mostra_storico(self, materiale_id, nome_materiale):
         """Mostra lo storico movimenti di un materiale"""
