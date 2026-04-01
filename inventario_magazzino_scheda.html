@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Scheda Inventario Magazzino — RCS</title>
+<style>
+  @page {
+    size: A4 portrait;
+    margin: 12mm 12mm 12mm 12mm;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Arial, sans-serif;
+    font-size: 13px;
+    color: #1a1a1a;
+  }
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 2px solid #1a1a1a;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+  }
+  .header h1 {
+    font-size: 17px;
+    font-weight: bold;
+    letter-spacing: 0.3px;
+  }
+  .header .meta {
+    font-size: 11px;
+    color: #555;
+    text-align: right;
+    line-height: 1.7;
+  }
+  .meta-line {
+    display: flex;
+    gap: 30px;
+    margin-bottom: 8px;
+    font-size: 12px;
+  }
+  .meta-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .meta-field label { font-weight: bold; white-space: nowrap; }
+  .meta-field .blank {
+    border-bottom: 1px solid #333;
+    min-width: 120px;
+    height: 16px;
+    display: inline-block;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  thead tr th {
+    background: #1a1a1a;
+    color: #fff;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: bold;
+    text-align: left;
+    border: 1px solid #1a1a1a;
+  }
+  thead tr th.right { text-align: right; }
+
+  /* righe materiale principale */
+  tr.mat-row td {
+    background: #f0f0f0;
+    border: 1px solid #aaa;
+    padding: 9px 10px;
+    font-weight: bold;
+    font-size: 13px;
+  }
+  tr.mat-row td.val {
+    text-align: right;
+    min-width: 90px;
+  }
+  /* celle vuote da compilare */
+  td.vuota {
+    border-bottom: 1.5px solid #333 !important;
+    background: transparent !important;
+  }
+
+  /* righe fornitore */
+  tr.forn-row td {
+    border: 1px solid #ccc;
+    padding: 7px 10px 7px 22px;
+    font-size: 12px;
+    background: #fff;
+  }
+  tr.forn-row td.val {
+    text-align: right;
+    padding: 7px 10px;
+  }
+  tr.forn-row:last-of-type td {
+    border-bottom: 1px solid #999;
+  }
+
+  /* separatore tra gruppi */
+  tr.spacer td {
+    height: 4px;
+    background: #fff;
+    border: none;
+  }
+
+  .firma {
+    margin-top: 18px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+  }
+  .firma-box {
+    width: 30%;
+    text-align: center;
+  }
+  .firma-box .linea {
+    border-bottom: 1px solid #333;
+    margin-bottom: 4px;
+    height: 30px;
+  }
+
+  /* nasconde tutto per la stampa tranne il contenuto */
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+  @media screen {
+    body { max-width: 210mm; margin: 20px auto; padding: 12mm; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>Scheda Inventario Magazzino</h1>
+    <div style="font-size:11px; color:#555; margin-top:3px;">Software Aziendale RCS</div>
+  </div>
+  <div class="meta">
+    Data rilevazione: _____ / _____ / _________<br>
+    Rilevato da: _______________________
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:34%">Materiale</th>
+      <th style="width:22%">Fornitore</th>
+      <th class="right" style="width:22%">Giacenza Rilevata (m²)</th>
+      <th class="right" style="width:22%">Note</th>
+    </tr>
+  </thead>
+  <tbody>
+
+    <!-- CBX200 -->
+    <tr class="mat-row">
+      <td>CBX200</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ ANGELONI</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ CIT</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- CBX300 -->
+    <tr class="mat-row">
+      <td>CBX300</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ ANGELONI</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ FIBERTECH</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- CC630 -->
+    <tr class="mat-row">
+      <td>CC630</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ ANGELONI</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ CIT</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ FIBERTECH</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- CK204-CIT -->
+    <tr class="mat-row">
+      <td>CK204-CIT</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ CIT</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ FIBERTECH</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- HM 100/64 -->
+    <tr class="mat-row">
+      <td>HM 100/64</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ CIT</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- HM 150/40J -->
+    <tr class="mat-row">
+      <td>HM 150/40J</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ CIT</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- HS100 -->
+    <tr class="mat-row">
+      <td>HS100</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ CIT</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- HS150 -->
+    <tr class="mat-row">
+      <td>HS150</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ CIT</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- HS300 -->
+    <tr class="mat-row">
+      <td>HS300</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ CIT</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- IM30/45 -->
+    <tr class="mat-row">
+      <td>IM30/45</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ CIT</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- PLAIN -->
+    <tr class="mat-row">
+      <td>PLAIN</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ CIT</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ FIBERTECH</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- TWILL -->
+    <tr class="mat-row">
+      <td>TWILL</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ ANGELONI</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ CIT</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ FIBERTECH</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- VR48 -->
+    <tr class="mat-row">
+      <td>VR48</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ Angeloni</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- VTR -->
+    <tr class="mat-row">
+      <td>VTR</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ Angeloni</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- VV1017 -->
+    <tr class="mat-row">
+      <td>VV1017</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ Angeloni</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- VV1031 -->
+    <tr class="mat-row">
+      <td>VV1031</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ Angeloni</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- VV350 -->
+    <tr class="mat-row">
+      <td>VV350</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ Angeloni</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="spacer"><td colspan="4"></td></tr>
+
+    <!-- VV770 -->
+    <tr class="mat-row">
+      <td>VV770</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+    <tr class="forn-row">
+      <td>↳ Angeloni</td>
+      <td></td>
+      <td class="val vuota"></td>
+      <td class="val vuota"></td>
+    </tr>
+
+  </tbody>
+</table>
+
+<div class="firma">
+  <div class="firma-box">
+    <div class="linea"></div>
+    <div>Rilevato da</div>
+  </div>
+  <div class="firma-box">
+    <div class="linea"></div>
+    <div>Verificato da</div>
+  </div>
+  <div class="firma-box">
+    <div class="linea"></div>
+    <div>Data</div>
+  </div>
+</div>
+
+</body>
+</html>
