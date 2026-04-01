@@ -698,11 +698,12 @@ class DatabaseManager:
     def get_scorte(self, ordina_per='giacenza_asc'):
         """Restituisce le scorte di tutti i materiali.
         La giacenza è la somma da materiale_fornitori (se presente) altrimenti dal campo legacy.
-        Restituisce: (id, nome, giacenza_totale, scorta_massima_max, n_fornitori, prezzo_min)
+        Restituisce: (id, nome, giacenza_totale, scorta_massima, n_fornitori, prezzo_min, scorta_minima)
+        La scorta_massima e scorta_minima aggregate vengono lette da m.scorta_massima / m.scorta_minima
+        (impostate in gestione materiali). Se non impostate (= 0) si usa il fallback sui fornitori.
         """
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            # Usa materiale_fornitori se disponibile, altrimenti legge giacenza legacy
             if ordina_per == 'giacenza_asc':
                 order = "giacenza_totale ASC"
             elif ordina_per == 'giacenza_desc':
@@ -719,9 +720,11 @@ class DatabaseManager:
             cursor.execute(f"""
                 SELECT m.id, m.nome,
                        COALESCE(SUM(mf.giacenza), m.giacenza) as giacenza_totale,
-                       COALESCE(MAX(mf.scorta_massima), m.capacita_magazzino) as scorta_massima,
+                       CASE WHEN m.scorta_massima > 0 THEN m.scorta_massima
+                            ELSE COALESCE(MAX(mf.scorta_massima), m.capacita_magazzino) END as scorta_massima,
                        COUNT(mf.id) as n_fornitori,
-                       COALESCE(MIN(mf.prezzo_fornitore), m.prezzo_fornitore) as prezzo_min
+                       COALESCE(MIN(mf.prezzo_fornitore), m.prezzo_fornitore) as prezzo_min,
+                       m.scorta_minima as scorta_minima
                 FROM materiali m
                 LEFT JOIN materiale_fornitori mf ON mf.materiale_id = m.id
                 GROUP BY m.id, m.nome

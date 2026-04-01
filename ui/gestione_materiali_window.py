@@ -595,6 +595,7 @@ class GestioneMaterialiWindow(QMainWindow):
                 self.lbl_info_materiale.setText(
                     f"ID: {mat_id}  •  {len(self.db_manager.get_fornitori_per_materiale(mat_id))} fornitore/i"
                 )
+                self.materiali_modificati.emit()
             else:
                 QMessageBox.warning(self, "Attenzione", "Fornitore già presente per questo materiale.")
 
@@ -613,6 +614,7 @@ class GestioneMaterialiWindow(QMainWindow):
             )
             if res:
                 self._carica_tabella_fornitori(mat_id)
+                self.materiali_modificati.emit()
             else:
                 QMessageBox.warning(self, "Attenzione", "Errore durante la modifica.")
 
@@ -628,6 +630,7 @@ class GestioneMaterialiWindow(QMainWindow):
         if risposta == QMessageBox.Yes:
             self.db_manager.delete_fornitore_materiale(mf_id)
             self._carica_tabella_fornitori(mat_id)
+            self.materiali_modificati.emit()
 
     def abilita_form(self, enabled):
         for w in [self.edit_nome, self.edit_spessore, self.edit_prezzo,
@@ -683,6 +686,10 @@ class GestioneMaterialiWindow(QMainWindow):
             if success:
                 self.db_manager.update_materiale_scorte(self.materiale_corrente[0], scorta_min, scorta_max)
                 self.carica_materiali()
+                # Aggiorna materiale_corrente con dati freschi dal DB
+                fresh = self.db_manager.get_materiale_by_id(self.materiale_corrente[0])
+                if fresh:
+                    self.materiale_corrente = fresh
                 self.materiali_modificati.emit()
             else:
                 QMessageBox.critical(self, "Errore", "Nome materiale già esistente o errore nel database.")

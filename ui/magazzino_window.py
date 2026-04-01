@@ -15,7 +15,8 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
                              QComboBox, QDoubleSpinBox, QDialog, QFormLayout,
                              QLineEdit, QTextEdit, QTabWidget, QGridLayout,
                              QTableWidget, QTableWidgetItem, QHeaderView,
-                             QListWidget, QListWidgetItem, QAbstractItemView)
+                             QListWidget, QListWidgetItem, QAbstractItemView,
+                             QDialogButtonBox)
 from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QColor, QPainter, QLinearGradient
 from ui.materiale_ui_components import NoScrollDoubleSpinBox
@@ -316,7 +317,17 @@ class MagazzinoWindow(QMainWindow):
         top_layout.addSpacing(8)
         top_layout.addWidget(lbl_fornitore)
         top_layout.addWidget(self.combo_fornitore_filtro)
+        btn_stampa = QPushButton("Stampa Inventario")
+        btn_stampa.setStyleSheet("""
+            QPushButton { background-color: #f7fafc; color: #4a5568;
+                          border: 1px solid #e2e8f0; min-height: 36px; }
+            QPushButton:hover { background-color: #edf2f7; }
+        """)
+        btn_stampa.clicked.connect(self.stampa_inventario)
+
         top_layout.addStretch()
+        top_layout.addWidget(btn_stampa)
+        top_layout.addSpacing(8)
         top_layout.addWidget(btn_carico)
         top_layout.addSpacing(8)
         top_layout.addWidget(btn_scarico)
@@ -377,14 +388,15 @@ class MagazzinoWindow(QMainWindow):
             return
 
         for mat in scorte:
-            # get_scorte restituisce: id, nome, giacenza_totale, scorta_massima, n_fornitori, prezzo_min
-            mat_id, nome, giacenza_totale, scorta_massima, n_fornitori, prezzo_min = mat
-            card = self._crea_card_scorta(mat_id, nome, giacenza_totale, scorta_massima, n_fornitori, prezzo_min)
+            # get_scorte restituisce: id, nome, giacenza_totale, scorta_massima, n_fornitori, prezzo_min, scorta_minima
+            mat_id, nome, giacenza_totale, scorta_massima, n_fornitori, prezzo_min = mat[:6]
+            scorta_minima = mat[6] if len(mat) > 6 else 0.0
+            card = self._crea_card_scorta(mat_id, nome, giacenza_totale, scorta_massima, scorta_minima, n_fornitori, prezzo_min)
             self.scorte_layout.addWidget(card)
 
         self.scorte_layout.addStretch()
 
-    def _crea_card_scorta(self, mat_id, nome, giacenza_totale, scorta_massima, n_fornitori, prezzo_min):
+    def _crea_card_scorta(self, mat_id, nome, giacenza_totale, scorta_massima, scorta_minima, n_fornitori, prezzo_min):
         """Crea una card per un materiale (giacenza aggregata su tutti i fornitori)"""
         card = QFrame()
         card.setStyleSheet("""
@@ -428,7 +440,13 @@ class MagazzinoWindow(QMainWindow):
         forn_col.addWidget(lbl_forn)
         card_layout.addLayout(forn_col)
 
-        # Barra scorta
+        # Scorta minima (se impostata)
+        if scorta_minima > 0 or scorta_massima > 0:
+            lbl_min_val = QLabel(f"min {scorta_minima:.1f} / max {scorta_massima:.1f} m²")
+            lbl_min_val.setStyleSheet("font-size: 12px; color: #718096; min-width: 140px;")
+            card_layout.addWidget(lbl_min_val)
+
+        # Barra scorta (percentuale rispetto alla scorta_massima aggregata)
         percentuale = (giacenza_totale / scorta_massima * 100) if scorta_massima > 0 else 0
         barra = BarraScorta(percentuale)
         barra.setMinimumWidth(160)
@@ -558,6 +576,104 @@ class MagazzinoWindow(QMainWindow):
             self.scorte_layout.addWidget(lbl_tot)
 
         self.scorte_layout.addStretch()
+
+    def stampa_inventario(self):
+        """Genera e mostra un report stampabile dell'inventario attuale"""
+        scorte = self.db_manager.get_scorte('nome')
+        from datetime import datetime as _dt
+        now = _dt.now().strftime("%d/%m/%Y %H:%M")
+
+        lines = []
+        lines.append("=" * 60)
+        lines.append("  INVENTARIO MAGAZZINO  –  Software Aziendale RCS")
+        lines.append(f"  Generato il: {now}")
+        lines.append("=" * 60)
+        lines.append("")
+
+        for row in scorte:
+            mat_id, nome, giacenza_totale, scorta_massima, n_fornitori, prezzo_min = row[:6]
+            scorta_minima = row[6] if len(row) > 6 else 0.0
+
+            lines.append(f"  {nome}")
+            lines.append(f"    Giacenza totale : {giacenza_totale:.2f} m²")
+            if scorta_minima > 0 or scorta_massima > 0:
+                lines.append(f"    Scorta min/max  : {scorta_minima:.2f} / {scorta_massima:.2f} m²")
+            lines.append(f"    Fornitori       : {n_fornitori}")
+
+            if n_fornitori > 1:
+                fornitori = self.db_manager.get_fornitori_per_materiale(mat_id)
+                for mf in fornitori:
+                    _, forn_nome, _, s_min, s_max, giacenza = mf
+                    lines.append(f"      • {forn_nome}: {giacenza:.2f} m²  (min {s_min:.1f} / max {s_max:.1f})")
+
+            lines.append("")
+
+        lines.append("=" * 60)
+        testo = "\n".join(lines)
+
+        # Dialog di anteprima con pulsante stampa
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Stampa Inventario")
+        dialog.setMinimumSize(620, 500)
+        dialog.setStyleSheet("QDialog { background-color: #fafbfc; }")
+
+        dlg_layout = QVBoxLayout(dialog)
+        dlg_layout.setContentsMargins(20, 20, 20, 20)
+        dlg_layout.setSpacing(12)
+
+        title_lbl = QLabel("Anteprima Inventario")
+        title_lbl.setStyleSheet("font-size: 16px; font-weight: 700; color: #2d3748;")
+        dlg_layout.addWidget(title_lbl)
+
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setPlainText(testo)
+        text_edit.setStyleSheet("""
+            QTextEdit { font-family: monospace; font-size: 13px;
+                        border: 1px solid #e2e8f0; border-radius: 6px;
+                        background-color: #ffffff; color: #2d3748; }
+        """)
+        dlg_layout.addWidget(text_edit)
+
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+
+        btn_chiudi = QPushButton("Chiudi")
+        btn_chiudi.setStyleSheet("""
+            QPushButton { background-color: #f7fafc; color: #4a5568;
+                          border: 1px solid #e2e8f0; min-height: 36px; min-width: 100px; }
+            QPushButton:hover { background-color: #edf2f7; }
+        """)
+        btn_chiudi.clicked.connect(dialog.reject)
+
+        btn_stampa_doc = QPushButton("Stampa")
+        btn_stampa_doc.setStyleSheet("""
+            QPushButton { background-color: #4a5568; color: #ffffff;
+                          min-height: 36px; min-width: 100px; }
+            QPushButton:hover { background-color: #2d3748; }
+        """)
+
+        def _esegui_stampa():
+            try:
+                from PyQt5.QtPrintSupport import QPrinter, QPrintDialog
+                from PyQt5.QtGui import QTextDocument
+                printer = QPrinter(QPrinter.HighResolution)
+                pdlg = QPrintDialog(printer, dialog)
+                if pdlg.exec_() == QPrintDialog.Accepted:
+                    doc = QTextDocument()
+                    doc.setPlainText(testo)
+                    doc.print_(printer)
+            except Exception as e:
+                QMessageBox.warning(dialog, "Stampa", f"Impossibile stampare:\n{str(e)}")
+
+        btn_stampa_doc.clicked.connect(_esegui_stampa)
+
+        btn_row.addWidget(btn_chiudi)
+        btn_row.addSpacing(8)
+        btn_row.addWidget(btn_stampa_doc)
+        dlg_layout.addLayout(btn_row)
+
+        dialog.exec_()
 
     def mostra_storico(self, materiale_id, nome_materiale):
         """Mostra lo storico movimenti di un materiale"""

@@ -442,12 +442,32 @@ class MainWindowBusinessLogic:
         # Collega il signal per aggiornare i preventivi aperti
         window_instance.gestione_materiali_window.materiali_modificati.connect(window_instance.aggiorna_preventivi_aperti)
 
+        # Collega il signal per aggiornare il magazzino se aperto
+        window_instance.gestione_materiali_window.materiali_modificati.connect(
+            lambda: MainWindowBusinessLogic._aggiorna_magazzino_se_aperto(window_instance)
+        )
+
         window_instance.gestione_materiali_window.show()
+
+    @staticmethod
+    def _aggiorna_magazzino_se_aperto(window_instance):
+        """Aggiorna le scorte del magazzino se la finestra è aperta"""
+        if (window_instance.magazzino_window is not None
+                and window_instance.magazzino_window.isVisible()):
+            window_instance.magazzino_window.carica_scorte()
 
     @staticmethod
     def apri_magazzino(window_instance):
         """Apre la finestra per gestire il magazzino"""
         window_instance.magazzino_window = MagazzinoWindow(window_instance.db_manager)
+
+        # Collega il signal di gestione materiali al magazzino se il primo è aperto
+        if (window_instance.gestione_materiali_window is not None
+                and window_instance.gestione_materiali_window.isVisible()):
+            window_instance.gestione_materiali_window.materiali_modificati.connect(
+                window_instance.magazzino_window.carica_scorte
+            )
+
         window_instance.magazzino_window.show()
 
     @staticmethod

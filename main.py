@@ -8,7 +8,7 @@ import sys
 import os
 import traceback
 from PyQt5.QtWidgets import QApplication, QMessageBox
-from PyQt5.QtCore import QDir
+from PyQt5.QtCore import QDir, Qt
 
 # Aggiungi la directory corrente al path per importare i moduli
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -54,9 +54,10 @@ def main():
     app.setOrganizationName("RCS")
 
     try:
-        # Crea e mostra la finestra principale
+        # Crea e mostra la finestra principale massimizzata
         window = MainWindow()
-        window.showMaximized()
+        window.setWindowState(Qt.WindowMaximized)
+        window.show()
 
         # Avvia il loop degli eventi
         sys.exit(app.exec_())
