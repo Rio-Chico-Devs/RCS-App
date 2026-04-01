@@ -578,28 +578,32 @@ class MagazzinoWindow(QMainWindow):
         self.scorte_layout.addStretch()
 
     def stampa_inventario(self):
-        """Genera PDF inventario, lo salva su disco e lo apre con il viewer di sistema"""
-        import os, sys
+        """Genera ODT inventario su un singolo foglio A4 orizzontale.
+
+        Fasi:
+        1. Raccolta dati (tutte le righe)
+        2. Calcolo adattivo di font e altezza righe per riempire esattamente il foglio
+        3. Generazione del file ODT con tabella unica
+        """
+        import os, sys, zipfile
         from datetime import datetime as _dt
         from PyQt5.QtWidgets import QFileDialog
-        from PyQt5.QtPrintSupport import QPrinter
-        from PyQt5.QtGui import QPainter, QFont, QColor, QPen, QBrush
-        from PyQt5.QtCore import Qt, QRectF
 
         now = _dt.now().strftime("%d/%m/%Y %H:%M")
         nome_default = f"Inventario_Magazzino_{_dt.now().strftime('%Y%m%d_%H%M')}"
 
         file_path, _ = QFileDialog.getSaveFileName(
-            self, "Salva Inventario PDF", nome_default, "PDF (*.pdf)"
+            self, "Salva Inventario ODT", nome_default, "ODT (*.odt)"
         )
         if not file_path:
             return
 
+        # ── Fase 1: raccolta dati ─────────────────────────────────────
         scorte = self.db_manager.get_scorte('nome')
-
         headers = ["Materiale", "Giac. Tot (m²)", "Sc. Min", "Sc. Max",
                    "% Agg.", "Fornitore", "Giac. Forn (m²)", "Min Forn", "% Forn"]
         col_ratios = [0.19, 0.10, 0.09, 0.09, 0.07, 0.18, 0.12, 0.09, 0.07]
+        right_cols = {1, 2, 3, 4, 6, 7, 8}
 
         data_rows = []
         for row in scorte:
@@ -615,96 +619,189 @@ class MagazzinoWindow(QMainWindow):
                     data_rows.append((True, ["", "", "", "", "",
                                              forn_nome, f"{giacenza:.2f}", f"{s_min:.2f}", pct_f]))
 
-        try:
-            printer = QPrinter(QPrinter.HighResolution)
-            printer.setOutputFormat(QPrinter.PdfFormat)
-            printer.setOutputFileName(file_path)
-            printer.setOrientation(QPrinter.Landscape)
-            printer.setPageSize(QPrinter.A4)
+        # ── Fase 2: calcolo adattivo dimensioni ───────────────────────
+        # A4 landscape: 29.7 x 21 cm — margini 1cm top/bottom, 1.5cm left/right
+        usable_w_cm = 26.7   # 29.7 - 2*1.5
+        usable_h_cm = 19.0   # 21 - 2*1  (titolo ~1.5cm lascia ~17.5cm per tabella)
+        title_h_cm = 1.5
+        table_h_cm = usable_h_cm - title_h_cm
 
-            painter = QPainter(printer)
-            pr = printer.pageRect()
-            pw, ph = pr.width(), pr.height()
+        total_rows = 1 + len(data_rows)   # header + righe dati
+        row_h_cm = table_h_cm / total_rows
+        padding_cm = min(0.10, row_h_cm * 0.15)
+        text_h_cm = max(row_h_cm - 2 * padding_cm, 0.10)
+        # 1pt ≈ 0.0353 cm  →  font_pt = text_h_cm / 0.0353
+        font_pt = max(5.5, min(11.0, text_h_cm / 0.0353))
+        font_pt_sub = max(5.0, font_pt * 0.88)
+        row_h_str = f"{row_h_cm:.4f}cm"
+        pad_str = f"{padding_cm:.4f}cm"
 
-            mx, my = pw * 0.03, ph * 0.04
-            uw = pw - 2 * mx
+        col_widths = [f"{r * usable_w_cm:.3f}cm" for r in col_ratios]
 
-            # ── Titolo ────────────────────────────────────────────────
-            title_h = ph * 0.07
-            font_t = QFont("Arial", 1)
-            font_t.setPointSizeF(title_h * 0.42)
-            font_t.setBold(True)
-            painter.setFont(font_t)
-            painter.setPen(QColor("#2d3748"))
-            painter.drawText(QRectF(mx, my, uw * 0.65, title_h),
-                             Qt.AlignLeft | Qt.AlignVCenter,
-                             "Inventario Magazzino — Software Aziendale RCS")
+        # ── Fase 3: costruzione ODT ───────────────────────────────────
+        def xe(v):
+            return str(v).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;')
 
-            font_d = QFont("Arial", 1)
-            font_d.setPointSizeF(title_h * 0.28)
-            painter.setFont(font_d)
-            painter.setPen(QColor("#718096"))
-            painter.drawText(QRectF(mx + uw * 0.65, my, uw * 0.35, title_h),
-                             Qt.AlignRight | Qt.AlignVCenter, f"Generato il {now}")
+        NS = (
+            'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+            'xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" '
+            'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" '
+            'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '
+            'xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"'
+        )
 
-            # ── Calcola altezze righe per riempire il foglio ──────────
-            table_top = my + title_h + ph * 0.01
-            table_h = ph - table_top - my
-            total_rows = 1 + len(data_rows)
-            row_h = table_h / total_rows
+        col_styles = ''.join(
+            f'<style:style style:name="IC{i}" style:family="table-column">'
+            f'<style:table-column-properties style:column-width="{w}"/></style:style>'
+            for i, w in enumerate(col_widths)
+        )
 
-            fs = max(row_h * 0.38, 1.0)
-            font_hdr = QFont("Arial", 1)
-            font_hdr.setPointSizeF(fs)
-            font_hdr.setBold(True)
-            font_body = QFont("Arial", 1)
-            font_body.setPointSizeF(fs)
-            font_sub = QFont("Arial", 1)
-            font_sub.setPointSizeF(max(fs * 0.88, 1.0))
+        auto_styles = (
+            f'<office:automatic-styles>'
+            f'<style:style style:name="TInv" style:family="table">'
+            f'<style:table-properties style:width="{usable_w_cm:.3f}cm" table:align="margins"/></style:style>'
+            f'{col_styles}'
+            f'<style:style style:name="RInv" style:family="table-row">'
+            f'<style:table-row-properties style:row-height="{row_h_str}"'
+            f' style:use-optimal-row-height="false"/></style:style>'
+            f'<style:style style:name="CHInv" style:family="table-cell">'
+            f'<style:table-cell-properties fo:border="0.5pt solid #2d3748" fo:padding="{pad_str}"'
+            f' fo:background-color="#edf2f7" fo:vertical-align="middle"/></style:style>'
+            f'<style:style style:name="CDInv" style:family="table-cell">'
+            f'<style:table-cell-properties fo:border="0.4pt solid #cbd5e0" fo:padding="{pad_str}"'
+            f' fo:vertical-align="middle"/></style:style>'
+            f'<style:style style:name="CSInv" style:family="table-cell">'
+            f'<style:table-cell-properties fo:border="0.4pt solid #cbd5e0" fo:padding="{pad_str}"'
+            f' fo:background-color="#f7fafc" fo:vertical-align="middle"/></style:style>'
+            f'<style:style style:name="PHdr" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="center"'
+            f' fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
+            f'<style:text-properties fo:font-size="{font_pt:.2f}pt"'
+            f' fo:font-weight="bold" fo:color="#2d3748"/></style:style>'
+            f'<style:style style:name="PMain" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="start"'
+            f' fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
+            f'<style:text-properties fo:font-size="{font_pt:.2f}pt"'
+            f' fo:font-weight="bold" fo:color="#2d3748"/></style:style>'
+            f'<style:style style:name="PNum" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="end"'
+            f' fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
+            f'<style:text-properties fo:font-size="{font_pt:.2f}pt" fo:color="#2d3748"/></style:style>'
+            f'<style:style style:name="PSub" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="start"'
+            f' fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
+            f'<style:text-properties fo:font-size="{font_pt_sub:.2f}pt" fo:color="#4a5568"/></style:style>'
+            f'<style:style style:name="PSubN" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="end"'
+            f' fo:margin-top="0cm" fo:margin-bottom="0cm"/>'
+            f'<style:text-properties fo:font-size="{font_pt_sub:.2f}pt" fo:color="#4a5568"/></style:style>'
+            f'<style:style style:name="PTit" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="start"'
+            f' fo:margin-top="0cm" fo:margin-bottom="0.2cm"/>'
+            f'<style:text-properties fo:font-size="13pt" fo:font-weight="bold"'
+            f' fo:color="#2d3748"/></style:style>'
+            f'<style:style style:name="PSub2" style:family="paragraph">'
+            f'<style:paragraph-properties fo:text-align="end"'
+            f' fo:margin-top="-0.5cm" fo:margin-bottom="0.2cm"/>'
+            f'<style:text-properties fo:font-size="8pt" fo:color="#718096"/></style:style>'
+            f'</office:automatic-styles>'
+        )
 
-            col_ws = [uw * r for r in col_ratios]
-            right_cols = {1, 2, 3, 4, 6, 7, 8}
+        def make_cell(val, cell_style, para_style):
+            return (
+                f'<table:table-cell table:style-name="{cell_style}">'
+                f'<text:p text:style-name="{para_style}">{xe(val)}</text:p>'
+                f'</table:table-cell>'
+            )
 
-            def draw_row(y, cols, is_header=False, is_sub=False):
-                x = mx
-                bg = QColor("#edf2f7") if is_header else (QColor("#f7fafc") if is_sub else QColor("#ffffff"))
-                painter.fillRect(QRectF(x, y, uw, row_h), QBrush(bg))
-                pen_b = QPen(QColor("#cbd5e0"), 0.4)
-                painter.setPen(pen_b)
-                painter.drawRect(QRectF(x, y, uw, row_h))
-                cx = x
-                for i, (val, cw) in enumerate(zip(cols, col_ws)):
-                    painter.setPen(pen_b)
-                    painter.drawLine(int(cx), int(y), int(cx), int(y + row_h))
-                    if is_header:
-                        painter.setFont(font_hdr)
-                        painter.setPen(QColor("#2d3748"))
-                    elif is_sub:
-                        painter.setFont(font_sub)
-                        painter.setPen(QColor("#4a5568"))
+        hdr_cells = ''.join(make_cell(h, 'CHInv', 'PHdr') for h in headers)
+        header_row = f'<table:table-row table:style-name="RInv">{hdr_cells}</table:table-row>'
+
+        data_xml_parts = []
+        for is_sub, cols in data_rows:
+            cell_st = 'CSInv' if is_sub else 'CDInv'
+            cells = ''
+            for i, val in enumerate(cols):
+                if is_sub:
+                    display = f'↳ {val}' if (i == 5 and val) else val
+                    para_st = 'PSubN' if i in right_cols else 'PSub'
+                else:
+                    display = val
+                    if i == 0:
+                        para_st = 'PMain'
+                    elif i in right_cols:
+                        para_st = 'PNum'
                     else:
-                        f2 = QFont(font_body)
-                        if i == 0:
-                            f2.setBold(True)
-                        painter.setFont(f2)
-                        painter.setPen(QColor("#2d3748"))
-                    pad = 3
-                    indent = 10 if (is_sub and i == 5) else 0
-                    text = ("  ↳ " + val) if (is_sub and i == 5 and val) else val
-                    align = (Qt.AlignRight if i in right_cols else Qt.AlignLeft) | Qt.AlignVCenter
-                    painter.drawText(QRectF(cx + pad + indent, y, cw - pad * 2 - indent, row_h), align, text)
-                    cx += cw
+                        para_st = 'PHdr'
+                cells += make_cell(display, cell_st, para_st)
+            data_xml_parts.append(f'<table:table-row table:style-name="RInv">{cells}</table:table-row>')
 
-            y = table_top
-            draw_row(y, headers, is_header=True)
-            y += row_h
-            for is_sub, cols in data_rows:
-                draw_row(y, cols, is_sub=is_sub)
-                y += row_h
+        col_defs = ''.join(f'<table:table-column table:style-name="IC{i}"/>' for i in range(len(col_widths)))
+        inv_table = (
+            f'<table:table table:name="Inventario" table:style-name="TInv">'
+            f'{col_defs}'
+            f'{header_row}'
+            + ''.join(data_xml_parts) +
+            f'</table:table>'
+        )
 
-            painter.end()
+        content_xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            f'<office:document-content {NS}>'
+            f'{auto_styles}'
+            f'<office:body><office:text>'
+            f'<text:p text:style-name="PTit">Inventario Magazzino \u2014 Software Aziendale RCS</text:p>'
+            f'<text:p text:style-name="PSub2">Generato il {xe(now)}</text:p>'
+            f'{inv_table}'
+            f'</office:text></office:body>'
+            f'</office:document-content>'
+        )
 
-            # ── Apri il PDF con il viewer di sistema ──────────────────
+        styles_xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<office:document-styles\n'
+            '    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"\n'
+            '    xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"\n'
+            '    xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0">\n'
+            '  <office:styles>\n'
+            '    <style:style style:name="Standard" style:family="paragraph" style:class="text"/>\n'
+            '  </office:styles>\n'
+            '  <office:automatic-styles>\n'
+            '    <style:page-layout style:name="pm1">\n'
+            '      <style:page-layout-properties\n'
+            '          fo:page-width="29.7cm" fo:page-height="21cm"\n'
+            '          style:print-orientation="landscape"\n'
+            '          fo:margin-top="1cm" fo:margin-bottom="1cm"\n'
+            '          fo:margin-left="1.5cm" fo:margin-right="1.5cm"/>\n'
+            '    </style:page-layout>\n'
+            '  </office:automatic-styles>\n'
+            '  <office:master-styles>\n'
+            '    <style:master-page style:name="Standard" style:page-layout-name="pm1"/>\n'
+            '  </office:master-styles>\n'
+            '</office:document-styles>'
+        )
+
+        manifest_xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<manifest:manifest\n'
+            '    xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"\n'
+            '    manifest:version="1.2">\n'
+            '  <manifest:file-entry manifest:media-type="application/vnd.oasis.opendocument.text"'
+            ' manifest:full-path="/"/>\n'
+            '  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="content.xml"/>\n'
+            '  <manifest:file-entry manifest:media-type="text/xml" manifest:full-path="styles.xml"/>\n'
+            '</manifest:manifest>'
+        )
+
+        try:
+            mi = zipfile.ZipInfo('mimetype')
+            mi.compress_type = zipfile.ZIP_STORED
+            with zipfile.ZipFile(file_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr(mi, 'application/vnd.oasis.opendocument.text')
+                zf.writestr('META-INF/manifest.xml', manifest_xml)
+                zf.writestr('styles.xml', styles_xml)
+                zf.writestr('content.xml', content_xml)
+
             try:
                 if sys.platform == 'win32':
                     os.startfile(file_path)
@@ -718,7 +815,7 @@ class MagazzinoWindow(QMainWindow):
                 pass
 
         except Exception as e:
-            QMessageBox.warning(self, "Errore", f"Impossibile generare il PDF:\n{str(e)}")
+            QMessageBox.warning(self, "Errore", f"Impossibile generare l'ODT:\n{str(e)}")
 
     def mostra_storico(self, materiale_id, nome_materiale):
         """Mostra lo storico movimenti di un materiale"""
