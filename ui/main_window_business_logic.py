@@ -23,7 +23,11 @@ v1.1.0 (25/09/2025):
 # pyright: reportUnusedVariable=false
 
 import sys
-from PyQt5.QtWidgets import QMessageBox, QDialog, QVBoxLayout, QTextEdit, QDialogButtonBox, QLabel, QListWidgetItem
+import os
+import json
+import subprocess
+from PyQt5.QtWidgets import (QMessageBox, QDialog, QVBoxLayout, QTextEdit,
+                             QDialogButtonBox, QLabel, QListWidgetItem, QFileDialog)
 from PyQt5.QtCore import Qt
 from ui.preventivo_window import PreventivoWindow
 from ui.gestione_materiali_window import GestioneMaterialiWindow
@@ -674,3 +678,62 @@ class MainWindowBusinessLogic:
             # Mostra un messaggio di successo
             QMessageBox.information(window_instance, "Successo",
                                   "Preventivo salvato con successo!\n\nUsa 'Visualizza Preventivi Salvati' per vederlo nella lista.")
+
+    @staticmethod
+    def cambia_database(window_instance):
+        """Permette all'utente di selezionare un database diverso (es. cartella condivisa in rete)."""
+        if getattr(sys, 'frozen', False):
+            base_dir = os.path.dirname(sys.executable)
+        else:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(
+                sys.modules[__name__].__file__
+            )))
+
+        # Mostra il percorso attuale
+        config_path = os.path.join(base_dir, "config.json")
+        db_attuale = window_instance.db_manager.db_path
+        risposta = QMessageBox.question(
+            window_instance,
+            "Cambia Database",
+            f"Database attuale:\n{db_attuale}\n\n"
+            "Vuoi selezionare un database diverso?\n"
+            "(Tutti i PC che puntano allo stesso file condivideranno gli stessi dati)",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if risposta != QMessageBox.Yes:
+            return
+
+        path_nuovo, _ = QFileDialog.getOpenFileName(
+            window_instance,
+            "Seleziona database",
+            os.path.dirname(db_attuale),
+            "Database SQLite (*.db);;Tutti i file (*)"
+        )
+        if not path_nuovo:
+            return
+
+        # Salva il nuovo percorso in config.json
+        try:
+            config = {"db_path": path_nuovo}
+            with open(config_path, "w", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            QMessageBox.critical(window_instance, "Errore",
+                                 f"Impossibile salvare la configurazione:\n{e}")
+            return
+
+        QMessageBox.information(
+            window_instance,
+            "Database aggiornato",
+            f"Il database è stato impostato a:\n{path_nuovo}\n\n"
+            "L'applicazione verrà riavviata ora."
+        )
+
+        # Riavvio applicazione
+        if getattr(sys, 'frozen', False):
+            subprocess.Popen([sys.executable] + sys.argv[1:])
+        else:
+            subprocess.Popen([sys.executable] + sys.argv)
+        window_instance.close()
+        sys.exit(0)

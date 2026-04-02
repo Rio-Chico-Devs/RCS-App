@@ -313,11 +313,43 @@ class MainWindowUIComponents:
         """)
         window_instance.btn_anagrafica_clienti.clicked.connect(window_instance.apri_anagrafica_clienti)
 
+        # Separatore visivo prima del bottone impostazioni DB
+        sep = QFrame()
+        sep.setFrameShape(QFrame.HLine)
+        sep.setFrameShadow(QFrame.Sunken)
+        sep.setStyleSheet("color: #e2e8f0;")
+
+        # Pulsante Cambia Database
+        window_instance.btn_cambia_database = QPushButton("Cambia Database")
+        window_instance.btn_cambia_database.setMinimumHeight(38)
+        window_instance.btn_cambia_database.setStyleSheet("""
+            QPushButton {
+                background-color: #fff8e1;
+                color: #7b5e00;
+                border: 1px solid #f6e05e;
+                min-height: 38px;
+                font-size: 13px;
+                font-weight: 500;
+            }
+            QPushButton:hover {
+                background-color: #fef3c7;
+            }
+            QPushButton:pressed {
+                background-color: #fde68a;
+            }
+        """)
+        window_instance.btn_cambia_database.setToolTip(
+            "Seleziona un database diverso (es. cartella condivisa in rete)"
+        )
+        window_instance.btn_cambia_database.clicked.connect(window_instance.cambia_database)
+
         buttons_layout.addWidget(window_instance.btn_nuovo_preventivo)
         buttons_layout.addWidget(window_instance.btn_visualizza_preventivi)
         buttons_layout.addWidget(window_instance.btn_gestisci_materiali)
         buttons_layout.addWidget(window_instance.btn_gestisci_magazzino)
         buttons_layout.addWidget(window_instance.btn_anagrafica_clienti)
+        buttons_layout.addWidget(sep)
+        buttons_layout.addWidget(window_instance.btn_cambia_database)
 
         parent_layout.addLayout(buttons_layout)
 
