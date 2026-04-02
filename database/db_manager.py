@@ -38,19 +38,24 @@ class DatabaseManager:
             config_path = os.path.join(base_dir, "config.json")
             if os.path.exists(config_path):
                 try:
-                    import json
                     with open(config_path, "r", encoding="utf-8") as f:
                         cfg = json.load(f)
                     if cfg.get("db_path"):
                         db_path = cfg["db_path"]
-                except Exception:
-                    pass  # Config non valida: usa il percorso locale
+                except Exception as e:
+                    raise RuntimeError(
+                        f"Impossibile leggere il file di configurazione:\n{config_path}\n\n"
+                        f"Errore: {e}\n\n"
+                        f"Verificare che il file config.json sia valido o eliminarlo per "
+                        f"reimpostare la configurazione."
+                    ) from e
 
             if db_path is None:
                 db_path = os.path.join(base_dir, "data", "materiali.db")
 
         self.db_path = db_path
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        db_dir = os.path.dirname(os.path.abspath(db_path))
+        os.makedirs(db_dir, exist_ok=True)
         self.init_database()
         self._backup_database()
 

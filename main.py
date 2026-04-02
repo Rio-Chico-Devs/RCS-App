@@ -141,7 +141,8 @@ def _mostra_dialogo_primo_avvio(base_dir):
     # Nota rete
     nota_rete = QLabel(
         "Nota: il percorso di rete deve essere accessibile da questo PC.\n"
-        "Su altri PC inserisci lo stesso percorso nella stessa schermata."
+        "Su altri PC inserisci lo stesso percorso nella stessa schermata.\n"
+        "Verrà salvato un file config.json nella cartella dell'applicazione."
     )
     nota_rete.setStyleSheet("color: #888; font-size: 11px; margin-left: 22px;")
     nota_rete.setWordWrap(True)
@@ -214,6 +215,18 @@ def _mostra_dialogo_primo_avvio(base_dir):
             config_path = os.path.join(base_dir, "config.json")
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
+
+            # Se esiste una cartella data/ locale con un db, avvisa l'utente
+            db_locale = os.path.join(base_dir, "data", "materiali.db")
+            if os.path.exists(db_locale):
+                QMessageBox.information(
+                    dialog,
+                    "Database locale esistente",
+                    f"È stato trovato un database locale in:\n{db_locale}\n\n"
+                    f"L'applicazione userà il percorso di rete configurato.\n"
+                    f"Il database locale NON verrà eliminato automaticamente: "
+                    f"puoi farlo manualmente se non ti serve più."
+                )
         # Locale: nessun config.json → comportamento default
         risultato["ok"] = True
         dialog.accept()
