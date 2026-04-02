@@ -40,6 +40,7 @@ from ui.gestione_materiali_window import GestioneMaterialiWindow
 from ui.main_window_ui_components import MainWindowUIComponents
 from ui.main_window_business_logic import MainWindowBusinessLogic
 from ui.document_utils import DocumentUtils
+from ui.settings_window import SettingsWindow
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -105,6 +106,31 @@ class MainWindow(QMainWindow):
     def apri_confronto_preventivi(self):
         """NUOVO: Apre la finestra per confrontare due preventivi"""
         MainWindowBusinessLogic.apri_confronto_preventivi(self)
+
+    def apri_impostazioni(self):
+        """Apre la finestra Impostazioni per cambiare il database"""
+        dialog = SettingsWindow(self)
+        if dialog.exec_() == SettingsWindow.Accepted:
+            # Reinizializza il database manager col nuovo percorso
+            nuovo_path = dialog.nuovo_percorso_db()
+            try:
+                self.db_manager = DatabaseManager(nuovo_path)
+            except Exception as e:
+                from PyQt5.QtWidgets import QMessageBox
+                QMessageBox.critical(self, "Errore database",
+                                     f"Impossibile connettersi al nuovo database:\n\n{e}")
+                return
+            # Chiudi le sottofinestre aperte che usavano il vecchio db
+            for attr in ("preventivo_window", "gestione_materiali_window",
+                         "visualizza_preventivi_window", "magazzino_window",
+                         "anagrafica_clienti_window"):
+                win = getattr(self, attr, None)
+                if win is not None:
+                    try:
+                        win.close()
+                    except Exception:
+                        pass
+                    setattr(self, attr, None)
 
     # =============================================================================
     # COMPATIBILITY METHODS - Per retrocompatibilità
