@@ -22,7 +22,7 @@ Author: Antonio VB
 
 from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QWidget,
                              QLabel, QGroupBox, QFrame, QSizePolicy,
-                             QGraphicsDropShadowEffect)
+                             QGraphicsDropShadowEffect, QScrollArea, QApplication)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QColor
 
@@ -31,33 +31,43 @@ class MainWindowUIComponents:
     @staticmethod
     def init_ui(window_instance):
         """Inizializzazione completa dell'interfaccia MainWindow"""
-        # Design system unificato
         window_instance.setWindowTitle("Software Aziendale RCS")
-        
+
         # Applica stili globali
         MainWindowUIComponents.apply_global_styles(window_instance)
-        
-        # Widget centrale
-        central_widget = QWidget()
-        window_instance.setCentralWidget(central_widget)
-        
-        # Layout principale con margini generosi
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(40, 30, 40, 30)
-        main_layout.setSpacing(30)
-        
+
+        # Widget centrale con scroll — si adatta a qualsiasi risoluzione
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setStyleSheet("QScrollArea { background-color: #fafbfc; border: none; }")
+        window_instance.setCentralWidget(scroll_area)
+
+        inner_widget = QWidget()
+        inner_widget.setStyleSheet("background-color: #fafbfc;")
+        scroll_area.setWidget(inner_widget)
+
+        # Calcola margini adattivi in base all'altezza dello schermo
+        screen = QApplication.primaryScreen().availableGeometry()
+        if screen.height() <= 800:
+            h_margin, v_margin, spacing = 24, 16, 16
+        else:
+            h_margin, v_margin, spacing = 40, 30, 30
+
+        main_layout = QVBoxLayout(inner_widget)
+        main_layout.setContentsMargins(h_margin, v_margin, h_margin, v_margin)
+        main_layout.setSpacing(spacing)
+
         # Header principale
         MainWindowUIComponents.create_header(window_instance, main_layout)
-        
-        # Contenuto principale - layout responsive
+
+        # Contenuto principale
         content_layout = QHBoxLayout()
-        content_layout.setSpacing(40)
-
-        # Colonna principale (pulsanti azioni) - ora occupa tutta la larghezza
+        content_layout.setSpacing(spacing)
         MainWindowUIComponents.create_main_actions_column(window_instance, content_layout)
-
         main_layout.addLayout(content_layout, 1)
-        
+
         # Footer informativo
         MainWindowUIComponents.create_footer(window_instance, main_layout)
     
@@ -135,46 +145,50 @@ class MainWindowUIComponents:
     @staticmethod
     def create_header(window_instance, parent_layout):
         """Header unificato con titolo principale"""
+        screen = QApplication.primaryScreen().availableGeometry()
+        small_screen = screen.height() <= 800
+
         header_container = QFrame()
-        header_container.setStyleSheet("""
-            QFrame {
+        padding = "10px 0px" if small_screen else "20px 0px"
+        header_container.setStyleSheet(f"""
+            QFrame {{
                 background-color: transparent;
                 border: none;
-                padding: 20px 0px;
-            }
+                padding: {padding};
+            }}
         """)
-        
+
         header_layout = QVBoxLayout(header_container)
-        header_layout.setSpacing(8)
-        
-        # Titolo principale
+        header_layout.setSpacing(4 if small_screen else 8)
+
+        title_size = "24px" if small_screen else "32px"
         title_label = QLabel("Software Aziendale RCS")
         title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("""
-            QLabel {
-                font-size: 32px;
+        title_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {title_size};
                 font-weight: 700;
                 color: #2d3748;
                 padding: 0;
-            }
+            }}
         """)
-        
-        # Sottotitolo
+
+        subtitle_size = "13px" if small_screen else "16px"
         subtitle_label = QLabel("Sistema di calcolo preventivi e statistiche RCS")
         subtitle_label.setAlignment(Qt.AlignCenter)
         subtitle_label.setWordWrap(True)
-        subtitle_label.setStyleSheet("""
-            QLabel {
-                font-size: 16px;
+        subtitle_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {subtitle_size};
                 font-weight: 400;
                 color: #718096;
                 padding: 0;
-            }
+            }}
         """)
-        
+
         header_layout.addWidget(title_label)
         header_layout.addWidget(subtitle_label)
-        
+
         parent_layout.addWidget(header_container)
     
     @staticmethod
@@ -190,9 +204,14 @@ class MainWindowUIComponents:
         actions_group = QGroupBox("Azioni Principali")
         actions_group.setGraphicsEffect(MainWindowUIComponents.create_shadow_effect())
         
+        screen = QApplication.primaryScreen().availableGeometry()
+        small_screen = screen.height() <= 800
+        pad = 16 if small_screen else 30
+        top_pad = 20 if small_screen else 35
+
         actions_layout = QVBoxLayout(actions_group)
-        actions_layout.setContentsMargins(30, 35, 30, 30)
-        actions_layout.setSpacing(20)
+        actions_layout.setContentsMargins(pad, top_pad, pad, pad)
+        actions_layout.setSpacing(12 if small_screen else 20)
         
         # Pulsanti principali
         MainWindowUIComponents.create_main_buttons(window_instance, actions_layout)
@@ -206,114 +225,67 @@ class MainWindowUIComponents:
     @staticmethod
     def create_main_buttons(window_instance, parent_layout):
         """Pulsanti principali standardizzati"""
+        screen = QApplication.primaryScreen().availableGeometry()
+        small_screen = screen.height() <= 800
+        btn_h = 40 if small_screen else 50
+        font_main = "14px" if small_screen else "16px"
+        font_db = "12px" if small_screen else "13px"
+        btn_db_h = 32 if small_screen else 38
+
         buttons_layout = QVBoxLayout()
-        buttons_layout.setSpacing(16)
-        
+        buttons_layout.setSpacing(10 if small_screen else 16)
+
         # Pulsante Nuovo Preventivo - primario
         window_instance.btn_nuovo_preventivo = QPushButton("Calcola Nuovo Preventivo")
-        window_instance.btn_nuovo_preventivo.setMinimumHeight(50)
-        window_instance.btn_nuovo_preventivo.setStyleSheet("""
-            QPushButton {
+        window_instance.btn_nuovo_preventivo.setMinimumHeight(btn_h)
+        window_instance.btn_nuovo_preventivo.setStyleSheet(f"""
+            QPushButton {{
                 background-color: #4a5568;
                 color: #ffffff;
-                min-height: 50px;
-                font-size: 16px;
+                min-height: {btn_h}px;
+                font-size: {font_main};
                 font-weight: 600;
-            }
-            QPushButton:hover {
-                background-color: #2d3748;
-            }
-            QPushButton:pressed {
-                background-color: #1a202c;
-            }
+            }}
+            QPushButton:hover {{ background-color: #2d3748; }}
+            QPushButton:pressed {{ background-color: #1a202c; }}
         """)
         window_instance.btn_nuovo_preventivo.clicked.connect(window_instance.apri_preventivo)
-        
-        # Pulsante Visualizza Preventivi - secondario
+
+        # Stile secondario riutilizzabile
+        style_secondary = f"""
+            QPushButton {{
+                background-color: #f7fafc;
+                color: #4a5568;
+                border: 1px solid #e2e8f0;
+                min-height: {btn_h}px;
+                font-size: {font_main};
+                font-weight: 600;
+            }}
+            QPushButton:hover {{ background-color: #edf2f7; }}
+            QPushButton:pressed {{ background-color: #e2e8f0; }}
+        """
+
         window_instance.btn_visualizza_preventivi = QPushButton("Visualizza Preventivi Salvati")
-        window_instance.btn_visualizza_preventivi.setMinimumHeight(50)
-        window_instance.btn_visualizza_preventivi.setStyleSheet("""
-            QPushButton {
-                background-color: #f7fafc;
-                color: #4a5568;
-                border: 1px solid #e2e8f0;
-                min-height: 50px;
-                font-size: 16px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background-color: #edf2f7;
-            }
-            QPushButton:pressed {
-                background-color: #e2e8f0;
-            }
-        """)
+        window_instance.btn_visualizza_preventivi.setMinimumHeight(btn_h)
+        window_instance.btn_visualizza_preventivi.setStyleSheet(style_secondary)
         window_instance.btn_visualizza_preventivi.clicked.connect(window_instance.mostra_nascondi_preventivi)
-        
-        # Pulsante Gestisci Materiali
+
         window_instance.btn_gestisci_materiali = QPushButton("Gestisci Materiali")
-        window_instance.btn_gestisci_materiali.setMinimumHeight(50)
-        window_instance.btn_gestisci_materiali.setStyleSheet("""
-            QPushButton {
-                background-color: #f7fafc;
-                color: #4a5568;
-                border: 1px solid #e2e8f0;
-                min-height: 50px;
-                font-size: 16px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background-color: #edf2f7;
-            }
-            QPushButton:pressed {
-                background-color: #e2e8f0;
-            }
-        """)
+        window_instance.btn_gestisci_materiali.setMinimumHeight(btn_h)
+        window_instance.btn_gestisci_materiali.setStyleSheet(style_secondary)
         window_instance.btn_gestisci_materiali.clicked.connect(window_instance.apri_gestione_materiali)
 
-        # Pulsante Gestisci Magazzino
         window_instance.btn_gestisci_magazzino = QPushButton("Gestisci Magazzino")
-        window_instance.btn_gestisci_magazzino.setMinimumHeight(50)
-        window_instance.btn_gestisci_magazzino.setStyleSheet("""
-            QPushButton {
-                background-color: #f7fafc;
-                color: #4a5568;
-                border: 1px solid #e2e8f0;
-                min-height: 50px;
-                font-size: 16px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background-color: #edf2f7;
-            }
-            QPushButton:pressed {
-                background-color: #e2e8f0;
-            }
-        """)
+        window_instance.btn_gestisci_magazzino.setMinimumHeight(btn_h)
+        window_instance.btn_gestisci_magazzino.setStyleSheet(style_secondary)
         window_instance.btn_gestisci_magazzino.clicked.connect(window_instance.apri_magazzino)
 
-        # Pulsante Anagrafica Clienti
         window_instance.btn_anagrafica_clienti = QPushButton("Anagrafica Clienti")
-        window_instance.btn_anagrafica_clienti.setMinimumHeight(50)
-        window_instance.btn_anagrafica_clienti.setStyleSheet("""
-            QPushButton {
-                background-color: #f7fafc;
-                color: #4a5568;
-                border: 1px solid #e2e8f0;
-                min-height: 50px;
-                font-size: 16px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background-color: #edf2f7;
-            }
-            QPushButton:pressed {
-                background-color: #e2e8f0;
-            }
-        """)
+        window_instance.btn_anagrafica_clienti.setMinimumHeight(btn_h)
+        window_instance.btn_anagrafica_clienti.setStyleSheet(style_secondary)
         window_instance.btn_anagrafica_clienti.clicked.connect(window_instance.apri_anagrafica_clienti)
 
-        # Separatore visivo prima del bottone impostazioni DB
+        # Separatore
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
         sep.setFrameShadow(QFrame.Sunken)
@@ -321,22 +293,18 @@ class MainWindowUIComponents:
 
         # Pulsante Cambia Database
         window_instance.btn_cambia_database = QPushButton("Cambia Database")
-        window_instance.btn_cambia_database.setMinimumHeight(38)
-        window_instance.btn_cambia_database.setStyleSheet("""
-            QPushButton {
+        window_instance.btn_cambia_database.setMinimumHeight(btn_db_h)
+        window_instance.btn_cambia_database.setStyleSheet(f"""
+            QPushButton {{
                 background-color: #fff8e1;
                 color: #7b5e00;
                 border: 1px solid #f6e05e;
-                min-height: 38px;
-                font-size: 13px;
+                min-height: {btn_db_h}px;
+                font-size: {font_db};
                 font-weight: 500;
-            }
-            QPushButton:hover {
-                background-color: #fef3c7;
-            }
-            QPushButton:pressed {
-                background-color: #fde68a;
-            }
+            }}
+            QPushButton:hover {{ background-color: #fef3c7; }}
+            QPushButton:pressed {{ background-color: #fde68a; }}
         """)
         window_instance.btn_cambia_database.setToolTip(
             "Seleziona un database diverso (es. cartella condivisa in rete)"
