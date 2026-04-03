@@ -35,6 +35,7 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QColor
 from typing import Optional, Any
+from ui.responsive import get_metrics
 
 class VisualizzaPreventiviWindow(QMainWindow):
     preventivo_modificato = pyqtSignal()  # Signal per notificare modifiche
@@ -161,9 +162,10 @@ class VisualizzaPreventiviWindow(QMainWindow):
         self.setCentralWidget(central_widget)
 
         # Layout principale - margini ridotti per mostrare tutto
+        _m = get_metrics()
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(20, 15, 20, 15)
-        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(_m['mi'], _m['sf'], _m['mi'], _m['sf'])
+        main_layout.setSpacing(_m['sf'])
 
         # Header
         self.create_header(main_layout)
@@ -203,15 +205,16 @@ class VisualizzaPreventiviWindow(QMainWindow):
         header_layout.setSpacing(4)
 
         # Titolo principale
+        _hm = get_metrics()
         title_label = QLabel("Visualizza Preventivi")
         title_label.setAlignment(Qt.AlignCenter)
-        title_label.setStyleSheet("""
-            QLabel {
-                font-size: 24px;
+        title_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {_hm['ft']}px;
                 font-weight: 700;
                 color: #2d3748;
                 padding: 0;
-            }
+            }}
         """)
 
         # Sottotitolo
@@ -254,7 +257,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         self.filtro_origine = QComboBox()
         self.filtro_origine.addItems(["Tutti", "Originali", "Revisionati", "Con modifiche"])
         self.filtro_origine.currentIndexChanged.connect(self.load_preventivi)
-        self.filtro_origine.setMinimumWidth(140)
+        self.filtro_origine.setMinimumWidth(110 if get_metrics()['small'] else 140)
 
         filters_layout.addWidget(tipo_label)
         filters_layout.addWidget(self.filtro_origine)
@@ -265,7 +268,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         self.filtro_cliente = QComboBox()
         self.filtro_cliente.addItem("Tutti i clienti", None)
         self.filtro_cliente.currentIndexChanged.connect(self.load_preventivi)
-        self.filtro_cliente.setMinimumWidth(180)
+        self.filtro_cliente.setMinimumWidth(140 if get_metrics()['small'] else 180)
 
         filters_layout.addWidget(cliente_label)
         filters_layout.addWidget(self.filtro_cliente)
@@ -287,9 +290,10 @@ class VisualizzaPreventiviWindow(QMainWindow):
         lista_group = QGroupBox("Preventivi")
         lista_group.setGraphicsEffect(self.create_shadow_effect())
 
+        _lm = get_metrics()
         lista_layout = QVBoxLayout(lista_group)
-        lista_layout.setContentsMargins(15, 20, 15, 15)
-        lista_layout.setSpacing(8)
+        lista_layout.setContentsMargins(_lm['sf'], _lm['mi'], _lm['sf'], _lm['sf'])
+        lista_layout.setSpacing(_lm['sf'])
 
         # Tabella principale
         self.lista_preventivi = QTableWidget()
@@ -305,7 +309,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
         self.lista_preventivi.setShowGrid(False)          # niente griglia → riga = blocco unico
         self.lista_preventivi.setAlternatingRowColors(True)
         self.lista_preventivi.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self.lista_preventivi.setMinimumHeight(220)
+        self.lista_preventivi.setMinimumHeight(get_metrics()['dh'] // 4)
 
         hdr = self.lista_preventivi.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)   # #

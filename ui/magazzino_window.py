@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
 from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QColor, QPainter, QLinearGradient
 from ui.materiale_ui_components import NoScrollDoubleSpinBox
+from ui.responsive import get_metrics
 from datetime import datetime, timedelta
 
 
@@ -184,9 +185,10 @@ class MagazzinoWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
+        _m = get_metrics()
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(30, 15, 30, 15)
-        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(_m['mo'], _m['sf'], _m['mo'], _m['sf'])
+        main_layout.setSpacing(_m['sf'])
 
         # Header
         self.create_header(main_layout)
@@ -220,11 +222,13 @@ class MagazzinoWindow(QMainWindow):
     def create_header(self, parent_layout):
         header_layout = QHBoxLayout()
 
+        _hm = get_metrics()
         title_label = QLabel("Gestione Magazzino")
-        title_label.setStyleSheet("QLabel { font-size: 24px; font-weight: 700; color: #2d3748; }")
+        title_label.setStyleSheet(f"QLabel {{ font-size: {_hm['ft']}px; font-weight: 700; color: #2d3748; }}")
 
         subtitle_label = QLabel("Visualizza scorte, gestisci carico/scarico e monitora i consumi")
-        subtitle_label.setStyleSheet("QLabel { font-size: 14px; font-weight: 400; color: #718096; }")
+        subtitle_label.setStyleSheet(f"QLabel {{ font-size: {_hm['fb']}px; font-weight: 400; color: #718096; }}")
+        subtitle_label.setWordWrap(True)
 
         header_layout.addWidget(title_label)
         header_layout.addSpacing(20)
@@ -408,18 +412,20 @@ class MagazzinoWindow(QMainWindow):
             QFrame:hover { background-color: #fafbfc; }
         """)
 
+        _cm = get_metrics()
         card_layout = QHBoxLayout(card)
-        card_layout.setContentsMargins(16, 16, 16, 16)
-        card_layout.setSpacing(24)
+        card_layout.setContentsMargins(_cm['mi'], _cm['sf'], _cm['mi'], _cm['sf'])
+        card_layout.setSpacing(_cm['sc'])
 
         # Nome materiale
         lbl_nome = QLabel(nome)
-        lbl_nome.setStyleSheet("font-size: 20px; font-weight: 700; color: #2d3748; min-width: 160px;")
+        lbl_nome.setWordWrap(True)
+        lbl_nome.setStyleSheet(f"font-size: {_cm['ft'] - 4}px; font-weight: 700; color: #2d3748; min-width: 140px;")
         card_layout.addWidget(lbl_nome)
 
         # Giacenza totale
         lbl_giacenza = QLabel(f"{giacenza_totale:.2f} m²")
-        lbl_giacenza.setStyleSheet("font-size: 18px; font-weight: 600; color: #38a169; min-width: 100px;")
+        lbl_giacenza.setStyleSheet(f"font-size: {_cm['ft'] - 6}px; font-weight: 600; color: #38a169; min-width: 100px;")
         lbl_giacenza_label = QLabel("Giacenza")
         lbl_giacenza_label.setStyleSheet("font-size: 11px; color: #a0aec0; font-weight: 500;")
         giacenza_col = QVBoxLayout()
@@ -431,7 +437,8 @@ class MagazzinoWindow(QMainWindow):
         # Numero fornitori
         forn_text = f"{n_fornitori}" if n_fornitori > 0 else "—"
         lbl_forn = QLabel(forn_text)
-        lbl_forn.setStyleSheet("font-size: 18px; font-weight: 600; color: #4a5568; min-width: 40px;")
+        lbl_forn.setWordWrap(True)
+        lbl_forn.setStyleSheet(f"font-size: {_cm['ft'] - 6}px; font-weight: 600; color: #4a5568; min-width: 40px;")
         lbl_forn_label = QLabel("Fornitori")
         lbl_forn_label.setStyleSheet("font-size: 11px; color: #a0aec0; font-weight: 500;")
         forn_col = QVBoxLayout()
@@ -1074,7 +1081,7 @@ class MagazzinoWindow(QMainWindow):
         spin_q.setMaximum(99999.99)
         spin_q.setSuffix(" m²")
         spin_q.setValue(quantita_attuale)
-        spin_q.setMinimumHeight(36)
+        spin_q.setMinimumHeight(get_metrics()['fh'])
 
         edit_note = QLineEdit()
         edit_note.setText(note_attuale)
@@ -1578,17 +1585,18 @@ class MagazzinoWindow(QMainWindow):
         footer_layout.addStretch()
 
         btn_chiudi = QPushButton("Chiudi Magazzino")
-        btn_chiudi.setStyleSheet("""
-            QPushButton {
+        _fbh = get_metrics()['bh']
+        btn_chiudi.setStyleSheet(f"""
+            QPushButton {{
                 background-color: #f7fafc;
                 color: #4a5568;
                 border: 1px solid #e2e8f0;
-                min-height: 40px;
+                min-height: {_fbh}px;
                 min-width: 200px;
-            }
-            QPushButton:hover {
+            }}
+            QPushButton:hover {{
                 background-color: #edf2f7;
-            }
+            }}
         """)
         btn_chiudi.clicked.connect(self.close)
 

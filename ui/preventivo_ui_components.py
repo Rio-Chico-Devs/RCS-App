@@ -17,6 +17,7 @@ from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QWidget, QLa
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QFont
 from ui.materiale_ui_components import NoScrollDoubleSpinBox
+from ui.responsive import get_metrics
 
 class PreventivoUIComponents:
     """Classe per creare componenti UI standardizzati"""
@@ -51,7 +52,7 @@ class PreventivoUIComponents:
         spinbox.setDecimals(2)
         if suffix:
             spinbox.setSuffix(f" {suffix}")
-        spinbox.setMinimumHeight(36)
+        spinbox.setMinimumHeight(get_metrics()['fh'])
         if callback:
             spinbox.valueChanged.connect(callback)
         return spinbox
@@ -71,10 +72,11 @@ class PreventivoUIComponents:
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         
+        m = get_metrics()
         scroll_content = QWidget()
         scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setSpacing(20)
-        scroll_layout.setContentsMargins(30, 30, 30, 30)
+        scroll_layout.setSpacing(m['sm'])
+        scroll_layout.setContentsMargins(m['mo'], m['mo'], m['mo'], m['mo'])
         
         # Componenti principali
         PreventivoUIComponents.create_header(window_instance, scroll_layout)
@@ -142,14 +144,15 @@ class PreventivoUIComponents:
         else:
             title_text = "Calcolo Preventivo"
             
+        ft = get_metrics()['ft']
         title_label = QLabel(title_text)
-        title_label.setStyleSheet("""
-            QLabel {
-                font-size: 24px;
+        title_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {ft}px;
                 font-weight: 700;
                 color: #2d3748;
                 padding: 0 0 20px 0;
-            }
+            }}
         """)
         parent_layout.addWidget(title_label)
     
@@ -159,15 +162,16 @@ class PreventivoUIComponents:
         client_group = QGroupBox("Informazioni Cliente")
         client_group.setGraphicsEffect(PreventivoUIComponents.create_shadow_effect())
         
+        m = get_metrics()
         client_layout = QFormLayout(client_group)
-        client_layout.setContentsMargins(25, 28, 25, 25)
-        client_layout.setVerticalSpacing(16)
-        client_layout.setHorizontalSpacing(16)
-        
+        client_layout.setContentsMargins(m['mi'], m['mi_top'], m['mi'], m['mi'])
+        client_layout.setVerticalSpacing(m['sf'])
+        client_layout.setHorizontalSpacing(m['sf'])
+
         # Campi cliente in layout a griglia
         client_grid_widget = QWidget()
         client_grid = QGridLayout(client_grid_widget)
-        client_grid.setSpacing(16)
+        client_grid.setSpacing(m['sf'])
         
         # Prima riga: Nome Cliente e Numero Ordine
         client_grid.addWidget(PreventivoUIComponents.create_standard_label("Nome Cliente:"), 0, 0)
@@ -293,9 +297,10 @@ class PreventivoUIComponents:
         materiali_group = QGroupBox("Gestione Materiali")
         materiali_group.setGraphicsEffect(PreventivoUIComponents.create_shadow_effect())
         
+        m = get_metrics()
         materiali_layout = QVBoxLayout(materiali_group)
-        materiali_layout.setContentsMargins(25, 28, 25, 25)
-        materiali_layout.setSpacing(16)
+        materiali_layout.setContentsMargins(m['mi'], m['mi_top'], m['mi'], m['mi'])
+        materiali_layout.setSpacing(m['sc'])
         
         # Pulsante aggiungi materiale
         if window_instance.modalita != 'visualizza':
@@ -351,9 +356,10 @@ class PreventivoUIComponents:
         costi_group = QGroupBox("Costi e Tempi")
         costi_group.setGraphicsEffect(PreventivoUIComponents.create_shadow_effect())
         
+        m = get_metrics()
         costi_layout = QVBoxLayout(costi_group)
-        costi_layout.setContentsMargins(25, 28, 25, 25)
-        costi_layout.setSpacing(20)
+        costi_layout.setContentsMargins(m['mi'], m['mi_top'], m['mi'], m['mi'])
+        costi_layout.setSpacing(m['sm'])
         
         # Layout orizzontale per due colonne
         columns_layout = QHBoxLayout()

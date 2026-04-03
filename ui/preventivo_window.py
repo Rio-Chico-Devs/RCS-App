@@ -41,6 +41,7 @@ from ui.materiale_ui_components import NoScrollSpinBox, NoScrollDoubleSpinBox
 from models.preventivo import Preventivo
 from models.materiale import MaterialeCalcolato
 from ui.materiale_window import MaterialeWindow
+from ui.responsive import get_metrics
 import json
 
 class PreventivoWindow(QMainWindow):
@@ -203,24 +204,28 @@ class PreventivoWindow(QMainWindow):
             }
         """)
         
+        # Metriche adattive in base alla risoluzione
+        self._m = get_metrics()
+        m = self._m
+
         # Widget centrale
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        
+
         # Layout principale
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(30, 25, 30, 25)
-        main_layout.setSpacing(20)
-        
+        main_layout.setContentsMargins(m['mo'], m['mo'] - 5, m['mo'], m['mo'] - 5)
+        main_layout.setSpacing(m['sm'])
+
         # Header
         self.create_header(main_layout)
-        
+
         # NUOVO: Sezione informazioni cliente
         self.create_client_info_section(main_layout)
-        
+
         # Contenuto principale - layout responsive a tre colonne
         content_layout = QHBoxLayout()
-        content_layout.setSpacing(30)
+        content_layout.setSpacing(m['sc'])
         
         self.create_left_column(content_layout)   # Materiali
         self.create_middle_column(content_layout) # Tempi
@@ -249,15 +254,16 @@ class PreventivoWindow(QMainWindow):
         client_group = QGroupBox("Informazioni Cliente")
         client_group.setGraphicsEffect(self.create_shadow_effect())
         
+        m = self._m
         client_layout = QFormLayout(client_group)
-        client_layout.setContentsMargins(25, 28, 25, 25)
-        client_layout.setVerticalSpacing(16)
-        client_layout.setHorizontalSpacing(16)
-        
+        client_layout.setContentsMargins(m['mi'], m['mi_top'], m['mi'], m['mi'])
+        client_layout.setVerticalSpacing(m['sf'])
+        client_layout.setHorizontalSpacing(m['sf'])
+
         # Campi cliente in layout a griglia per sfruttare lo spazio
         client_grid_widget = QWidget()
         client_grid = QGridLayout(client_grid_widget)
-        client_grid.setSpacing(16)
+        client_grid.setSpacing(m['sf'])
         
         # Prima riga: Nome Cliente, Numero Ordine
         client_grid.addWidget(self.create_standard_label("Nome Cliente:"), 0, 0)
@@ -409,32 +415,34 @@ class PreventivoWindow(QMainWindow):
         else:
             title_text = "Calcolo Preventivo"
             
+        ft = self._m['ft']
         title_label = QLabel(title_text)
-        title_label.setStyleSheet("""
-            QLabel {
-                font-size: 24px;
+        title_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {ft}px;
                 font-weight: 700;
                 color: #2d3748;
                 padding: 0;
-            }
+            }}
         """)
         parent_layout.addWidget(title_label)
     
     def create_left_column(self, parent_layout):
         """Colonna materiali - stile unificato e responsive"""
+        m = self._m
         column_widget = QWidget()
         column_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        
+
         layout = QVBoxLayout(column_widget)
-        layout.setSpacing(20)
-        
+        layout.setSpacing(m['sm'])
+
         # Sezione materiali
         materiali_group = QGroupBox("Materiali")
         materiali_group.setGraphicsEffect(self.create_shadow_effect())
-        
+
         materiali_layout = QVBoxLayout(materiali_group)
-        materiali_layout.setContentsMargins(25, 28, 25, 25)
-        materiali_layout.setSpacing(16)
+        materiali_layout.setContentsMargins(m['mi'], m['mi_top'], m['mi'], m['mi'])
+        materiali_layout.setSpacing(m['sc'])
         
         # Info costo materiali
         self.create_cost_info_card(materiali_layout)
@@ -449,19 +457,20 @@ class PreventivoWindow(QMainWindow):
     
     def create_middle_column(self, parent_layout):
         """Colonna tempi - stile unificato e responsive"""
+        m = self._m
         column_widget = QWidget()
         column_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        
+
         layout = QVBoxLayout(column_widget)
-        layout.setSpacing(20)
-        
+        layout.setSpacing(m['sm'])
+
         # Sezione tempi
         tempi_group = QGroupBox("Tempi di Lavorazione")
         tempi_group.setGraphicsEffect(self.create_shadow_effect())
-        
+
         tempi_layout = QVBoxLayout(tempi_group)
-        tempi_layout.setContentsMargins(25, 28, 25, 25)
-        tempi_layout.setSpacing(16)
+        tempi_layout.setContentsMargins(m['mi'], m['mi_top'], m['mi'], m['mi'])
+        tempi_layout.setSpacing(m['sc'])
         
         # Form tempi
         self.create_time_form(tempi_layout)
@@ -476,31 +485,32 @@ class PreventivoWindow(QMainWindow):
     
     def create_right_column(self, parent_layout):
         """Colonna costi e totali - stile unificato e responsive"""
+        m = self._m
         column_widget = QWidget()
         column_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        
+
         layout = QVBoxLayout(column_widget)
-        layout.setSpacing(20)
-        
+        layout.setSpacing(m['sm'])
+
         # Sezione costi accessori
         costi_group = QGroupBox("Costi Accessori")
         costi_group.setGraphicsEffect(self.create_shadow_effect())
-        
+
         costi_layout = QVBoxLayout(costi_group)
-        costi_layout.setContentsMargins(25, 28, 25, 25)
-        costi_layout.setSpacing(16)
-        
+        costi_layout.setContentsMargins(m['mi'], m['mi_top'], m['mi'], m['mi'])
+        costi_layout.setSpacing(m['sc'])
+
         self.create_accessory_costs_form(costi_layout)
-        
+
         layout.addWidget(costi_group)
-        
+
         # Sezione totali
         totali_group = QGroupBox("Riepilogo Finale")
         totali_group.setGraphicsEffect(self.create_shadow_effect())
-        
+
         totali_layout = QVBoxLayout(totali_group)
-        totali_layout.setContentsMargins(25, 28, 25, 25)
-        totali_layout.setSpacing(16)
+        totali_layout.setContentsMargins(m['mi'], m['mi_top'], m['mi'], m['mi'])
+        totali_layout.setSpacing(m['sc'])
         
         self.create_totals_summary(totali_layout)
         
@@ -719,7 +729,7 @@ class PreventivoWindow(QMainWindow):
                 margin: 8px 0px;
             }
         """)
-        final_container.setMinimumHeight(50)
+        final_container.setMinimumHeight(self._m['bh'])
 
         final_layout = QHBoxLayout(final_container)
         final_layout.setContentsMargins(16, 12, 16, 12)
@@ -807,7 +817,7 @@ class PreventivoWindow(QMainWindow):
         spinbox.setDecimals(2)
         if suffix:
             spinbox.setSuffix(f" {suffix}")
-        spinbox.setMinimumHeight(36)
+        spinbox.setMinimumHeight(self._m['fh'])
         spinbox.valueChanged.connect(self.aggiorna_totali)
         return spinbox
     
