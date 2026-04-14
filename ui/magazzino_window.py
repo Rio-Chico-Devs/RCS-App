@@ -116,11 +116,11 @@ class MagazzinoWindow(QMainWindow):
             QComboBox {
                 border: 1px solid #e2e8f0;
                 border-radius: 6px;
-                padding: 8px 14px;
-                font-size: 14px;
+                padding: 5px 10px;
+                font-size: 13px;
                 background-color: #ffffff;
                 color: #2d3748;
-                min-height: 18px;
+                min-height: 16px;
                 font-family: system-ui, -apple-system, sans-serif;
             }
             QComboBox:hover {
@@ -136,12 +136,11 @@ class MagazzinoWindow(QMainWindow):
                 border: 1px solid #e2e8f0;
                 border-bottom: none;
                 border-radius: 6px 6px 0 0;
-                padding: 10px 20px;
-                font-size: 14px;
+                padding: 8px 16px;
+                font-size: 13px;
                 font-weight: 600;
                 font-family: system-ui, -apple-system, sans-serif;
                 margin-right: 4px;
-                min-width: 160px;
             }
             QTabBar::tab:selected {
                 background-color: #ffffff;
@@ -175,9 +174,9 @@ class MagazzinoWindow(QMainWindow):
             QPushButton {
                 border: none;
                 border-radius: 6px;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 600;
-                padding: 12px 24px;
+                padding: 8px 16px;
                 font-family: system-ui, -apple-system, sans-serif;
             }
         """)
@@ -244,19 +243,20 @@ class MagazzinoWindow(QMainWindow):
         layout.setContentsMargins(0, 20, 0, 0)
         layout.setSpacing(16)
 
-        # Barra superiore: toggle vista + ordina + carico/scarico
-        top_layout = QHBoxLayout()
+        # Barra superiore: due righe per evitare overflow su schermi 1366px
+        top_container = QVBoxLayout()
+        top_container.setSpacing(6)
 
         # Toggle singoli/categorie
         _toggle_style_active = """
             QPushButton { background-color: #4a5568; color: #ffffff;
-                          border-radius: 6px; min-height: 34px; padding: 6px 18px;
+                          border-radius: 6px; min-height: 32px; padding: 5px 14px;
                           font-size: 13px; font-weight: 700; }
         """
         _toggle_style_inactive = """
             QPushButton { background-color: #f7fafc; color: #4a5568;
                           border: 1px solid #e2e8f0; border-radius: 6px;
-                          min-height: 34px; padding: 6px 18px;
+                          min-height: 32px; padding: 5px 14px;
                           font-size: 13px; font-weight: 600; }
             QPushButton:hover { background-color: #edf2f7; }
         """
@@ -266,39 +266,67 @@ class MagazzinoWindow(QMainWindow):
         self.btn_vista_singoli = QPushButton("Singoli Materiali")
         self.btn_vista_singoli.setStyleSheet(_toggle_style_active)
         self.btn_vista_singoli.clicked.connect(self._vista_singoli)
-
         self._scorte_vista = 'singoli'
 
-        top_layout.addWidget(self.btn_vista_singoli)
-        top_layout.addSpacing(16)
+        # Riga 1: toggle + pulsanti azione
+        row1 = QHBoxLayout()
+        row1.setSpacing(6)
 
-        btn_carico = QPushButton("Carico Materiale")
+        btn_carico = QPushButton("Carico")
         btn_carico.setStyleSheet("""
-            QPushButton { background-color: #38a169; color: #ffffff; min-height: 36px; }
+            QPushButton { background-color: #38a169; color: #ffffff; min-height: 32px; padding: 5px 14px; }
             QPushButton:hover { background-color: #2f855a; }
         """)
+        btn_carico.setToolTip("Carico Materiale")
         btn_carico.clicked.connect(self.apri_dialog_carico)
 
-        btn_scarico = QPushButton("Scarico Materiale")
+        btn_scarico = QPushButton("Scarico")
         btn_scarico.setStyleSheet("""
-            QPushButton { background-color: #e53e3e; color: #ffffff; min-height: 36px; }
+            QPushButton { background-color: #e53e3e; color: #ffffff; min-height: 32px; padding: 5px 14px; }
             QPushButton:hover { background-color: #c53030; }
         """)
+        btn_scarico.setToolTip("Scarico Materiale")
         btn_scarico.clicked.connect(self.apri_dialog_scarico)
 
-        # Search field
+        btn_azzera = QPushButton("Azzera Giacenze")
+        btn_azzera.setStyleSheet("""
+            QPushButton { background-color: #dd6b20; color: #ffffff; min-height: 32px; padding: 5px 14px; }
+            QPushButton:hover { background-color: #c05621; }
+        """)
+        btn_azzera.clicked.connect(self.azzera_tutte_giacenze)
+
+        btn_stampa = QPushButton("Stampa Inventario")
+        btn_stampa.setStyleSheet("""
+            QPushButton { background-color: #f7fafc; color: #4a5568;
+                          border: 1px solid #e2e8f0; min-height: 32px; padding: 5px 14px; }
+            QPushButton:hover { background-color: #edf2f7; }
+        """)
+        btn_stampa.clicked.connect(self.stampa_inventario)
+
+        row1.addWidget(self.btn_vista_singoli)
+        row1.addStretch()
+        row1.addWidget(btn_stampa)
+        row1.addWidget(btn_carico)
+        row1.addWidget(btn_scarico)
+        row1.addWidget(btn_azzera)
+
+        # Riga 2: ricerca + filtri
+        row2 = QHBoxLayout()
+        row2.setSpacing(6)
+
         self.search_scorte = QLineEdit()
         self.search_scorte.setPlaceholderText("Cerca materiale...")
-        self.search_scorte.setFixedWidth(200)
+        self.search_scorte.setMinimumWidth(140)
+        self.search_scorte.setMaximumWidth(220)
         self.search_scorte.setStyleSheet("""
-            QLineEdit { border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px 12px;
-                        font-size: 13px; background-color: #ffffff; min-height: 22px; }
+            QLineEdit { border: 1px solid #e2e8f0; border-radius: 6px; padding: 5px 10px;
+                        font-size: 13px; background-color: #ffffff; min-height: 20px; }
             QLineEdit:focus { border-color: #718096; }
         """)
         self.search_scorte.textChanged.connect(self.carica_scorte)
 
         lbl_filtro = QLabel("Mostra:")
-        lbl_filtro.setStyleSheet("font-weight: 600;")
+        lbl_filtro.setStyleSheet("font-weight: 600; font-size: 13px;")
         self.combo_filtro_scorte = QComboBox()
         self.combo_filtro_scorte.addItem("Tutte le scorte", "tutte")
         self.combo_filtro_scorte.addItem("Scorte basse", "basse")
@@ -306,45 +334,24 @@ class MagazzinoWindow(QMainWindow):
         self.combo_filtro_scorte.currentIndexChanged.connect(self.carica_scorte)
 
         lbl_fornitore = QLabel("Fornitore:")
-        lbl_fornitore.setStyleSheet("font-weight: 600;")
+        lbl_fornitore.setStyleSheet("font-weight: 600; font-size: 13px;")
         self.combo_fornitore_filtro = QComboBox()
         self.combo_fornitore_filtro.addItem("Tutti", None)
         for nome_f in self.db_manager.get_fornitori_nomi_attivi():
             self.combo_fornitore_filtro.addItem(nome_f, nome_f)
         self.combo_fornitore_filtro.currentIndexChanged.connect(self.carica_scorte)
 
-        top_layout.addSpacing(8)
-        top_layout.addWidget(self.search_scorte)
-        top_layout.addSpacing(8)
-        top_layout.addWidget(lbl_filtro)
-        top_layout.addWidget(self.combo_filtro_scorte)
-        top_layout.addSpacing(8)
-        top_layout.addWidget(lbl_fornitore)
-        top_layout.addWidget(self.combo_fornitore_filtro)
-        btn_stampa = QPushButton("Stampa Inventario")
-        btn_stampa.setStyleSheet("""
-            QPushButton { background-color: #f7fafc; color: #4a5568;
-                          border: 1px solid #e2e8f0; min-height: 36px; }
-            QPushButton:hover { background-color: #edf2f7; }
-        """)
-        btn_stampa.clicked.connect(self.stampa_inventario)
+        row2.addWidget(self.search_scorte)
+        row2.addWidget(lbl_filtro)
+        row2.addWidget(self.combo_filtro_scorte)
+        row2.addSpacing(8)
+        row2.addWidget(lbl_fornitore)
+        row2.addWidget(self.combo_fornitore_filtro)
+        row2.addStretch()
 
-        btn_azzera = QPushButton("Azzera Giacenze")
-        btn_azzera.setStyleSheet("""
-            QPushButton { background-color: #dd6b20; color: #ffffff; min-height: 36px; }
-            QPushButton:hover { background-color: #c05621; }
-        """)
-        btn_azzera.clicked.connect(self.azzera_tutte_giacenze)
-
-        top_layout.addStretch()
-        top_layout.addWidget(btn_stampa)
-        top_layout.addSpacing(8)
-        top_layout.addWidget(btn_carico)
-        top_layout.addSpacing(8)
-        top_layout.addWidget(btn_scarico)
-        top_layout.addSpacing(8)
-        top_layout.addWidget(btn_azzera)
-        layout.addLayout(top_layout)
+        top_container.addLayout(row1)
+        top_container.addLayout(row2)
+        layout.addLayout(top_container)
 
         # Scroll area per le scorte
         self.scroll_scorte = QScrollArea()
@@ -781,28 +788,29 @@ class MagazzinoWindow(QMainWindow):
         dialog = QDialog(self)
         titolo = "Carico Materiale" if tipo == 'carico' else "Scarico Materiale"
         dialog.setWindowTitle(titolo)
-        dialog.setFixedSize(500, 440)
+        dialog.setMaximumSize(520, 480)
+        dialog.resize(500, 400)
         dialog.setStyleSheet("""
             QDialog { background-color: #fafbfc; font-family: system-ui, -apple-system, sans-serif; }
-            QLabel { color: #2d3748; font-size: 14px; font-weight: 500; }
+            QLabel { color: #2d3748; font-size: 13px; font-weight: 500; }
             QComboBox, QDoubleSpinBox, QLineEdit {
                 border: 1px solid #e2e8f0; border-radius: 6px;
-                padding: 10px 14px; font-size: 14px;
-                background-color: #ffffff; color: #2d3748; min-height: 18px;
+                padding: 6px 10px; font-size: 13px;
+                background-color: #ffffff; color: #2d3748; min-height: 16px;
             }
             QPushButton {
                 border: none; border-radius: 6px;
-                font-size: 14px; font-weight: 600;
-                padding: 12px 24px; min-height: 36px;
+                font-size: 13px; font-weight: 600;
+                padding: 8px 16px; min-height: 34px;
             }
         """)
 
         layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(30, 25, 30, 25)
-        layout.setSpacing(20)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(12)
 
         lbl_titolo = QLabel(titolo)
-        lbl_titolo.setStyleSheet("font-size: 18px; font-weight: 700;")
+        lbl_titolo.setStyleSheet("font-size: 16px; font-weight: 700;")
         layout.addWidget(lbl_titolo)
 
         form = QFormLayout()
@@ -1439,19 +1447,20 @@ class MagazzinoWindow(QMainWindow):
         """Dialog per aggiungere un nuovo fornitore"""
         dialog = QDialog(self)
         dialog.setWindowTitle("Aggiungi Fornitore")
-        dialog.setFixedSize(500, 480)
+        dialog.setMaximumSize(520, 500)
+        dialog.resize(500, 440)
         dialog.setStyleSheet("""
             QDialog { background-color: #fafbfc; font-family: system-ui, -apple-system, sans-serif; }
-            QLabel { color: #2d3748; font-size: 14px; font-weight: 500; }
+            QLabel { color: #2d3748; font-size: 13px; font-weight: 500; }
             QLineEdit {
                 border: 1px solid #e2e8f0; border-radius: 6px;
-                padding: 10px 14px; font-size: 14px;
-                background-color: #ffffff; color: #2d3748; min-height: 18px;
+                padding: 6px 10px; font-size: 13px;
+                background-color: #ffffff; color: #2d3748; min-height: 16px;
             }
             QPushButton {
                 border: none; border-radius: 6px;
-                font-size: 14px; font-weight: 600;
-                padding: 10px 20px; min-height: 36px;
+                font-size: 13px; font-weight: 600;
+                padding: 8px 16px; min-height: 34px;
             }
             QListWidget {
                 border: 1px solid #e2e8f0; border-radius: 6px;
@@ -1463,8 +1472,8 @@ class MagazzinoWindow(QMainWindow):
         """)
 
         layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(30, 25, 30, 25)
-        layout.setSpacing(16)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(12)
 
         lbl_titolo = QLabel("Nuovo Fornitore")
         lbl_titolo.setStyleSheet("font-size: 18px; font-weight: 700;")

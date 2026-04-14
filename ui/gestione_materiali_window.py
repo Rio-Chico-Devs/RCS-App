@@ -68,8 +68,8 @@ _BASE_STYLE = """
         border-color: #718096; }
     QLineEdit:hover, QDoubleSpinBox:hover, QComboBox:hover, QTextEdit:hover {
         border-color: #a0aec0; }
-    QPushButton { border: none; border-radius: 6px; font-size: 14px;
-                  font-weight: 600; padding: 12px 24px;
+    QPushButton { border: none; border-radius: 6px; font-size: 13px;
+                  font-weight: 600; padding: 8px 16px;
                   font-family: system-ui, -apple-system, sans-serif; }
     QCheckBox { font-size: 13px; color: #4a5568; font-weight: 500; }
     QTableWidget { background-color: #ffffff; border: 1px solid #e2e8f0;
@@ -748,8 +748,8 @@ _DIALOG_STYLE = """
         font-size: 14px; background-color: #ffffff; color: #2d3748; min-height: 18px; }
     QLineEdit:focus, QDoubleSpinBox:focus, QComboBox:focus, QTextEdit:focus {
         border-color: #718096; }
-    QPushButton { border: none; border-radius: 6px; font-size: 14px;
-                  font-weight: 600; padding: 12px 24px; min-height: 36px; }
+    QPushButton { border: none; border-radius: 6px; font-size: 13px;
+                  font-weight: 600; padding: 8px 16px; min-height: 34px; }
 """
 
 

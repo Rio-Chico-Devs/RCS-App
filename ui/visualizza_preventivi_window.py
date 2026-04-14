@@ -120,11 +120,11 @@ class VisualizzaPreventiviWindow(QMainWindow):
             QLineEdit, QComboBox {
                 border: 1px solid #e2e8f0;
                 border-radius: 6px;
-                padding: 10px 14px;
-                font-size: 14px;
+                padding: 6px 10px;
+                font-size: 13px;
                 background-color: #ffffff;
                 color: #2d3748;
-                min-height: 18px;
+                min-height: 16px;
                 font-family: system-ui, -apple-system, sans-serif;
             }
             QLineEdit:focus, QComboBox:focus {
@@ -150,9 +150,9 @@ class VisualizzaPreventiviWindow(QMainWindow):
             QPushButton {
                 border: none;
                 border-radius: 6px;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 600;
-                padding: 12px 24px;
+                padding: 8px 16px;
                 font-family: system-ui, -apple-system, sans-serif;
             }
         """)
