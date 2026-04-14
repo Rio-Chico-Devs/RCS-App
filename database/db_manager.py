@@ -686,6 +686,20 @@ class DatabaseManager:
             conn.commit()
             return True
 
+    def reset_tutte_giacenze(self):
+        """Azzera la giacenza di tutti i materiali e fornitori, e cancella tutti i movimenti."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE materiali SET giacenza = 0")
+                cursor.execute("UPDATE materiale_fornitori SET giacenza = 0")
+                cursor.execute("DELETE FROM movimenti_magazzino")
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in reset_tutte_giacenze: {e}")
+            return False
+
     def get_consumi_periodo(self, data_inizio, data_fine):
         """Restituisce i consumi aggregati per materiale in un periodo"""
         with sqlite3.connect(self.db_path) as conn:

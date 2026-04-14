@@ -329,12 +329,21 @@ class MagazzinoWindow(QMainWindow):
         """)
         btn_stampa.clicked.connect(self.stampa_inventario)
 
+        btn_azzera = QPushButton("Azzera Giacenze")
+        btn_azzera.setStyleSheet("""
+            QPushButton { background-color: #dd6b20; color: #ffffff; min-height: 36px; }
+            QPushButton:hover { background-color: #c05621; }
+        """)
+        btn_azzera.clicked.connect(self.azzera_tutte_giacenze)
+
         top_layout.addStretch()
         top_layout.addWidget(btn_stampa)
         top_layout.addSpacing(8)
         top_layout.addWidget(btn_carico)
         top_layout.addSpacing(8)
         top_layout.addWidget(btn_scarico)
+        top_layout.addSpacing(8)
+        top_layout.addWidget(btn_azzera)
         layout.addLayout(top_layout)
 
         # Scroll area per le scorte
@@ -739,6 +748,25 @@ class MagazzinoWindow(QMainWindow):
         layout.addWidget(btn_chiudi, alignment=Qt.AlignRight)
 
         dialog.exec_()
+
+    def azzera_tutte_giacenze(self):
+        """Azzera la giacenza di tutti i materiali e cancella tutti i movimenti."""
+        from PyQt5.QtWidgets import QMessageBox
+        risposta = QMessageBox.question(
+            self,
+            "Conferma azzeramento",
+            "Stai per azzerare la giacenza di TUTTI i materiali e cancellare tutti i movimenti.\n\n"
+            "Questa operazione non è reversibile.\n\nProcedere?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+        if risposta == QMessageBox.Yes:
+            ok = self.db_manager.reset_tutte_giacenze()
+            if ok:
+                QMessageBox.information(self, "Completato", "Giacenze azzerate con successo.")
+                self.carica_scorte()
+            else:
+                QMessageBox.critical(self, "Errore", "Si è verificato un errore durante l'azzeramento.")
 
     def apri_dialog_carico(self):
         """Dialog per aggiungere materiale al magazzino (carico)"""
