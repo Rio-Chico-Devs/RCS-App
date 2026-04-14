@@ -34,6 +34,7 @@ from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                              QMessageBox, QFileDialog, QLabel, QFrame)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
+from ui.responsive import get_metrics
 
 class DocumentUtils:
     """Utilità per generazione documenti di produzione"""
@@ -90,8 +91,9 @@ class DocumentUtils:
         btn_odt  = QPushButton("ODT\n(OpenOffice / LibreOffice)")
         btn_html.setStyleSheet(btn_style)
         btn_odt.setStyleSheet(btn_style)
-        btn_html.setMinimumHeight(52)
-        btn_odt.setMinimumHeight(52)
+        _bh = get_metrics()['bh'] + 4
+        btn_html.setMinimumHeight(_bh)
+        btn_odt.setMinimumHeight(_bh)
         btn_layout.addWidget(btn_html)
         btn_layout.addWidget(btn_odt)
         layout.addLayout(btn_layout)

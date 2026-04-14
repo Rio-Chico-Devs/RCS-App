@@ -26,6 +26,7 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
                              QSizePolicy)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QColor
+from ui.responsive import get_metrics
 
 class ConfrontoPreventiviWindow(QMainWindow):
     def __init__(self, db_manager, parent=None):
@@ -42,14 +43,16 @@ class ConfrontoPreventiviWindow(QMainWindow):
     def init_ui(self):
         """Inizializza l'interfaccia utente"""
         self.setWindowTitle("RCS - Confronto Preventivi")
-        self.setMinimumSize(1400, 800)
+        _m = get_metrics()
+        self.setMinimumSize(900 if _m['small'] else 1200, 600 if _m['small'] else 750)
+        self.showMaximized()
 
         # Widget centrale
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(20, 20, 20, 20)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(_m['mi'], _m['mi'], _m['mi'], _m['mi'])
+        main_layout.setSpacing(_m['sm'])
 
         # Header
         header_frame = QFrame()
@@ -64,8 +67,9 @@ class ConfrontoPreventiviWindow(QMainWindow):
         header_layout = QVBoxLayout(header_frame)
 
         # Titolo
+        _ft = get_metrics()['ft'] - 2
         title_label = QLabel("Confronto Preventivi")
-        title_label.setFont(QFont("Segoe UI", 22, QFont.Bold))
+        title_label.setFont(QFont("Segoe UI", _ft, QFont.Bold))
         title_label.setWordWrap(True)
         title_label.setStyleSheet("color: #2d3748; border: none; padding: 0;")
         header_layout.addWidget(title_label)
@@ -88,9 +92,10 @@ class ConfrontoPreventiviWindow(QMainWindow):
                 border-radius: 8px;
             }
         """)
+        _cm = get_metrics()
         self.content_layout = QVBoxLayout(self.content_container)
-        self.content_layout.setContentsMargins(20, 20, 20, 20)
-        self.content_layout.setSpacing(15)
+        self.content_layout.setContentsMargins(_cm['mi'], _cm['mi'], _cm['mi'], _cm['mi'])
+        self.content_layout.setSpacing(_cm['sc'])
 
         main_layout.addWidget(self.content_container, 1)
 

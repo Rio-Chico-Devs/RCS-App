@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 from PyQt5.QtGui import QFont, QColor, QPainter, QBrush, QPen
 from ui.materiale_ui_components import NoScrollDoubleSpinBox
+from ui.responsive import get_metrics
 
 
 # ---------------------------------------------------------------------------
@@ -67,8 +68,8 @@ _BASE_STYLE = """
         border-color: #718096; }
     QLineEdit:hover, QDoubleSpinBox:hover, QComboBox:hover, QTextEdit:hover {
         border-color: #a0aec0; }
-    QPushButton { border: none; border-radius: 6px; font-size: 14px;
-                  font-weight: 600; padding: 12px 24px;
+    QPushButton { border: none; border-radius: 6px; font-size: 13px;
+                  font-weight: 600; padding: 8px 16px;
                   font-family: system-ui, -apple-system, sans-serif; }
     QCheckBox { font-size: 13px; color: #4a5568; font-weight: 500; }
     QTableWidget { background-color: #ffffff; border: 1px solid #e2e8f0;
@@ -187,18 +188,19 @@ class GestioneMaterialiWindow(QMainWindow):
         self.setWindowTitle("Gestione Materiali - Software Aziendale RCS")
         self.setStyleSheet(_BASE_STYLE)
 
+        m = get_metrics()
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
-        main_layout.setContentsMargins(30, 15, 30, 15)
-        main_layout.setSpacing(12)
+        main_layout.setContentsMargins(m['mo'], m['sf'], m['mo'], m['sf'])
+        main_layout.setSpacing(m['sf'])
 
         # Header
         header_layout = QHBoxLayout()
         title = QLabel("Gestione Materiali")
-        title.setStyleSheet("QLabel { font-size: 24px; font-weight: 700; color: #2d3748; }")
+        title.setStyleSheet(f"QLabel {{ font-size: {m['ft']}px; font-weight: 700; color: #2d3748; }}")
         subtitle = QLabel("Modifica materiali")
-        subtitle.setStyleSheet("QLabel { font-size: 14px; font-weight: 400; color: #718096; }")
+        subtitle.setStyleSheet(f"QLabel {{ font-size: {m['fb']}px; font-weight: 400; color: #718096; }}")
         header_layout.addWidget(title)
         header_layout.addSpacing(20)
         header_layout.addWidget(subtitle)
@@ -219,10 +221,11 @@ class GestioneMaterialiWindow(QMainWindow):
         footer = QHBoxLayout()
         footer.addStretch()
         btn_chiudi = QPushButton("Chiudi Gestione Materiali")
-        btn_chiudi.setStyleSheet("""
-            QPushButton { background-color: #f7fafc; color: #4a5568;
-                          border: 1px solid #e2e8f0; min-height: 40px; min-width: 200px; }
-            QPushButton:hover { background-color: #edf2f7; }
+        _bh = get_metrics()['bh']
+        btn_chiudi.setStyleSheet(f"""
+            QPushButton {{ background-color: #f7fafc; color: #4a5568;
+                          border: 1px solid #e2e8f0; min-height: {_bh}px; min-width: 200px; }}
+            QPushButton:hover {{ background-color: #edf2f7; }}
         """)
         btn_chiudi.clicked.connect(self.close)
         footer.addWidget(btn_chiudi)
@@ -259,11 +262,12 @@ class GestioneMaterialiWindow(QMainWindow):
         layout.setSpacing(16)
         layout.setContentsMargins(0, 0, 0, 0)
 
+        _m = get_metrics()
         lista_group = QGroupBox("Materiali Disponibili")
         lista_group.setGraphicsEffect(_make_shadow())
         lista_inner = QVBoxLayout(lista_group)
-        lista_inner.setContentsMargins(20, 28, 20, 15)
-        lista_inner.setSpacing(10)
+        lista_inner.setContentsMargins(_m['mi'], _m['mi_top'], _m['mi'], _m['mi'])
+        lista_inner.setSpacing(_m['sf'])
 
         # Barra ricerca
         search_row = QHBoxLayout()
@@ -325,8 +329,9 @@ class GestioneMaterialiWindow(QMainWindow):
         layout.addLayout(back_row)
 
         # Layout a due colonne 50/50: sinistra = form, destra = fornitori
+        _m2 = get_metrics()
         columns = QHBoxLayout()
-        columns.setSpacing(20)
+        columns.setSpacing(_m2['sc'])
         columns.setContentsMargins(0, 0, 0, 0)
 
         # ── Colonna sinistra: form dettagli ──────────────────────────
@@ -334,8 +339,8 @@ class GestioneMaterialiWindow(QMainWindow):
         form_group.setGraphicsEffect(_make_shadow())
         form_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         form_inner = QVBoxLayout(form_group)
-        form_inner.setContentsMargins(20, 28, 20, 15)
-        form_inner.setSpacing(10)
+        form_inner.setContentsMargins(_m2['mi'], _m2['mi_top'], _m2['mi'], _m2['mi'])
+        form_inner.setSpacing(_m2['sf'])
 
         self.info_container = QFrame()
         self.info_container.setStyleSheet("""
@@ -363,26 +368,26 @@ class GestioneMaterialiWindow(QMainWindow):
         self.edit_spessore.setDecimals(2)
         self.edit_spessore.setMaximum(999.99)
         self.edit_spessore.setSuffix(" mm")
-        self.edit_spessore.setMinimumHeight(36)
+        self.edit_spessore.setMinimumHeight(get_metrics()['fh'])
 
         self.edit_prezzo = NoScrollDoubleSpinBox()
         self.edit_prezzo.setDecimals(2)
         self.edit_prezzo.setMaximum(9999.99)
         self.edit_prezzo.setSuffix(" €")
-        self.edit_prezzo.setMinimumHeight(36)
+        self.edit_prezzo.setMinimumHeight(get_metrics()['fh'])
 
         self.edit_scorta_min_mat = NoScrollDoubleSpinBox()
         self.edit_scorta_min_mat.setDecimals(2)
         self.edit_scorta_min_mat.setMaximum(99999.99)
         self.edit_scorta_min_mat.setSuffix(" m²")
-        self.edit_scorta_min_mat.setMinimumHeight(36)
+        self.edit_scorta_min_mat.setMinimumHeight(get_metrics()['fh'])
         self.edit_scorta_min_mat.setToolTip("Scorta minima aggregata del materiale (indipendente dai fornitori)")
 
         self.edit_scorta_max_mat = NoScrollDoubleSpinBox()
         self.edit_scorta_max_mat.setDecimals(2)
         self.edit_scorta_max_mat.setMaximum(99999.99)
         self.edit_scorta_max_mat.setSuffix(" m²")
-        self.edit_scorta_max_mat.setMinimumHeight(36)
+        self.edit_scorta_max_mat.setMinimumHeight(get_metrics()['fh'])
         self.edit_scorta_max_mat.setToolTip("Scorta massima aggregata del materiale (indipendente dai fornitori)")
 
         form_fields.addRow(_std_label("Nome Materiale:"), self.edit_nome)
@@ -743,8 +748,8 @@ _DIALOG_STYLE = """
         font-size: 14px; background-color: #ffffff; color: #2d3748; min-height: 18px; }
     QLineEdit:focus, QDoubleSpinBox:focus, QComboBox:focus, QTextEdit:focus {
         border-color: #718096; }
-    QPushButton { border: none; border-radius: 6px; font-size: 14px;
-                  font-weight: 600; padding: 12px 24px; min-height: 36px; }
+    QPushButton { border: none; border-radius: 6px; font-size: 13px;
+                  font-weight: 600; padding: 8px 16px; min-height: 34px; }
 """
 
 

@@ -27,12 +27,20 @@ class DatabaseManager:
     def __init__(self, db_path=None):
         if db_path is None:
             if getattr(sys, 'frozen', False):
-                # Eseguibile PyInstaller: usa la directory dell'exe
                 base_dir = os.path.dirname(sys.executable)
             else:
-                # Script Python: risali dalla cartella database/ alla root del progetto
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            db_path = os.path.join(base_dir, "data", "materiali.db")
+            # Leggi config.json se esiste (percorso db condiviso in rete)
+            config_path = os.path.join(base_dir, "config.json")
+            if os.path.exists(config_path):
+                try:
+                    with open(config_path, "r", encoding="utf-8") as f:
+                        config = json.load(f)
+                    db_path = config.get("db_path") or os.path.join(base_dir, "data", "materiali.db")
+                except Exception:
+                    db_path = os.path.join(base_dir, "data", "materiali.db")
+            else:
+                db_path = os.path.join(base_dir, "data", "materiali.db")
         self.db_path = db_path
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
         self.init_database()
@@ -677,6 +685,20 @@ class DatabaseManager:
             cursor.execute("DELETE FROM movimenti_magazzino WHERE id = ?", (movimento_id,))
             conn.commit()
             return True
+
+    def reset_tutte_giacenze(self):
+        """Azzera la giacenza di tutti i materiali e fornitori, e cancella tutti i movimenti."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("UPDATE materiali SET giacenza = 0")
+                cursor.execute("UPDATE materiale_fornitori SET giacenza = 0")
+                cursor.execute("DELETE FROM movimenti_magazzino")
+                conn.commit()
+                return True
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in reset_tutte_giacenze: {e}")
+            return False
 
     def get_consumi_periodo(self, data_inizio, data_fine):
         """Restituisce i consumi aggregati per materiale in un periodo"""

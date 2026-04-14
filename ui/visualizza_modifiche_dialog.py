@@ -28,6 +28,7 @@ from PyQt5.QtGui import QColor
 from datetime import datetime
 import json
 from typing import Any, Optional
+from ui.responsive import get_metrics
 
 
 class VisualizzaModificheDialog(QDialog):
@@ -47,9 +48,10 @@ class VisualizzaModificheDialog(QDialog):
 
     def init_ui(self) -> None:
         """Inizializza l'interfaccia"""
+        _m = get_metrics()
         self.setWindowTitle(f"Storico Modifiche - Preventivo #{self.preventivo_id:03d}")
         self.setModal(True)
-        self.resize(1000, 700)
+        self.resize(_m['dw'], _m['dh'])
 
         # Stile unificato
         self.setStyleSheet("""
@@ -121,9 +123,10 @@ class VisualizzaModificheDialog(QDialog):
         """)
 
         # Layout principale
+        _lm = get_metrics()
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(25, 25, 25, 25)
-        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(_lm['mi'], _lm['mi'], _lm['mi'], _lm['mi'])
+        main_layout.setSpacing(_lm['sm'])
 
         # Header
         self.create_header(main_layout)
@@ -139,8 +142,9 @@ class VisualizzaModificheDialog(QDialog):
         # Lista versioni
         lista_group = QGroupBox("Versioni Disponibili")
         lista_group.setGraphicsEffect(self.create_shadow_effect())
+        _dlm = get_metrics()
         lista_layout = QVBoxLayout(lista_group)
-        lista_layout.setContentsMargins(15, 20, 15, 15)
+        lista_layout.setContentsMargins(_dlm['sf'], _dlm['mi'], _dlm['sf'], _dlm['sf'])
 
         self.lista_versioni = QListWidget()
         self.lista_versioni.itemSelectionChanged.connect(self.on_versione_selezionata)
@@ -152,7 +156,7 @@ class VisualizzaModificheDialog(QDialog):
         dettagli_group = QGroupBox("Dettagli Versione")
         dettagli_group.setGraphicsEffect(self.create_shadow_effect())
         dettagli_layout = QVBoxLayout(dettagli_group)
-        dettagli_layout.setContentsMargins(15, 20, 15, 15)
+        dettagli_layout.setContentsMargins(_dlm['sf'], _dlm['mi'], _dlm['sf'], _dlm['sf'])
 
         self.text_dettagli = QTextEdit()
         self.text_dettagli.setReadOnly(True)
@@ -182,15 +186,16 @@ class VisualizzaModificheDialog(QDialog):
 
     def create_header(self, parent_layout: QVBoxLayout) -> None:
         """Header del dialog"""
+        _ft = get_metrics()['ft'] - 2
         title_label = QLabel(f"Storico Modifiche - Preventivo #{self.preventivo_id:03d}")
         title_label.setWordWrap(True)
-        title_label.setStyleSheet("""
-            QLabel {
-                font-size: 20px;
+        title_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {_ft}px;
                 font-weight: 700;
                 color: #2d3748;
                 padding: 0;
-            }
+            }}
         """)
         parent_layout.addWidget(title_label)
 

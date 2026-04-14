@@ -23,6 +23,7 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QGraphicsDropShadowEffect)
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QColor
+from ui.responsive import get_metrics
 
 
 class AnagraficaClientiWindow(QMainWindow):
@@ -104,16 +105,17 @@ class AnagraficaClientiWindow(QMainWindow):
             }
         """)
 
+        m = get_metrics()
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QVBoxLayout(central)
-        main_layout.setContentsMargins(60, 40, 60, 40)
-        main_layout.setSpacing(24)
+        main_layout.setContentsMargins(m['mo'], m['sm'], m['mo'], m['sm'])
+        main_layout.setSpacing(m['sm'])
 
         # Header
         header = QLabel("Anagrafica Clienti")
         header.setAlignment(Qt.AlignCenter)
-        header.setStyleSheet("font-size: 28px; font-weight: 700; color: #2d3748; padding: 10px 0;")
+        header.setStyleSheet(f"font-size: {m['ft']}px; font-weight: 700; color: #2d3748; padding: 6px 0;")
         main_layout.addWidget(header)
 
         # Card principale
@@ -124,9 +126,10 @@ class AnagraficaClientiWindow(QMainWindow):
         shadow.setOffset(0, 2)
         card.setGraphicsEffect(shadow)
 
+        _m = get_metrics()
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(30, 30, 30, 30)
-        card_layout.setSpacing(16)
+        card_layout.setContentsMargins(_m['mi'], _m['mi'], _m['mi'], _m['mi'])
+        card_layout.setSpacing(_m['sc'])
 
         # Barra azioni: search + input nuovo + pulsanti
         actions_row = QHBoxLayout()

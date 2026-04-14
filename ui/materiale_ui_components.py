@@ -18,6 +18,7 @@ from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QWidget, QLa
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QColor, QFont
 from ui.tela_preview_widget import TelaPreviewWidget
+from ui.responsive import get_metrics
 
 
 class NoScrollSpinBox(QSpinBox):
@@ -84,8 +85,8 @@ class MaterialeUIComponents:
             QDoubleSpinBox, QSpinBox, QComboBox {
                 border: 1px solid #e2e8f0;
                 border-radius: 6px;
-                padding: 10px 14px;
-                font-size: 14px;
+                padding: 6px 10px;
+                font-size: 13px;
                 background-color: #ffffff;
                 color: #2d3748;
                 min-height: 16px;
@@ -101,9 +102,9 @@ class MaterialeUIComponents:
             QPushButton {
                 border: none;
                 border-radius: 6px;
-                font-size: 14px;
+                font-size: 13px;
                 font-weight: 600;
-                padding: 12px 24px;
+                padding: 8px 16px;
                 font-family: system-ui, -apple-system, sans-serif;
             }
         """)
@@ -112,17 +113,18 @@ class MaterialeUIComponents:
         main_widget = QWidget()
         window_instance.setCentralWidget(main_widget)
         
-        # Layout principale con proporzioni fisse
+        # Layout principale adattivo
+        m = get_metrics()
         main_layout = QVBoxLayout(main_widget)
-        main_layout.setContentsMargins(30, 25, 30, 25)
-        main_layout.setSpacing(20)
-        
+        main_layout.setContentsMargins(m['mo'], m['mo'] - 5, m['mo'], m['mo'] - 5)
+        main_layout.setSpacing(m['sm'])
+
         # Header
         MaterialeUIComponents.create_header(window_instance, main_layout)
-        
+
         # Contenuto principale - layout orizzontale: Input | Risultati | Anteprima
         content_layout = QHBoxLayout()
-        content_layout.setSpacing(20)
+        content_layout.setSpacing(m['sc'])
 
         MaterialeUIComponents.create_input_section(window_instance, content_layout)
         MaterialeUIComponents.create_results_section(window_instance, content_layout)
@@ -140,34 +142,37 @@ class MaterialeUIComponents:
         if window_instance.materiale_esistente:
             title_text = "Modifica Materiale"
         
+        ft = get_metrics()['ft']
         title_label = QLabel(title_text)
-        title_label.setStyleSheet("""
-            QLabel {
-                font-size: 24px;
+        title_label.setStyleSheet(f"""
+            QLabel {{
+                font-size: {ft}px;
                 font-weight: 700;
                 color: #2d3748;
                 padding: 0;
-            }
+            }}
         """)
-        
+
         parent_layout.addWidget(title_label)
     
     @staticmethod
     def create_input_section(window_instance, parent_layout):
         """Sezione input con design unificato"""
+        m = get_metrics()
         input_group = QGroupBox("Parametri")
-        input_group.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        input_group.setFixedWidth(450)
+        input_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        input_group.setMinimumWidth(m['iw'])
+        input_group.setMaximumWidth(m['iw'] + 80)
         input_group.setGraphicsEffect(MaterialeUIComponents.create_shadow_effect())
 
         layout = QVBoxLayout(input_group)
-        layout.setContentsMargins(25, 28, 25, 25)
-        layout.setSpacing(18)
+        layout.setContentsMargins(m['mi'], m['mi_top'], m['mi'], m['mi'])
+        layout.setSpacing(m['sc'])
 
         # Form layout principale
         form_layout = QFormLayout()
-        form_layout.setVerticalSpacing(16)
-        form_layout.setHorizontalSpacing(16)
+        form_layout.setVerticalSpacing(m['sf'])
+        form_layout.setHorizontalSpacing(m['sf'])
         form_layout.setLabelAlignment(Qt.AlignRight | Qt.AlignVCenter)
 
         # === CAMPI CILINDRICA (diametro + lunghezza) - visibili in modalità cilindrica ===
@@ -235,7 +240,7 @@ class MaterialeUIComponents:
         window_instance.spin_conicita_altezza.setDecimals(1)
         window_instance.spin_conicita_altezza.setValue(0.0)
         window_instance.spin_conicita_altezza.setSuffix(" mm")
-        window_instance.spin_conicita_altezza.setMinimumHeight(32)
+        window_instance.spin_conicita_altezza.setMinimumHeight(get_metrics()['fh'] - 4)
         window_instance.spin_conicita_altezza.valueChanged.connect(window_instance.on_conicita_changed)
         conica_form.addRow(
             MaterialeUIComponents.create_standard_label("Altezza inizio"),
@@ -247,7 +252,7 @@ class MaterialeUIComponents:
         window_instance.spin_conicita_lunghezza.setDecimals(1)
         window_instance.spin_conicita_lunghezza.setValue(0.0)
         window_instance.spin_conicita_lunghezza.setSuffix(" mm")
-        window_instance.spin_conicita_lunghezza.setMinimumHeight(32)
+        window_instance.spin_conicita_lunghezza.setMinimumHeight(get_metrics()['fh'] - 4)
         window_instance.spin_conicita_lunghezza.valueChanged.connect(window_instance.on_conicita_changed)
         conica_form.addRow(
             MaterialeUIComponents.create_standard_label("Lunghezza taglio"),
@@ -306,7 +311,7 @@ class MaterialeUIComponents:
         # Toggle Conica
         window_instance.btn_conica = QPushButton("Conica")
         window_instance.btn_conica.setCheckable(True)
-        window_instance.btn_conica.setFixedHeight(36)
+        window_instance.btn_conica.setFixedHeight(get_metrics()['fh'])
         window_instance.btn_conica.setStyleSheet("""
             QPushButton { background-color: #edf2f7; color: #4a5568; border: 1px solid #e2e8f0; font-size: 13px; font-weight: 600; }
             QPushButton:hover { background-color: #e2e8f0; }
@@ -345,7 +350,7 @@ class MaterialeUIComponents:
             field.setValue(default_value)
         if callback:
             field.valueChanged.connect(callback)
-        field.setMinimumHeight(36)
+        field.setMinimumHeight(get_metrics()['fh'])
         return field
     
     @staticmethod
@@ -384,14 +389,16 @@ class MaterialeUIComponents:
     @staticmethod
     def create_results_section(window_instance, parent_layout):
         """Sezione risultati con design unificato"""
+        m = get_metrics()
         results_group = QGroupBox("Risultati")
-        results_group.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        results_group.setFixedWidth(450)
+        results_group.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        results_group.setMinimumWidth(m['iw'])
+        results_group.setMaximumWidth(m['iw'] + 80)
         results_group.setGraphicsEffect(MaterialeUIComponents.create_shadow_effect())
-        
+
         layout = QVBoxLayout(results_group)
-        layout.setContentsMargins(25, 28, 25, 25)
-        layout.setSpacing(12)
+        layout.setContentsMargins(m['mi'], m['mi_top'], m['mi'], m['mi'])
+        layout.setSpacing(m['sf'])
         
         # Tutti i risultati con design identico
         MaterialeUIComponents.create_standard_result(window_instance, "Spessore Tela", "lbl_spessore", "0.00 mm", layout)
@@ -414,8 +421,9 @@ class MaterialeUIComponents:
     @staticmethod
     def create_standard_result(window_instance, title, attr_name, default_value, parent_layout, important=False):
         """Risultato standardizzato - stile identico ai Parametri"""
+        m = get_metrics()
         container = QFrame()
-        container.setFixedHeight(48)
+        container.setFixedHeight(m['fh'] + 18)
         
         # Sfondo uniforme senza bordi per il contenitore
         container.setStyleSheet("""
@@ -443,9 +451,9 @@ class MaterialeUIComponents:
                 border: none;
             }
         """)
-        title_label.setFixedHeight(36)
+        title_label.setFixedHeight(m['fh'])
         title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        
+
         # Valore con bordi - stile identico agli input
         value_label = QLabel(default_value)
         if important:
@@ -477,7 +485,7 @@ class MaterialeUIComponents:
                 }
             """)
         
-        value_label.setFixedHeight(36)
+        value_label.setFixedHeight(m['fh'])
         value_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         
         layout.addWidget(title_label)
@@ -489,8 +497,9 @@ class MaterialeUIComponents:
     @staticmethod
     def create_override_section(window_instance, parent_layout):
         """Sviluppo manuale section - FIX: callback specifico per sviluppo"""
+        m = get_metrics()
         container = QFrame()
-        container.setFixedHeight(48)
+        container.setFixedHeight(m['fh'] + 18)
         container.setStyleSheet("""
             QFrame {
                 background-color: transparent;
@@ -516,18 +525,18 @@ class MaterialeUIComponents:
                 border: none;
             }
         """)
-        title_label.setFixedHeight(36)
+        title_label.setFixedHeight(m['fh'])
         title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        
+
         # Container per input senza status - allineato come gli altri
         input_container = QWidget()
-        input_container.setFixedHeight(36)
-        
+        input_container.setFixedHeight(m['fh'])
+
         # FIX: Input con callback specifico per sviluppo manuale
         window_instance.edit_arrotondamento = NoScrollDoubleSpinBox()
         window_instance.edit_arrotondamento.setMaximum(999999.99)
         window_instance.edit_arrotondamento.setDecimals(2)
-        window_instance.edit_arrotondamento.setFixedHeight(36)
+        window_instance.edit_arrotondamento.setFixedHeight(m['fh'])
         window_instance.edit_arrotondamento.valueChanged.connect(window_instance.on_sviluppo_manuale_changed)
         window_instance.edit_arrotondamento.setStyleSheet("""
             QDoubleSpinBox {
@@ -566,8 +575,9 @@ class MaterialeUIComponents:
     @staticmethod
     def create_final_result(window_instance, parent_layout):
         """Maggiorazione finale - ricreata identica agli altri campi"""
+        m = get_metrics()
         container = QFrame()
-        container.setFixedHeight(48)
+        container.setFixedHeight(m['fh'] + 18)
         
         # Stesso stile container degli altri
         container.setStyleSheet("""
@@ -613,7 +623,7 @@ class MaterialeUIComponents:
                 min-height: 16px;
             }
         """)
-        window_instance.lbl_maggiorazione.setFixedHeight(36)
+        window_instance.lbl_maggiorazione.setFixedHeight(m['fh'])
         window_instance.lbl_maggiorazione.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         
         layout.addWidget(title_label)
@@ -693,8 +703,9 @@ class MaterialeUIComponents:
         footer_layout = QHBoxLayout()
         footer_layout.addStretch()
         
+        fh = get_metrics()['bh']
         window_instance.btn_annulla = QPushButton("Annulla")
-        window_instance.btn_annulla.setFixedHeight(40)
+        window_instance.btn_annulla.setFixedHeight(fh)
         window_instance.btn_annulla.setStyleSheet("""
             QPushButton {
                 background-color: #f7fafc;
@@ -709,7 +720,7 @@ class MaterialeUIComponents:
         
         confirm_text = "Aggiorna" if window_instance.materiale_esistente else "Conferma"
         window_instance.btn_concludi = QPushButton(confirm_text)
-        window_instance.btn_concludi.setFixedHeight(40)
+        window_instance.btn_concludi.setFixedHeight(fh)
         window_instance.btn_concludi.setStyleSheet("""
             QPushButton {
                 background-color: #4a5568;

@@ -106,6 +106,10 @@ class MainWindow(QMainWindow):
         """NUOVO: Apre la finestra per confrontare due preventivi"""
         MainWindowBusinessLogic.apri_confronto_preventivi(self)
 
+    def cambia_database(self):
+        """Permette di selezionare un database diverso (es. cartella condivisa in rete)"""
+        MainWindowBusinessLogic.cambia_database(self)
+
     # =============================================================================
     # COMPATIBILITY METHODS - Per retrocompatibilità
     # =============================================================================
