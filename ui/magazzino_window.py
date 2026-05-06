@@ -697,17 +697,19 @@ class MagazzinoWindow(QMainWindow):
 
         dialog = QDialog(self)
         dialog.setWindowTitle(f"Storico Movimenti - {nome_materiale}")
-        dialog.setMinimumSize(600, 400)
+        dialog.resize(860, 520)
+        dialog.setMinimumSize(700, 420)
         dialog.setStyleSheet("""
             QDialog { background-color: #fafbfc; }
             QLabel { color: #2d3748; font-family: system-ui, -apple-system, sans-serif; }
         """)
 
         layout = QVBoxLayout(dialog)
-        layout.setContentsMargins(25, 25, 25, 25)
+        layout.setContentsMargins(24, 20, 24, 20)
+        layout.setSpacing(12)
 
         title = QLabel(f"Storico Movimenti: {nome_materiale}")
-        title.setStyleSheet("font-size: 18px; font-weight: 700;")
+        title.setStyleSheet("font-size: 16px; font-weight: 700;")
         layout.addWidget(title)
 
         if not movimenti:
@@ -717,7 +719,11 @@ class MagazzinoWindow(QMainWindow):
         else:
             table = QTableWidget(len(movimenti), 4)
             table.setHorizontalHeaderLabels(["Data", "Tipo", "Quantità (m²)", "Note"])
-            table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+            # Data, Tipo, Quantità si adattano al contenuto; Note occupa il resto
+            table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
+            table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+            table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+            table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
             table.setEditTriggers(QTableWidget.NoEditTriggers)
             table.setAlternatingRowColors(True)
             table.setStyleSheet("""
@@ -729,11 +735,9 @@ class MagazzinoWindow(QMainWindow):
             for row, mov in enumerate(movimenti):
                 mov_id, tipo, quantita, data, note, prev_id = mov
 
-                # Data formattata
                 data_str = data.split('T')[0] if 'T' in data else data
                 table.setItem(row, 0, QTableWidgetItem(data_str))
 
-                # Tipo con colore
                 tipo_item = QTableWidgetItem(tipo.upper())
                 if tipo == 'carico':
                     tipo_item.setForeground(QColor(56, 161, 105))
@@ -744,11 +748,11 @@ class MagazzinoWindow(QMainWindow):
                 table.setItem(row, 2, QTableWidgetItem(f"{quantita:.2f}"))
                 table.setItem(row, 3, QTableWidgetItem(note or ""))
 
-            layout.addWidget(table)
+            layout.addWidget(table, 1)
 
         btn_chiudi = QPushButton("Chiudi")
         btn_chiudi.setStyleSheet("""
-            QPushButton { background-color: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; min-height: 36px; }
+            QPushButton { background-color: #f7fafc; color: #4a5568; border: 1px solid #e2e8f0; min-height: 34px; }
             QPushButton:hover { background-color: #edf2f7; }
         """)
         btn_chiudi.clicked.connect(dialog.accept)
