@@ -1,0 +1,14 @@
+# Output generati e configurazione locale - non versionare
+config.json
+report/
+assets/
+notiziario_ultimo.json
+
+# Build PyInstaller
+build/
+dist/
+*.spec
+
+# Python
+__pycache__/
+*.py[cod]

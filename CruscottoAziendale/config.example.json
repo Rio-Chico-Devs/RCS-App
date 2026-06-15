@@ -1,0 +1,5 @@
+{
+  "_istruzioni": "Rinomina questo file in 'config.json' e scrivi in db_path il percorso del database del gestionale (materiali.db). Usa la barra '/'. La voce anthropic_api_key serve SOLO per il notiziario di settore (opzionale): se non lo usi, lasciala vuota.",
+  "db_path": "Z:/RCS/data/materiali.db",
+  "anthropic_api_key": ""
+}

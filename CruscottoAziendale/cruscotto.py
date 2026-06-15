@@ -6,9 +6,9 @@ Genera un report HTML interattivo (grafici, sintesi, confronti per
 mese/trimestre/anno) leggendo il database del gestionale in SOLA LETTURA.
 
 Uso:
-    python genera_report.py            # genera e apre il report nel browser
-    python genera_report.py --no-open  # genera senza aprire il browser
-    python genera_report.py --db PERCORSO\\materiali.db   # database specifico
+    python cruscotto.py            # genera e apre il report nel browser
+    python cruscotto.py --no-open  # genera senza aprire il browser
+    python cruscotto.py --db PERCORSO/materiali.db   # database specifico
 
 Non modifica mai il database: la connessione e' aperta in modalita' read-only.
 """
@@ -24,8 +24,9 @@ import webbrowser
 from datetime import datetime
 from string import Template
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))          # cartella analisi/
-APP_DIR = os.path.dirname(BASE_DIR)                            # cartella dell'app
+import config_db  # modulo locale: trova il DB dal config.json di questo strumento
+
+BASE_DIR = config_db.base_dir()                               # cartella dello strumento (o dell'exe)
 REPORT_DIR = os.path.join(BASE_DIR, "report")
 ASSETS_DIR = os.path.join(BASE_DIR, "assets")
 CHARTJS_URL = "https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"
@@ -35,26 +36,12 @@ NOTIZIARIO_PATH = os.path.join(BASE_DIR, "notiziario_ultimo.json")
 
 # ----------------------------------------------------------------- database
 
-def trova_db_path():
-    """Stessa logica dell'app principale: config.json oppure data/materiali.db."""
-    config_path = os.path.join(APP_DIR, "config.json")
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                config = json.load(f)
-            percorso = config.get("db_path")
-            if percorso:
-                return percorso
-        except Exception:
-            pass
-    return os.path.join(APP_DIR, "data", "materiali.db")
+def trova_db_path(cli=None):
+    return config_db.trova_db_path(cli)
 
 
 def apri_db_sola_lettura(db_path):
-    if not os.path.exists(db_path):
-        sys.exit(f"Database non trovato: {db_path}")
-    uri = "file:{}?mode=ro".format(db_path.replace("\\", "/"))
-    return sqlite3.connect(uri, uri=True)
+    return config_db.apri_db_sola_lettura(db_path)
 
 
 def _num(v):
@@ -976,8 +963,8 @@ def main():
     parser.add_argument("--db", help="percorso del database (default: come l'app)")
     parser.add_argument("--no-open", action="store_true", help="non aprire il browser")
     args = parser.parse_args()
-    db_path = args.db or trova_db_path()
-    print("Database (sola lettura): {}".format(db_path))
+    db_path = trova_db_path(args.db)
+    print("Database (sola lettura): {}".format(db_path or "(non configurato - vedi README)"))
     genera(db_path, apri_browser=not args.no_open)
 
 

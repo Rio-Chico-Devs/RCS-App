@@ -31,29 +31,21 @@ import sqlite3
 import sys
 from datetime import datetime
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-APP_DIR = os.path.dirname(BASE_DIR)
+import config_db  # modulo locale: DB e chiave API dal config.json di questo strumento
+
+BASE_DIR = config_db.base_dir()
 OUTPUT_PATH = os.path.join(BASE_DIR, "notiziario_ultimo.json")
 MODELLO = "claude-opus-4-8"
 
 
 def trova_db_path():
-    config_path = os.path.join(APP_DIR, "config.json")
-    if os.path.exists(config_path):
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                percorso = json.load(f).get("db_path")
-            if percorso:
-                return percorso
-        except Exception:
-            pass
-    return os.path.join(APP_DIR, "data", "materiali.db")
+    return config_db.trova_db_path()
 
 
 def contesto_azienda(db_path):
     """Ritorna (materiali, fornitori): solo nomi generici, nessun dato sensibile."""
     materiali, fornitori = [], []
-    if not os.path.exists(db_path):
+    if not db_path or not os.path.exists(db_path):
         return materiali, fornitori
     try:
         uri = "file:{}?mode=ro".format(db_path.replace("\\", "/"))
@@ -139,10 +131,10 @@ def raccogli(quante):
     except ImportError:
         sys.exit("Pacchetto 'anthropic' non installato. Esegui:  pip install anthropic")
 
-    api_key = os.environ.get("ANTHROPIC_API_KEY")
+    api_key = os.environ.get("ANTHROPIC_API_KEY") or config_db.carica_config().get("anthropic_api_key")
     if not api_key:
-        sys.exit("Variabile ANTHROPIC_API_KEY non impostata. "
-                 "Imposta la chiave API e riprova (vedi README.md).")
+        sys.exit("Chiave API non trovata. Imposta 'anthropic_api_key' nel file config.json "
+                 "accanto al programma, oppure la variabile ANTHROPIC_API_KEY (vedi README.md).")
 
     client = anthropic.Anthropic(api_key=api_key)
     db_path = trova_db_path()
@@ -184,7 +176,7 @@ def raccogli(quante):
 
     print("Notiziario salvato: {}".format(OUTPUT_PATH))
     print("  Notizie raccolte: {}".format(len(dati.get("notizie", []))))
-    print("  Verra' mostrato nel report alla prossima esecuzione di genera_report.py")
+    print("  Verra' mostrato nel report alla prossima esecuzione di cruscotto.py")
     for n in dati.get("notizie", []):
         print("   - {}".format(n.get("titolo", "")))
 

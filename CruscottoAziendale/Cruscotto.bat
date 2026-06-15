@@ -10,9 +10,9 @@ echo ========================================
 echo.
 
 REM Prova prima 'python', poi 'py' (launcher Windows)
-python genera_report.py
+python cruscotto.py
 if %errorlevel% neq 0 (
-    py genera_report.py
+    py cruscotto.py
 )
 
 if %errorlevel% neq 0 (
