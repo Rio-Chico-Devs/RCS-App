@@ -14,33 +14,34 @@ mese/trimestre/anno).
 
 ## Indice rapido
 
-1. Copia `config.example.json` in **`config.json`** e scrivi il percorso del database.
-2. Avvia **`Cruscotto.bat`** (o `python cruscotto.py`).
-3. (Facoltativo) Per il notiziario: metti la chiave API in `config.json` e avvia `Notiziario.bat`.
+1. Avvia **`Cruscotto.bat`** (o `python cruscotto.py`).
+2. La **prima volta** si apre una finestra: **scegli il file del database**
+   (`materiali.db`). Fatto — la scelta viene ricordata.
+3. (Facoltativo) Per il notiziario di settore: vedi più sotto.
 
 ---
 
-## 1. Configurazione (una volta sola)
+## 1. Il database (te lo chiede da solo)
 
-Nella cartella c'è `config.example.json`. **Copialo e rinomina la copia in
-`config.json`**, poi apri `config.json` e imposta il percorso del database:
+Al **primo avvio** il programma apre una finestra e ti fa **selezionare il file
+del database** del gestionale (di solito si chiama `materiali.db`). Lo scegli una
+volta e la scelta viene **ricordata** (salvata in `config.json`): le volte
+successive parte da sola.
 
-```json
-{
-  "db_path": "Z:/RCS/data/materiali.db",
-  "anthropic_api_key": ""
-}
+Per **cambiare** database in seguito:
 ```
+python cruscotto.py --scegli
+```
+(ri-apre la finestra di selezione), oppure modifica a mano il file `config.json`.
 
-- Usa la **barra normale `/`** anche su Windows (più semplice e funziona).
-- Esempi di percorso:
-  - su disco/cartella di rete mappata: `"Z:/RCS/data/materiali.db"`
-  - su percorso di rete: `"//NOMEPC/RCS/data/materiali.db"`
-  - se tieni una copia del database accanto al programma, basta `materiali.db`
-    o `data/materiali.db` (li trova da solo, senza configurazione).
-
-`anthropic_api_key` serve **solo** per il notiziario di settore: se non lo usi,
-lasciala vuota.
+**Alternativa manuale** (facoltativa): puoi anche partire da `config.example.json`,
+copiarlo in `config.json` e scrivere il percorso a mano:
+```json
+{ "db_path": "Z:/RCS/data/materiali.db", "anthropic_api_key": "" }
+```
+Usa la barra normale `/` anche su Windows. Se tieni una copia del database accanto
+al programma (`materiali.db` o `data/materiali.db`), lo trova da solo senza
+chiedere nulla. `anthropic_api_key` serve solo per il notiziario.
 
 ---
 
@@ -57,6 +58,7 @@ Genera il report e lo apre nel browser. I report restano in `report/`
 
 Opzioni:
 ```
+python cruscotto.py --scegli                    scegli/cambia il database (finestra)
 python cruscotto.py --no-open                   genera senza aprire il browser
 python cruscotto.py --db "Z:/RCS/materiali.db"  usa un database specifico al volo
 ```

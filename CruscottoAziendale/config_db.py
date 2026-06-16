@@ -66,3 +66,79 @@ def apri_db_sola_lettura(db_path):
         )
     uri = "file:{}?mode=ro".format(db_path.replace("\\", "/"))
     return sqlite3.connect(uri, uri=True)
+
+
+def salva_db_path(db_path):
+    """Salva/aggiorna 'db_path' in config.json, preservando le altre voci
+    (es. la chiave API del notiziario)."""
+    cfg = carica_config()
+    cfg.pop("_istruzioni", None)
+    cfg["db_path"] = db_path
+    try:
+        with open(os.path.join(base_dir(), "config.json"), "w", encoding="utf-8") as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
+
+
+def database_valido(db_path):
+    """Verifica che il file sia davvero un database del gestionale,
+    controllando la presenza delle tabelle attese. Sola lettura."""
+    if not db_path or not os.path.exists(db_path):
+        return False
+    try:
+        uri = "file:{}?mode=ro".format(db_path.replace("\\", "/"))
+        conn = sqlite3.connect(uri, uri=True)
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            tabelle = {r[0] for r in cur.fetchall()}
+        finally:
+            conn.close()
+        return "preventivi" in tabelle or "materiali" in tabelle
+    except Exception:
+        return False
+
+
+def seleziona_db_interattivo():
+    """Apre una finestra per scegliere il file del database e lo salva in
+    config.json (la scelta viene ricordata). Ritorna il percorso scelto,
+    oppure None se l'utente annulla o se l'interfaccia grafica non c'e'."""
+    try:
+        import tkinter as tk
+        from tkinter import filedialog, messagebox
+    except Exception:
+        return None  # nessun ambiente grafico: si torna al messaggio testuale
+
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        messagebox.showinfo(
+            "Cruscotto Aziendale",
+            "Seleziona il file del database del gestionale (di solito 'materiali.db').\n\n"
+            "La scelta verra' ricordata: le prossime volte parte da sola.")
+        while True:
+            scelto = filedialog.askopenfilename(
+                title="Seleziona il database del gestionale (materiali.db)",
+                filetypes=[("Database SQLite", "*.db"), ("Tutti i file", "*.*")])
+            if not scelto:
+                return None
+            if database_valido(scelto):
+                salva_db_path(scelto)
+                return scelto
+            if not messagebox.askretrycancel(
+                    "File non riconosciuto",
+                    "Il file scelto non sembra il database del gestionale "
+                    "(mancano le tabelle attese).\n\nVuoi sceglierne un altro?"):
+                return None
+    finally:
+        root.destroy()
+
+
+def assicura_db_path(cli=None):
+    """Come trova_db_path, ma se non trova nulla apre la finestra di selezione."""
+    percorso = trova_db_path(cli)
+    if percorso:
+        return percorso
+    return seleziona_db_interattivo()

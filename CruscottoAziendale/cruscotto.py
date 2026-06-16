@@ -960,10 +960,17 @@ def genera(db_path, apri_browser=True):
 
 def main():
     parser = argparse.ArgumentParser(description="Genera il Cruscotto Aziendale RCS (sola lettura)")
-    parser.add_argument("--db", help="percorso del database (default: come l'app)")
+    parser.add_argument("--db", help="percorso del database (ha priorita' su config.json)")
     parser.add_argument("--no-open", action="store_true", help="non aprire il browser")
+    parser.add_argument("--scegli", action="store_true",
+                        help="apri la finestra per scegliere/cambiare il database")
     args = parser.parse_args()
-    db_path = trova_db_path(args.db)
+
+    if args.scegli and not args.db:
+        config_db.seleziona_db_interattivo()  # salva la scelta in config.json
+
+    # Trova il database; se non e' mai stato configurato, apre la finestra di scelta.
+    db_path = config_db.assicura_db_path(args.db)
     print("Database (sola lettura): {}".format(db_path or "(non configurato - vedi README)"))
     genera(db_path, apri_browser=not args.no_open)
 
