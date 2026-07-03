@@ -137,9 +137,6 @@ class MagazzinoWindow(QMainWindow):
                 border-bottom: none;
                 border-radius: 6px 6px 0 0;
                 padding: 8px 24px;
-                font-size: 13px;
-                font-weight: 600;
-                font-family: system-ui, -apple-system, sans-serif;
                 margin-right: 4px;
             }
             QTabBar::tab:selected {
@@ -197,13 +194,19 @@ class MagazzinoWindow(QMainWindow):
         # Mostra sempre il testo completo delle tab (evita il taglio con "...")
         self.tabs.tabBar().setElideMode(Qt.ElideNone)
         self.tabs.tabBar().setUsesScrollButtons(False)
+        # Il font va impostato sul widget (non nel foglio di stile), altrimenti
+        # Qt calcola la larghezza delle tab con il font di default e taglia il testo
+        _tab_font = self.tabs.tabBar().font()
+        _tab_font.setPixelSize(13)
+        _tab_font.setBold(True)
+        self.tabs.tabBar().setFont(_tab_font)
         self.tab_scorte = QWidget()
         self.tab_consumi = QWidget()
         self.tab_fornitori = QWidget()
 
-        self.tabs.addTab(self.tab_scorte, "Scorte")
-        self.tabs.addTab(self.tab_consumi, "Consumi")
-        self.tabs.addTab(self.tab_fornitori, "Fornitori")
+        self.tabs.addTab(self.tab_scorte, "Scorte Magazzino")
+        self.tabs.addTab(self.tab_consumi, "Consumi e Spese")
+        self.tabs.addTab(self.tab_fornitori, "Gestione Fornitori")
 
         self.setup_tab_scorte()
         self.setup_tab_consumi()
