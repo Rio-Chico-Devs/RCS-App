@@ -136,12 +136,11 @@ class MagazzinoWindow(QMainWindow):
                 border: 1px solid #e2e8f0;
                 border-bottom: none;
                 border-radius: 6px 6px 0 0;
-                padding: 8px 20px;
+                padding: 8px 24px;
                 font-size: 13px;
                 font-weight: 600;
                 font-family: system-ui, -apple-system, sans-serif;
                 margin-right: 4px;
-                min-width: 80px;
             }
             QTabBar::tab:selected {
                 background-color: #ffffff;
@@ -195,6 +194,9 @@ class MagazzinoWindow(QMainWindow):
 
         # Tab widget
         self.tabs = QTabWidget()
+        # Mostra sempre il testo completo delle tab (evita il taglio con "...")
+        self.tabs.tabBar().setElideMode(Qt.ElideNone)
+        self.tabs.tabBar().setUsesScrollButtons(False)
         self.tab_scorte = QWidget()
         self.tab_consumi = QWidget()
         self.tab_fornitori = QWidget()
