@@ -1,0 +1,56 @@
+========================================================
+AGGIORNAMENTO RCS APP - 03/07/2026
+========================================================
+
+Questo pacchetto contiene SOLO i file diversi rispetto alla
+versione attualmente su main. Tutto il resto (responsive,
+cambio database, reset giacenze, ecc.) e' gia' aggiornato.
+
+La struttura delle cartelle nello zip rispecchia quella
+dell'applicazione: ogni file va copiato nella stessa
+posizione, sovrascrivendo quello esistente.
+
+--------------------------------------------------------
+FILE DA SOSTITUIRE (4 in totale)
+--------------------------------------------------------
+
+1) ui\magazzino_window.py
+   -> va nella cartella "ui" dell'app
+   COSA CAMBIA:
+   - Le tre linguette in alto (Scorte / Consumi / Fornitori)
+     ora mostrano sempre il testo completo, senza "..."
+
+2) ui\anagrafica_clienti_window.py
+   -> va nella cartella "ui" dell'app
+   COSA CAMBIA:
+   - Il cliente selezionato in anagrafica e' ora ben
+     evidenziato (sfondo scuro, testo bianco) invece della
+     sola linea tratteggiata
+
+3) ui\gestione_materiali_window.py
+   -> va nella cartella "ui" dell'app
+   COSA CAMBIA:
+   - Dopo aver salvato una modifica a un materiale compare
+     il messaggio "Materiale '<nome>' salvato con successo!"
+
+4) pyexecreator.bat
+   -> va nella cartella PRINCIPALE dell'app (dove c'e' main.py)
+   COSA CAMBIA:
+   - Installa automaticamente PyQt5 e tutte le dipendenze
+     prima di creare l'eseguibile (evita errori di build)
+
+--------------------------------------------------------
+COME PROCEDERE
+--------------------------------------------------------
+
+1. Chiudi l'applicazione se e' aperta
+2. (Consigliato) Fai una copia di backup dei 4 file originali
+3. Copia i file dello zip nelle rispettive cartelle,
+   confermando la sovrascrittura
+4. Se presente, svuota la cartella "ui\__pycache__"
+   (elimina i file .pyc) per evitare che venga usata
+   la versione vecchia compilata
+5. Riavvia l'applicazione
+
+NOTA: il database NON viene toccato da questo aggiornamento,
+tutti i dati restano invariati.

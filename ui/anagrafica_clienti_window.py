@@ -81,11 +81,16 @@ class AnagraficaClientiWindow(QMainWindow):
                 border-radius: 8px;
                 font-size: 14px;
                 gridline-color: #f7fafc;
+                outline: none;
             }
             QTableWidget::item { padding: 12px; color: #2d3748; }
             QTableWidget::item:selected {
-                background-color: #edf2f7;
-                color: #2d3748;
+                background-color: #4a5568;
+                color: #ffffff;
+            }
+            QTableWidget::item:focus {
+                background-color: #4a5568;
+                color: #ffffff;
             }
             QHeaderView::section {
                 background-color: #f7fafc;
