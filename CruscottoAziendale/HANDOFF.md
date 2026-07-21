@@ -77,24 +77,22 @@ l'intervento a **più alto ritorno** identificato finora (confermato anche da
 ricerca di mercato: la maggior parte delle micro-officine non sa se un
 lavoro preso sta davvero guadagnando).
 
-**Prima di implementarlo, chiedi esplicitamente all'utente** dove devono
-vivere questi due campi — è una decisione che gli spetta, non presumerla:
+**Decisione già presa dall'utente: NON implementarlo.** Gli è stata posta
+esplicitamente la domanda (gestionale vs mini-schermata nel Cruscotto) e ha
+risposto "lasciamo stare l'esito del preventivo". Resta descritto qui solo
+come nota storica/di contesto — **non riproporre la domanda e non
+implementare questa funzione** a meno che sia l'utente stesso a richiederla
+di nuovo in futuro. Le due opzioni valutate, per riferimento se dovesse
+tornare sull'argomento:
 
-- **Opzione A — nel gestionale**: si aggiungono due colonne alla tabella
-  `preventivi` (es. `esito` testo, `ore_reali` reale), seguendo lo stesso
-  pattern di migrazione additiva già usato in
+- **Opzione A — nel gestionale**: due colonne in più nella tabella
+  `preventivi` (es. `esito` testo, `ore_reali` reale), stesso pattern di
+  migrazione additiva già usato in
   `database/db_manager.py::_migrate_database()` (`ALTER TABLE ... ADD COLUMN`
-  con default, mai distruttivo). Il Cruscotto li legge in più. Vantaggio:
-  l'utente li inserisce mentre lavora nel gestionale, un solo posto.
-- **Opzione B — nel Cruscotto stesso**: una mini-schermata separata (nuova
-  finestra tkinter o un piccolo form HTML con salvataggio locale) che tiene
-  esito/ore in un file/tabella propria del Cruscotto, associata per ID
-  preventivo. Il gestionale resta assolutamente intoccato. Svantaggio:
-  l'utente inserisce il dato in due punti diversi.
-
-L'utente propendeva per essere consultato con una domanda esplicita
-(A vs B) — non era ancora stata risposta quando questo handoff è stato
-scritto. **Fai la domanda prima di scrivere codice per questa funzione.**
+  con default, mai distruttivo).
+- **Opzione B — nel Cruscotto stesso**: mini-schermata separata (tkinter o
+  form HTML) con salvataggio proprio, associata per ID preventivo. Il
+  gestionale resta intoccato, ma il dato si inserisce in due punti diversi.
 
 ### Altri interventi già discussi con l'utente, non ancora implementati
 
@@ -335,6 +333,5 @@ browser.
 - Non inventare nuovi colori/raggi/animazioni quando uno schema esistente
   copre già il caso — chiedi all'utente solo se serve davvero un concetto
   visivo nuovo (es. un tipo di grafico mai usato prima).
-- Non implementare il tracciamento vinto/perso + ore reali senza prima
-  chiedere esplicitamente A vs B (vedi §2) — è una decisione dell'utente,
-  non tua.
+- Non implementare il tracciamento vinto/perso + ore reali: l'utente ha già
+  risposto "lasciamo stare" (vedi §2). Non riproporlo di tua iniziativa.
