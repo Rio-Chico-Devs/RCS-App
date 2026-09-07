@@ -244,6 +244,22 @@ def main():
         if not configurato:
             sys.exit(0)
 
+    # Controllo preliminare del database PRIMA di aprire l'interfaccia: se è
+    # danneggiato è meglio fermarsi con un messaggio comprensibile (e con i
+    # backup già messi al sicuro) che entrare nell'app e mostrare dati rovinati.
+    try:
+        from database.db_manager import risolvi_percorso_db
+        from database import backup_manager
+        percorso_db, _configurazione = risolvi_percorso_db()
+        esito_verifica = backup_manager.esegui_backup_avvio(percorso_db)
+        if not esito_verifica.get("integro", True):
+            QMessageBox.critical(None, "Database danneggiato",
+                                 esito_verifica.get("avviso") or
+                                 "Il database risulta danneggiato.")
+            sys.exit(1)
+    except Exception:
+        pass  # un problema nel controllo non deve impedire l'avvio dell'app
+
     try:
         # Crea e mostra la finestra principale massimizzata
         window = MainWindow()

@@ -23,51 +23,97 @@ import json
 import logging
 from datetime import datetime
 
+from database import backup_manager
+
+def risolvi_percorso_db():
+    """Determina il percorso del database e legge la configurazione.
+
+    Ordine: 'db_path' da config.json (percorso condiviso in rete), altrimenti
+    data/materiali.db accanto all'applicazione.
+    Ritorna (percorso, configurazione)."""
+    if getattr(sys, 'frozen', False):
+        base_dir = os.path.dirname(sys.executable)
+    else:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    predefinito = os.path.join(base_dir, "data", "materiali.db")
+    config_path = os.path.join(base_dir, "config.json")
+
+    if not os.path.exists(config_path):
+        return predefinito, {}
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+        if not isinstance(config, dict):
+            return predefinito, {}
+        return (config.get("db_path") or predefinito), config
+    except Exception:
+        return predefinito, {}
+
+
 class DatabaseManager:
     def __init__(self, db_path=None):
+        config = {}
         if db_path is None:
-            if getattr(sys, 'frozen', False):
-                base_dir = os.path.dirname(sys.executable)
-            else:
-                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            # Leggi config.json se esiste (percorso db condiviso in rete)
-            config_path = os.path.join(base_dir, "config.json")
-            if os.path.exists(config_path):
-                try:
-                    with open(config_path, "r", encoding="utf-8") as f:
-                        config = json.load(f)
-                    db_path = config.get("db_path") or os.path.join(base_dir, "data", "materiali.db")
-                except Exception:
-                    db_path = os.path.join(base_dir, "data", "materiali.db")
-            else:
-                db_path = os.path.join(base_dir, "data", "materiali.db")
+            db_path, config = risolvi_percorso_db()
         self.db_path = db_path
+        # Messaggio da mostrare all'utente se all'avvio si rileva un problema
+        # di integrità (viene letto dalla finestra principale).
+        self.avviso_integrita = None
+        # Controllo di integrità dopo ogni scrittura importante: serve a capire
+        # quale operazione danneggia il database. Disattivabile da config.json
+        # con "verifica_dopo_scrittura": false se dovesse risultare lento.
+        if not isinstance(config, dict):
+            config = {}
+        self.verifica_dopo_scrittura = bool(config.get("verifica_dopo_scrittura", True))
+        # True se il database è danneggiato al punto da non poter essere usato.
+        self.database_inutilizzabile = False
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        self.init_database()
+
+        # IMPORTANTE: verifica e backup vanno PRIMA di init_database(). Su un
+        # database danneggiato le migrazioni fallirebbero con un errore tecnico,
+        # impedendo di mettere al sicuro i backup buoni e di avvisare l'utente.
         self._backup_database()
 
-    def _backup_database(self):
-        """Crea un backup automatico del database all'avvio. Mantiene gli ultimi 7 backup."""
         try:
-            import shutil
-            backup_dir = os.path.join(os.path.dirname(self.db_path), "backup")
-            os.makedirs(backup_dir, exist_ok=True)
+            self.init_database()
+        except sqlite3.DatabaseError as e:
+            self.database_inutilizzabile = True
+            logging.getLogger('rcs').error(
+                f"Database inutilizzabile, inizializzazione fallita: {e}")
+            if not self.avviso_integrita:
+                self.avviso_integrita = (
+                    "Il database risulta danneggiato e non può essere aperto.\n\n"
+                    "Non è stata effettuata nessuna modifica e i backup esistenti sono "
+                    "intatti. Contatta l'assistenza per il ripristino.")
 
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            backup_name = f"materiali_backup_{timestamp}.db"
-            backup_path = os.path.join(backup_dir, backup_name)
+    def _backup_database(self):
+        """Verifica l'integrità del database e ne crea un backup all'avvio.
 
-            if os.path.exists(self.db_path):
-                shutil.copy2(self.db_path, backup_path)
+        La logica vera sta in database/backup_manager.py: copie verificate,
+        conservazione distribuita nel mese, quarantena dei file corrotti e
+        protezione dell'ultimo backup buono."""
+        try:
+            esito = backup_manager.esegui_backup_avvio(self.db_path)
+            self.avviso_integrita = esito.get("avviso")
+        except Exception as e:
+            # Il backup non deve mai impedire l'avvio dell'applicazione.
+            logging.getLogger('rcs').error(f"Backup all'avvio non riuscito: {e}")
 
-            # Mantieni solo gli ultimi 7 backup
-            backups = sorted([
-                f for f in os.listdir(backup_dir) if f.startswith("materiali_backup_") and f.endswith(".db")
-            ])
-            while len(backups) > 7:
-                os.remove(os.path.join(backup_dir, backups.pop(0)))
+    def verifica_integrita(self):
+        """Controllo di integrità su richiesta. Ritorna (ok, messaggio)."""
+        integro, messaggio, _ms = backup_manager.verifica_integrita(self.db_path)
+        return integro, messaggio
+
+    def _controlla_dopo_scrittura(self, operazione):
+        """Verifica il database subito dopo una scrittura importante, così una
+        eventuale corruzione viene attribuita all'operazione che l'ha causata."""
+        if not self.verifica_dopo_scrittura:
+            return True
+        try:
+            return backup_manager.verifica_dopo_scrittura(self.db_path, operazione)
         except Exception:
-            pass  # Backup non critico, non blocca l'avvio
+            return True
 
     def init_database(self):
         """Inizializza il database con le tabelle necessarie"""
@@ -798,7 +844,9 @@ class DatabaseManager:
                 "",
             ))
             conn.commit()
-            return cursor.lastrowid
+            nuovo_id = cursor.lastrowid
+        self._controlla_dopo_scrittura("add_preventivo")
+        return nuovo_id
 
     def update_preventivo(self, preventivo_id, preventivo_data):
         """AGGIORNATO: Aggiorna un preventivo esistente salvando snapshot nello storico"""
@@ -887,9 +935,13 @@ class DatabaseManager:
                     preventivo_id
                 ))
                 conn.commit()
-                return cursor.rowcount > 0
+                aggiornato = cursor.rowcount > 0
+            else:
+                aggiornato = False
 
-            return False
+        if aggiornato:
+            self._controlla_dopo_scrittura("update_preventivo")
+        return aggiornato
 
     def get_storico_modifiche(self, preventivo_id):
         """NUOVO: Ottiene lo storico modifiche di un preventivo"""
@@ -1271,7 +1323,11 @@ class DatabaseManager:
                     """, (preventivo_id,))
 
                 conn.commit()
-                return cursor.rowcount > 0
+                eliminato = cursor.rowcount > 0
+
+            if eliminato:
+                self._controlla_dopo_scrittura("delete_preventivo_e_revisioni")
+            return eliminato
         except sqlite3.Error as e:
             logging.getLogger('rcs').error(f"DB error in delete_preventivo_e_revisioni: {e}")
             return False

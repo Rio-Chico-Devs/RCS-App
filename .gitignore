@@ -213,3 +213,11 @@ CruscottoAziendale/config.json
 CruscottoAziendale/notiziario_ultimo.json
 CruscottoAziendale/dist/
 CruscottoAziendale/build/
+
+# Backup e diagnostica generati dall'applicazione a runtime
+# (contengono dati reali dei clienti: non vanno nel repository)
+backup_locale/
+data/backup/sicurezza/
+data/backup/corrotti/
+sessioni_attive.json
+logs/

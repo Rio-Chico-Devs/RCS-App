@@ -53,7 +53,23 @@ class MainWindow(QMainWindow):
 
         # Inizializzazione UI delegata al modulo
         MainWindowUIComponents.init_ui(self)
-    
+
+        # Se il controllo di integrità all'avvio ha rilevato un problema,
+        # avvisa subito l'utente invece di lasciarlo lavorare su dati rovinati.
+        if getattr(self.db_manager, "avviso_integrita", None):
+            QMessageBox.critical(self, "Problema con il database",
+                                 self.db_manager.avviso_integrita)
+
+    def closeEvent(self, event):
+        """Alla chiusura, toglie questo PC dall'elenco delle sessioni aperte
+        (serve a capire se due postazioni erano attive insieme)."""
+        try:
+            from database import backup_manager
+            backup_manager.chiudi_sessione(self.db_manager.db_path)
+        except Exception:
+            pass
+        super().closeEvent(event)
+
     # =============================================================================
     # CALLBACK METHODS - Delegano alla business logic
     # =============================================================================
