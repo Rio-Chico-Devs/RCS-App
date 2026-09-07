@@ -291,8 +291,8 @@ class MainWindowUIComponents:
         sep.setFrameShadow(QFrame.Sunken)
         sep.setStyleSheet("color: #e2e8f0;")
 
-        # Pulsante Cambia Database
-        window_instance.btn_cambia_database = QPushButton("Cambia Database")
+        # Pulsante Impostazioni di archiviazione (stato dati, copie, database)
+        window_instance.btn_cambia_database = QPushButton("Impostazioni di archiviazione")
         window_instance.btn_cambia_database.setMinimumHeight(btn_db_h)
         window_instance.btn_cambia_database.setStyleSheet(f"""
             QPushButton {{
@@ -307,9 +307,10 @@ class MainWindowUIComponents:
             QPushButton:pressed {{ background-color: #fde68a; }}
         """)
         window_instance.btn_cambia_database.setToolTip(
-            "Seleziona un database diverso (es. cartella condivisa in rete)"
+            "Stato dei dati, copie di sicurezza e scelta del database"
         )
-        window_instance.btn_cambia_database.clicked.connect(window_instance.cambia_database)
+        window_instance.btn_cambia_database.clicked.connect(
+            window_instance.apri_impostazioni_archiviazione)
 
         buttons_layout.addWidget(window_instance.btn_nuovo_preventivo)
         buttons_layout.addWidget(window_instance.btn_visualizza_preventivi)

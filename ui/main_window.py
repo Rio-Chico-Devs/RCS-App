@@ -50,6 +50,7 @@ class MainWindow(QMainWindow):
         self.visualizza_preventivi_window = None
         self.magazzino_window = None
         self.anagrafica_clienti_window = None
+        self.impostazioni_archiviazione_window = None
 
         # Inizializzazione UI delegata al modulo
         MainWindowUIComponents.init_ui(self)
@@ -131,6 +132,10 @@ class MainWindow(QMainWindow):
     def cambia_database(self):
         """Permette di selezionare un database diverso (es. cartella condivisa in rete)"""
         MainWindowBusinessLogic.cambia_database(self)
+
+    def apri_impostazioni_archiviazione(self):
+        """Apre la schermata con stato dei dati, copie di sicurezza e database"""
+        MainWindowBusinessLogic.apri_impostazioni_archiviazione(self)
 
     # =============================================================================
     # COMPATIBILITY METHODS - Per retrocompatibilità

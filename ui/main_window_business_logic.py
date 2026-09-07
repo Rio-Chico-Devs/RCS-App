@@ -743,6 +743,26 @@ class MainWindowBusinessLogic:
                                   "Preventivo salvato con successo!\n\nUsa 'Visualizza Preventivi Salvati' per vederlo nella lista.")
 
     @staticmethod
+    def apri_impostazioni_archiviazione(window_instance):
+        """Apre la schermata unica per stato dei dati, copie di sicurezza e
+        scelta del database."""
+        from ui.impostazioni_archiviazione_window import ImpostazioniArchiviazioneWindow
+
+        esistente = getattr(window_instance, 'impostazioni_archiviazione_window', None)
+        try:
+            if esistente and esistente.isVisible():
+                esistente.aggiorna_tutto()
+                esistente.raise_()
+                esistente.activateWindow()
+                return
+        except RuntimeError:
+            pass   # finestra già chiusa e distrutta da Qt
+
+        window_instance.impostazioni_archiviazione_window = ImpostazioniArchiviazioneWindow(
+            window_instance.db_manager, window_instance)
+        window_instance.impostazioni_archiviazione_window.show()
+
+    @staticmethod
     def cambia_database(window_instance):
         """Permette all'utente di selezionare un database diverso (es. cartella condivisa in rete)."""
         if getattr(sys, 'frozen', False):
@@ -776,9 +796,19 @@ class MainWindowBusinessLogic:
         if not path_nuovo:
             return
 
-        # Salva il nuovo percorso in config.json
+        # Salva il nuovo percorso in config.json, conservando le altre
+        # impostazioni eventualmente presenti (prima venivano cancellate).
         try:
-            config = {"db_path": path_nuovo}
+            config = {}
+            if os.path.exists(config_path):
+                try:
+                    with open(config_path, "r", encoding="utf-8") as f:
+                        letto = json.load(f)
+                    if isinstance(letto, dict):
+                        config = letto
+                except Exception:
+                    config = {}
+            config["db_path"] = path_nuovo
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
         except Exception as e:
