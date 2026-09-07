@@ -136,7 +136,7 @@ class MagazzinoWindow(QMainWindow):
                 border: 1px solid #e2e8f0;
                 border-bottom: none;
                 border-radius: 6px 6px 0 0;
-                padding: 8px 16px;
+                padding: 8px 24px;
                 font-size: 13px;
                 font-weight: 600;
                 font-family: system-ui, -apple-system, sans-serif;
@@ -194,13 +194,16 @@ class MagazzinoWindow(QMainWindow):
 
         # Tab widget
         self.tabs = QTabWidget()
+        # Mostra sempre il testo completo delle tab (evita il taglio con "...")
+        self.tabs.tabBar().setElideMode(Qt.ElideNone)
+        self.tabs.tabBar().setUsesScrollButtons(False)
         self.tab_scorte = QWidget()
         self.tab_consumi = QWidget()
         self.tab_fornitori = QWidget()
 
-        self.tabs.addTab(self.tab_scorte, "Scorte Magazzino")
-        self.tabs.addTab(self.tab_consumi, "Consumi e Spese")
-        self.tabs.addTab(self.tab_fornitori, "Gestione Fornitori")
+        self.tabs.addTab(self.tab_scorte, "Scorte")
+        self.tabs.addTab(self.tab_consumi, "Consumi")
+        self.tabs.addTab(self.tab_fornitori, "Fornitori")
 
         self.setup_tab_scorte()
         self.setup_tab_consumi()

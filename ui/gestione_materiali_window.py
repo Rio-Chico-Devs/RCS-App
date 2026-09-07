@@ -701,6 +701,7 @@ class GestioneMaterialiWindow(QMainWindow):
                     self.edit_scorta_min_mat.setValue(fresh[8] if len(fresh) > 8 else 0.0)
                     self.edit_scorta_max_mat.setValue(fresh[9] if len(fresh) > 9 else 0.0)
                 self.materiali_modificati.emit()
+                QMessageBox.information(self, "Successo", f"Materiale '{nome}' salvato con successo!")
             else:
                 QMessageBox.critical(self, "Errore", "Nome materiale già esistente o errore nel database.")
         except Exception as e:
