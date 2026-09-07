@@ -20,7 +20,7 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
 from PyQt5.QtCore import Qt, pyqtSignal, QDate
 from PyQt5.QtGui import QColor, QPainter, QLinearGradient
 from ui.materiale_ui_components import NoScrollDoubleSpinBox
-from ui.responsive import get_metrics
+from ui.responsive import get_metrics, adatta_linguette
 from datetime import datetime, timedelta
 
 
@@ -194,9 +194,10 @@ class MagazzinoWindow(QMainWindow):
 
         # Tab widget
         self.tabs = QTabWidget()
-        # Mostra sempre il testo completo delle tab (evita il taglio con "...")
-        self.tabs.tabBar().setElideMode(Qt.ElideNone)
-        self.tabs.tabBar().setUsesScrollButtons(False)
+        # Linguette dimensionate sul testo reale: senza questo il testo viene
+        # tagliato ai due lati ("Scorte" -> "cort"), in modo diverso a seconda
+        # della risoluzione dello schermo. Va fatto PRIMA di aggiungere le schede.
+        adatta_linguette(self.tabs)
         self.tab_scorte = QWidget()
         self.tab_consumi = QWidget()
         self.tab_fornitori = QWidget()

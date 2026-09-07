@@ -13,11 +13,13 @@ automatici.
 from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QLabel, QPushButton, QTabWidget, QTextEdit,
                              QTableWidget, QTableWidgetItem, QHeaderView,
-                             QAbstractItemView, QMessageBox, QGroupBox)
+                             QAbstractItemView, QMessageBox, QGroupBox,
+                             QApplication)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont
 
 from database import archivio
+from ui.responsive import adatta_linguette
 
 COLORE_TESTO = "#2d3748"
 COLORE_TENUE = "#718096"
@@ -35,7 +37,7 @@ class ImpostazioniArchiviazioneWindow(QMainWindow):
         self._backup = []
 
         self.setWindowTitle("Impostazioni di archiviazione")
-        self.setMinimumSize(820, 620)
+        self._dimensiona_sullo_schermo()
         self.setStyleSheet(f"""
             QMainWindow, QWidget {{ background-color: #ffffff; color: {COLORE_TESTO}; }}
             QLabel {{ color: {COLORE_TESTO}; }}
@@ -82,6 +84,9 @@ class ImpostazioniArchiviazioneWindow(QMainWindow):
         layout.addWidget(sottotitolo)
 
         self.schede = QTabWidget()
+        # Linguette dimensionate sul testo reale (va fatto prima di aggiungerle):
+        # altrimenti il testo viene tagliato ai due lati su alcuni schermi.
+        adatta_linguette(self.schede)
         self.schede.addTab(self._crea_scheda_stato(), "Stato")
         self.schede.addTab(self._crea_scheda_copie(), "Copie di sicurezza")
         self.schede.addTab(self._crea_scheda_database(), "Database in uso")
@@ -89,6 +94,22 @@ class ImpostazioniArchiviazioneWindow(QMainWindow):
 
         self.setCentralWidget(centrale)
         self.aggiorna_tutto()
+
+    def _dimensiona_sullo_schermo(self):
+        """Sceglie la dimensione in base allo schermo, senza mai superarlo.
+
+        Un minimo fisso non va bene: su un portatile piccolo la finestra
+        risulterebbe piu' alta dello spazio disponibile e i pulsanti in fondo
+        finirebbero fuori dallo schermo."""
+        try:
+            disponibile = QApplication.primaryScreen().availableGeometry()
+            largo = min(900, int(disponibile.width() * 0.75))
+            alto = min(680, int(disponibile.height() * 0.80))
+            self.resize(max(largo, 560), max(alto, 420))
+            self.setMinimumSize(min(560, disponibile.width() - 40),
+                                min(420, disponibile.height() - 40))
+        except Exception:
+            self.resize(820, 620)   # se lo schermo non e' interrogabile
 
     # ------------------------------------------------------------------
     # Scheda: Stato

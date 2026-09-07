@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 from PyQt5.QtGui import QFont, QColor, QPainter, QBrush, QPen
 from ui.materiale_ui_components import NoScrollDoubleSpinBox
-from ui.responsive import get_metrics
+from ui.responsive import get_metrics, adatta_linguette
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +210,8 @@ class GestioneMaterialiWindow(QMainWindow):
         # Tab widget
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabPosition(QTabWidget.North)
+        # Linguette dimensionate sul testo reale (prima di aggiungerle)
+        adatta_linguette(self.tab_widget)
 
         self.tab_materiali = QWidget()
         self._build_tab_materiali(self.tab_materiali)
