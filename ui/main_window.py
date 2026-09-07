@@ -61,11 +61,17 @@ class MainWindow(QMainWindow):
                                  self.db_manager.avviso_integrita)
 
     def closeEvent(self, event):
-        """Alla chiusura, toglie questo PC dall'elenco delle sessioni aperte
-        (serve a capire se due postazioni erano attive insieme)."""
+        """Chiusura regolare: toglie questo PC dall'elenco delle sessioni aperte
+        e cancella il marcatore, così al prossimo avvio si sa che la chiusura
+        è avvenuta correttamente."""
         try:
             from database import backup_manager
             backup_manager.chiudi_sessione(self.db_manager.db_path)
+        except Exception:
+            pass
+        try:
+            from utils import diagnostica
+            diagnostica.segna_chiusura_regolare()
         except Exception:
             pass
         super().closeEvent(event)

@@ -7,6 +7,7 @@ Creata con PyQt5 e SQLite
 import sys
 import os
 import json
+import logging
 import traceback
 from PyQt5.QtWidgets import (QApplication, QMessageBox, QDialog, QVBoxLayout,
                               QHBoxLayout, QLabel, QPushButton, QLineEdit,
@@ -224,6 +225,56 @@ def _mostra_dialogo_primo_avvio(base_dir):
     return risultato["ok"]
 
 
+def _controlla_sessione_precedente():
+    """Verifica com'è finita la sessione precedente e, se è stata interrotta di
+    colpo (aggiornamento di Windows, mancanza di corrente, blocco), spiega
+    all'utente cosa è successo e quali preventivi non salvati sono recuperabili."""
+    from utils import bozze, diagnostica
+    from database.db_manager import risolvi_percorso_db
+
+    try:
+        percorso_db, _ = risolvi_percorso_db()
+    except Exception:
+        percorso_db = ""
+
+    stato = diagnostica.segna_avvio(percorso_db)
+    if stato.get("chiusura_precedente_regolare") is not False:
+        bozze.pulisci_vecchie()
+        return
+
+    # La sessione precedente è stata interrotta: cerchiamo di capire perché.
+    eventi = diagnostica.eventi_windows()
+    riepilogo = diagnostica.riepilogo_avvio(stato, eventi)
+    if riepilogo:
+        logging.getLogger('rcs').warning("Riepilogo sessione precedente:\n%s", riepilogo)
+
+    bozze_rimaste = bozze.elenca_bozze()
+
+    messaggio = ["L'ultima volta il programma non è stato chiuso normalmente."]
+    if eventi:
+        messaggio.append("\nWindows ha registrato:")
+        for evento in eventi[:5]:
+            messaggio.append("  • " + evento)
+
+    if bozze_rimaste:
+        messaggio.append(
+            "\nErano rimasti aperti {} preventivi non salvati. "
+            "Il loro contenuto è stato conservato:".format(len(bozze_rimaste)))
+        for bozza in bozze_rimaste[:5]:
+            messaggio.append("  • " + bozze.descrivi_bozza(bozza))
+        messaggio.append(
+            "\nI dati si trovano nella cartella:\n{}".format(bozze.cartella_bozze()))
+    else:
+        messaggio.append("\nNon risultano preventivi non salvati da recuperare.")
+
+    messaggio.append(
+        "\nIl database è stato controllato: se ci fossero problemi verrebbe "
+        "segnalato subito dopo questo messaggio.")
+
+    QMessageBox.warning(None, "Chiusura anomala rilevata", "\n".join(messaggio))
+    bozze.pulisci_vecchie()
+
+
 def main():
     """Funzione principale dell'applicazione"""
     setup_logger()
@@ -243,6 +294,13 @@ def main():
         configurato = _mostra_dialogo_primo_avvio(base_dir)
         if not configurato:
             sys.exit(0)
+
+    # Diagnostica: com'è andata la sessione precedente? (chiusura regolare o
+    # interruzione improvvisa) e sono rimaste bozze di preventivi non salvati?
+    try:
+        _controlla_sessione_precedente()
+    except Exception:
+        pass  # la diagnostica non deve mai impedire l'avvio
 
     # Controllo preliminare del database PRIMA di aprire l'interfaccia: se è
     # danneggiato è meglio fermarsi con un messaggio comprensibile (e con i

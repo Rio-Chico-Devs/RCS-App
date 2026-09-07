@@ -35,7 +35,7 @@ from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
                              QDialog, QListWidget, QListWidgetItem, QGridLayout, QFrame,
                              QSizePolicy, QApplication, QGraphicsDropShadowEffect, QTextEdit,
                              QComboBox)
-from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer
 from PyQt5.QtGui import QFont, QDoubleValidator, QColor
 from ui.materiale_ui_components import NoScrollSpinBox, NoScrollDoubleSpinBox
 from models.preventivo import Preventivo
@@ -60,6 +60,11 @@ class PreventivoWindow(QMainWindow):
         self.preventivo = Preventivo()
         self.materiale_windows = []
         self.operazione_completata = False  # Flag per evitare popup se operazione completata
+
+        # Bozza automatica (attivata in fondo al costruttore): definite subito
+        # perché la chiusura della finestra può avvenire in qualsiasi momento.
+        self._chiave_bozza = None
+        self._timer_bozza = None
         
         # Se stiamo caricando un preventivo esistente
         if preventivo_id:
@@ -67,6 +72,61 @@ class PreventivoWindow(QMainWindow):
         
         self.init_ui()
         # RIMOSSA: self.aggiorna_totali() - causava azzeramento dei valori caricati
+
+        # Bozza automatica: se il PC si spegne (aggiornamento di Windows,
+        # mancanza di corrente) il lavoro fatto in questa finestra non va perso.
+        try:
+            if self.modalita in ('nuovo', 'modifica', 'revisione'):
+                from datetime import datetime as _dt
+                self._chiave_bozza = _dt.now().strftime("%Y%m%d_%H%M%S_%f")
+                self._timer_bozza = QTimer(self)
+                self._timer_bozza.timeout.connect(self._salva_bozza_automatica)
+                self._timer_bozza.start(15000)   # ogni 15 secondi
+        except Exception:
+            pass  # senza bozze si lavora comunque: non deve impedire l'apertura
+
+    def _ha_contenuto_da_salvare(self):
+        """True se in questa finestra c'è del lavoro che varrebbe la pena non
+        perdere (stessa condizione usata per l'avviso alla chiusura)."""
+        try:
+            if self.preventivo.materiali_calcolati:
+                return True
+            if any(v for v in self.get_dati_cliente().values()):
+                return True
+            campi = (self.edit_costi_accessori, self.edit_minuti_taglio,
+                     self.edit_minuti_avvolgimento, self.edit_minuti_pulizia,
+                     self.edit_minuti_rettifica, self.edit_minuti_imballaggio)
+            return any(c.value() > 0 for c in campi)
+        except Exception:
+            return False
+
+    def _salva_bozza_automatica(self):
+        """Salva il contenuto corrente come bozza sul disco locale."""
+        if not getattr(self, "_chiave_bozza", None) or self.operazione_completata:
+            return
+        try:
+            if not self._ha_contenuto_da_salvare():
+                return
+            from utils import bozze
+            dati = self.preventivo.to_dict()
+            dati.update(self.get_dati_cliente())
+            bozze.salva_bozza(self._chiave_bozza, dati,
+                              modalita=self.modalita, preventivo_id=self.preventivo_id)
+        except Exception:
+            pass  # la bozza non deve mai disturbare il lavoro in corso
+
+    def _elimina_bozza(self):
+        """Toglie la bozza: il preventivo è stato salvato o chiuso di proposito."""
+        try:
+            timer = getattr(self, "_timer_bozza", None)
+            if timer:
+                timer.stop()
+            chiave = getattr(self, "_chiave_bozza", None)
+            if chiave:
+                from utils import bozze
+                bozze.elimina_bozza(chiave)
+        except Exception:
+            pass
     
     def carica_preventivo_esistente(self):
         """Carica un preventivo esistente dal database"""
@@ -1424,9 +1484,10 @@ class PreventivoWindow(QMainWindow):
         
         # Non mostrare popup se operazione completata o in modalità visualizzazione
         if self.operazione_completata or self.modalita == 'visualizza':
+            self._elimina_bozza()   # salvato o nulla da salvare: bozza inutile
             event.accept()
             return
-        
+
         # Controllo modifiche non salvate
         if self.modalita in ['nuovo', 'modifica', 'revisione']:
             dati_cliente = self.get_dati_cliente()
@@ -1445,7 +1506,8 @@ class PreventivoWindow(QMainWindow):
                                               "Ci sono dati non salvati. Vuoi chiudere comunque?",
                                               QMessageBox.Yes | QMessageBox.No)
                 if risposta == QMessageBox.No:
-                    event.ignore()
-                    return
-        
+                    return event.ignore()   # continua a lavorare: bozza mantenuta
+
+        # Chiusura decisa dall'utente: la bozza non serve più
+        self._elimina_bozza()
         event.accept()

@@ -105,15 +105,27 @@ class DatabaseManager:
         integro, messaggio, _ms = backup_manager.verifica_integrita(self.db_path)
         return integro, messaggio
 
-    def _controlla_dopo_scrittura(self, operazione):
-        """Verifica il database subito dopo una scrittura importante, così una
-        eventuale corruzione viene attribuita all'operazione che l'ha causata."""
-        if not self.verifica_dopo_scrittura:
-            return True
+    def _controlla_dopo_scrittura(self, operazione, dettaglio=""):
+        """Verifica il database subito dopo una scrittura importante e registra
+        l'operazione, così una eventuale corruzione viene attribuita
+        all'operazione che l'ha causata invece che a un momento imprecisato."""
+        integro = True
+        durata = None
         try:
-            return backup_manager.verifica_dopo_scrittura(self.db_path, operazione)
+            if self.verifica_dopo_scrittura:
+                inizio = datetime.now()
+                integro = backup_manager.verifica_dopo_scrittura(self.db_path, operazione)
+                durata = (datetime.now() - inizio).total_seconds() * 1000
         except Exception:
-            return True
+            integro = True
+        try:
+            from utils import diagnostica
+            diagnostica.registra_scrittura(
+                operazione, dettaglio,
+                "ok" if integro else "DATABASE DANNEGGIATO", durata)
+        except Exception:
+            pass
+        return integro
 
     def init_database(self):
         """Inizializza il database con le tabelle necessarie"""
@@ -845,7 +857,7 @@ class DatabaseManager:
             ))
             conn.commit()
             nuovo_id = cursor.lastrowid
-        self._controlla_dopo_scrittura("add_preventivo")
+        self._controlla_dopo_scrittura("add_preventivo", f"id {nuovo_id}")
         return nuovo_id
 
     def update_preventivo(self, preventivo_id, preventivo_data):
@@ -940,7 +952,7 @@ class DatabaseManager:
                 aggiornato = False
 
         if aggiornato:
-            self._controlla_dopo_scrittura("update_preventivo")
+            self._controlla_dopo_scrittura("update_preventivo", f"id {preventivo_id}")
         return aggiornato
 
     def get_storico_modifiche(self, preventivo_id):
@@ -1326,7 +1338,8 @@ class DatabaseManager:
                 eliminato = cursor.rowcount > 0
 
             if eliminato:
-                self._controlla_dopo_scrittura("delete_preventivo_e_revisioni")
+                self._controlla_dopo_scrittura("delete_preventivo_e_revisioni",
+                                               f"id {preventivo_id}")
             return eliminato
         except sqlite3.Error as e:
             logging.getLogger('rcs').error(f"DB error in delete_preventivo_e_revisioni: {e}")
