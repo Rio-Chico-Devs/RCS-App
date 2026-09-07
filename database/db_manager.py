@@ -21,9 +21,62 @@ import os
 import sys
 import json
 import logging
+import time
 from datetime import datetime
+from functools import wraps
 
 from database import backup_manager
+
+# Su una cartella di rete condivisa una scrittura può richiedere più tempo del
+# normale, e un altro computer può tenere il database occupato per qualche
+# istante. Il valore predefinito della libreria (5 secondi) è troppo basso.
+TIMEOUT_CONNESSIONE = 20.0
+TENTATIVI_SCRITTURA = 4
+ATTESA_TRA_TENTATIVI = 0.6      # secondi; cresce a ogni tentativo
+
+
+class DatabaseOccupato(Exception):
+    """Un altro computer sta scrivendo sul database in questo momento."""
+
+
+def _e_database_occupato(errore):
+    testo = str(errore).lower()
+    return "locked" in testo or "busy" in testo
+
+
+def riprova_se_occupato(operazione):
+    """Se il database è occupato da un altro computer, riprova qualche volta
+    prima di arrendersi, invece di far fallire subito il salvataggio.
+
+    È il caso di due postazioni che salvano nello stesso istante: normalmente
+    l'attesa si risolve in una frazione di secondo e l'utente non si accorge
+    di nulla."""
+    def decoratore(funzione):
+        @wraps(funzione)
+        def involucro(self, *args, **kwargs):
+            for tentativo in range(1, TENTATIVI_SCRITTURA + 1):
+                try:
+                    return funzione(self, *args, **kwargs)
+                except sqlite3.OperationalError as errore:
+                    if not _e_database_occupato(errore):
+                        raise
+                    if tentativo == TENTATIVI_SCRITTURA:
+                        break
+                    attesa = ATTESA_TRA_TENTATIVI * tentativo
+                    logging.getLogger('rcs').warning(
+                        "Database occupato da un altro computer durante '%s': "
+                        "tentativo %d di %d, riprovo tra %.1f s",
+                        operazione, tentativo, TENTATIVI_SCRITTURA, attesa)
+                    self._registra_conflitto(operazione, tentativo)
+                    time.sleep(attesa)
+
+            self._registra_conflitto(operazione, TENTATIVI_SCRITTURA, fallito=True)
+            raise DatabaseOccupato(
+                "Un altro computer sta salvando in questo momento.\n\n"
+                "Attendi qualche secondo e riprova: i tuoi dati non sono andati persi.")
+        return involucro
+    return decoratore
+
 
 def risolvi_percorso_db():
     """Determina il percorso del database e legge la configurazione.
@@ -100,6 +153,23 @@ class DatabaseManager:
             # Il backup non deve mai impedire l'avvio dell'applicazione.
             logging.getLogger('rcs').error(f"Backup all'avvio non riuscito: {e}")
 
+    def _connessione(self):
+        """Apre una connessione al database con un'attesa adeguata a una
+        cartella di rete condivisa (il valore predefinito è 5 secondi, troppo
+        poco se un altro computer sta scrivendo)."""
+        return sqlite3.connect(self.db_path, timeout=TIMEOUT_CONNESSIONE)
+
+    def _registra_conflitto(self, operazione, tentativo, fallito=False):
+        """Annota nel registro che due postazioni hanno scritto insieme.
+        Serve a sapere quanto spesso capita davvero."""
+        try:
+            from utils import diagnostica
+            diagnostica.registra_scrittura(
+                operazione, f"tentativo {tentativo}",
+                "NON RIUSCITO: database occupato" if fallito else "database occupato, riprovo")
+        except Exception:
+            pass
+
     def verifica_integrita(self):
         """Controllo di integrità su richiesta. Ritorna (ok, messaggio)."""
         integro, messaggio, _ms = backup_manager.verifica_integrita(self.db_path)
@@ -129,7 +199,7 @@ class DatabaseManager:
 
     def init_database(self):
         """Inizializza il database con le tabelle necessarie"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
 
             # Tabella materiali (IDENTICA ALL'ORIGINALE)
@@ -346,7 +416,7 @@ class DatabaseManager:
     def get_all_materiali(self):
         """Restituisce tutti i materiali disponibili"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, scorta_minima, scorta_massima FROM materiali ORDER BY nome")
                 return cursor.fetchall()
@@ -357,7 +427,7 @@ class DatabaseManager:
     def get_materiale_by_id(self, materiale_id):
         """Restituisce un materiale specifico tramite ID"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, scorta_minima, scorta_massima FROM materiali WHERE id = ?", (materiale_id,))
                 return cursor.fetchone()
@@ -368,7 +438,7 @@ class DatabaseManager:
     def get_materiale_by_nome(self, nome):
         """Restituisce un materiale specifico tramite nome"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT id, nome, spessore, prezzo, fornitore, prezzo_fornitore, capacita_magazzino, giacenza, scorta_minima, scorta_massima FROM materiali WHERE nome = ?", (nome,))
                 return cursor.fetchone()
@@ -378,7 +448,7 @@ class DatabaseManager:
 
     def add_materiale(self, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0):
         """Aggiunge un nuovo materiale"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute(
@@ -392,7 +462,7 @@ class DatabaseManager:
 
     def update_materiale_base(self, materiale_id, nome, spessore, prezzo):
         """Aggiorna solo i campi base di un materiale (senza toccare fornitori/giacenza legacy)"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute(
@@ -410,7 +480,7 @@ class DatabaseManager:
     def update_materiale_scorte(self, materiale_id, scorta_minima, scorta_massima):
         """Aggiorna le scorte aggregate (min/max) di un materiale"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     "UPDATE materiali SET scorta_minima = ?, scorta_massima = ? WHERE id = ?",
@@ -424,7 +494,7 @@ class DatabaseManager:
 
     def update_materiale(self, materiale_id, nome, spessore, prezzo, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0):
         """Aggiorna un materiale esistente"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute(
@@ -442,7 +512,7 @@ class DatabaseManager:
     def update_prezzo_materiale(self, materiale_id, nuovo_prezzo):
         """Aggiorna solo il prezzo di un materiale"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     "UPDATE materiali SET prezzo = ? WHERE id = ?",
@@ -457,7 +527,7 @@ class DatabaseManager:
     def delete_materiale(self, materiale_id):
         """Elimina un materiale, i suoi movimenti e le sue voci fornitore"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM movimenti_magazzino WHERE materiale_id = ?", (materiale_id,))
                 cursor.execute("DELETE FROM materiale_fornitori WHERE materiale_id = ?", (materiale_id,))
@@ -473,7 +543,7 @@ class DatabaseManager:
     def get_fornitori_per_materiale(self, materiale_id):
         """Restituisce i fornitori di un materiale specifico"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     SELECT id, fornitore_nome, prezzo_fornitore, scorta_minima, scorta_massima, giacenza
@@ -489,7 +559,7 @@ class DatabaseManager:
     def get_fornitori_counts(self):
         """Restituisce dict {materiale_id: n_fornitori} per tutti i materiali"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT materiale_id, COUNT(*) FROM materiale_fornitori GROUP BY materiale_id")
                 return {row[0]: row[1] for row in cursor.fetchall()}
@@ -499,7 +569,7 @@ class DatabaseManager:
 
     def add_fornitore_a_materiale(self, materiale_id, fornitore_nome, prezzo_fornitore=0.0, scorta_minima=0.0, scorta_massima=0.0):
         """Aggiunge un fornitore a un materiale"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute("""
@@ -517,7 +587,7 @@ class DatabaseManager:
 
     def update_fornitore_materiale(self, mf_id, fornitore_nome, prezzo_fornitore=0.0, scorta_minima=0.0, scorta_massima=0.0):
         """Aggiorna un fornitore di un materiale"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute("""
@@ -536,7 +606,7 @@ class DatabaseManager:
     def delete_fornitore_materiale(self, mf_id):
         """Elimina un fornitore da un materiale"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM materiale_fornitori WHERE id = ?", (mf_id,))
                 conn.commit()
@@ -548,7 +618,7 @@ class DatabaseManager:
     def get_giacenza_totale_materiale(self, materiale_id):
         """Restituisce la giacenza totale di un materiale (somma di tutti i fornitori)"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     SELECT COALESCE(SUM(giacenza), 0)
@@ -569,7 +639,7 @@ class DatabaseManager:
     def get_giacenza_scorta_fornitore(self, materiale_id, fornitore_nome):
         """Restituisce (giacenza, scorta_massima) per un materiale/fornitore specifico."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     SELECT giacenza, scorta_massima FROM materiale_fornitori
@@ -591,7 +661,7 @@ class DatabaseManager:
     def registra_movimento(self, materiale_id, tipo, quantita, note="", preventivo_id=None, fornitore_nome=""):
         """Registra un movimento di magazzino (carico/scarico) e aggiorna giacenza"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     INSERT INTO movimenti_magazzino (materiale_id, tipo, quantita, data, note, preventivo_id, fornitore_nome)
@@ -626,7 +696,7 @@ class DatabaseManager:
     def get_movimenti_per_materiale(self, materiale_id, limit=100):
         """Restituisce i movimenti di un materiale"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     SELECT m.id, m.tipo, m.quantita, m.data, m.note, m.preventivo_id
@@ -643,7 +713,7 @@ class DatabaseManager:
     def get_movimenti_periodo(self, data_inizio, data_fine):
         """Restituisce tutti i movimenti individuali in un periodo (non aggregati)"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     SELECT mov.id, m.nome, mov.tipo, mov.quantita, mov.data,
@@ -661,7 +731,7 @@ class DatabaseManager:
     def get_movimento_by_id(self, movimento_id):
         """Restituisce un singolo movimento per id"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     SELECT id, materiale_id, tipo, quantita, data, note, preventivo_id, fornitore_nome
@@ -675,7 +745,7 @@ class DatabaseManager:
     def modifica_movimento(self, movimento_id, nuova_quantita, note):
         """Modifica un movimento: reversa il vecchio effetto su giacenza e applica il nuovo"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     "SELECT materiale_id, tipo, quantita, fornitore_nome FROM movimenti_magazzino WHERE id = ?",
@@ -717,7 +787,7 @@ class DatabaseManager:
 
     def elimina_movimento(self, movimento_id):
         """Elimina un movimento e reversa il suo effetto sulla giacenza"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT materiale_id, tipo, quantita, fornitore_nome FROM movimenti_magazzino WHERE id = ?",
@@ -747,7 +817,7 @@ class DatabaseManager:
     def reset_tutte_giacenze(self):
         """Azzera la giacenza di tutti i materiali e fornitori, e cancella tutti i movimenti."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("UPDATE materiali SET giacenza = 0")
                 cursor.execute("UPDATE materiale_fornitori SET giacenza = 0")
@@ -760,7 +830,7 @@ class DatabaseManager:
 
     def get_consumi_periodo(self, data_inizio, data_fine):
         """Restituisce i consumi aggregati per materiale in un periodo"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT mat.id, mat.nome, mat.prezzo_fornitore,
@@ -782,7 +852,7 @@ class DatabaseManager:
         La scorta_massima e scorta_minima aggregate vengono lette da m.scorta_massima / m.scorta_minima
         (impostate in gestione materiali). Se non impostate (= 0) si usa il fallback sui fornitori.
         """
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             if ordina_per == 'giacenza_asc':
                 order = "giacenza_totale ASC"
@@ -818,9 +888,10 @@ class DatabaseManager:
         """Salva un preventivo nel database - COMPATIBILITÀ ORIGINALE con nuovi campi"""
         return self.add_preventivo(preventivo_data)
 
+    @riprova_se_occupato("add_preventivo")
     def add_preventivo(self, preventivo_data):
         """Aggiunge un nuovo preventivo originale con i nuovi campi"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO preventivi (
@@ -860,9 +931,10 @@ class DatabaseManager:
         self._controlla_dopo_scrittura("add_preventivo", f"id {nuovo_id}")
         return nuovo_id
 
+    @riprova_se_occupato("update_preventivo")
     def update_preventivo(self, preventivo_id, preventivo_data):
         """AGGIORNATO: Aggiorna un preventivo esistente salvando snapshot nello storico"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
 
             # 1. Prima di aggiornare, salva lo snapshot corrente nello storico
@@ -957,7 +1029,7 @@ class DatabaseManager:
 
     def get_storico_modifiche(self, preventivo_id):
         """NUOVO: Ottiene lo storico modifiche di un preventivo"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT storico_modifiche FROM preventivi WHERE id = ?", (preventivo_id,))
             row = cursor.fetchone()
@@ -971,7 +1043,7 @@ class DatabaseManager:
 
     def ripristina_versione_preventivo(self, preventivo_id, timestamp_versione):
         """NUOVO: Ripristina una versione precedente del preventivo"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
 
             # Ottieni storico
@@ -1063,7 +1135,7 @@ class DatabaseManager:
 
     def add_revisione_preventivo(self, preventivo_originale_id, preventivo_data, note_revisione=""):
         """NUOVO: Aggiunge una revisione a un preventivo esistente con i nuovi campi"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
 
             # Trova il numero revisione successivo
@@ -1116,7 +1188,7 @@ class DatabaseManager:
     def get_all_preventivi(self):
         """Restituisce tutti i preventivi salvati - AGGIORNATO con nuovi campi"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     SELECT id, data_creazione, preventivo_finale, prezzo_cliente,
@@ -1131,7 +1203,7 @@ class DatabaseManager:
 
     def get_all_preventivi_latest(self):
         """NUOVO: Restituisce solo l'ultima revisione di ogni preventivo con i nuovi campi"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 WITH latest_preventivi AS (
@@ -1156,7 +1228,7 @@ class DatabaseManager:
 
     def get_preventivi_con_modifiche(self):
         """NUOVO: Restituisce solo i preventivi che hanno modifiche nello storico"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT id, data_creazione, preventivo_finale, prezzo_cliente,
@@ -1171,7 +1243,7 @@ class DatabaseManager:
     def get_preventivo_by_id(self, preventivo_id):
         """Restituisce un preventivo specifico con tutti i dettagli - AGGIORNATO"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("SELECT * FROM preventivi WHERE id = ?", (preventivo_id,))
                 row = cursor.fetchone()
@@ -1211,7 +1283,7 @@ class DatabaseManager:
     def get_revisioni_preventivo(self, preventivo_originale_id):
         """NUOVO: Restituisce tutte le revisioni di un preventivo con i nuovi campi"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     SELECT id, data_creazione, preventivo_finale, prezzo_cliente,
@@ -1230,28 +1302,28 @@ class DatabaseManager:
 
     def get_fornitori_nomi_attivi(self):
         """Restituisce i nomi distinti dei fornitori che hanno almeno un materiale"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT DISTINCT fornitore_nome FROM materiale_fornitori ORDER BY fornitore_nome")
             return [row[0] for row in cursor.fetchall()]
 
     def get_materiali_ids_per_fornitore(self, fornitore_nome):
         """Restituisce gli id dei materiali che hanno un certo fornitore"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT DISTINCT materiale_id FROM materiale_fornitori WHERE fornitore_nome = ?", (fornitore_nome,))
             return {row[0] for row in cursor.fetchall()}
 
     def get_all_fornitori(self):
         """Restituisce tutti i fornitori"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, nome FROM fornitori ORDER BY nome")
             return cursor.fetchall()
 
     def add_fornitore(self, nome):
         """Aggiunge un nuovo fornitore"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute("INSERT INTO fornitori (nome) VALUES (?)", (nome,))
@@ -1263,7 +1335,7 @@ class DatabaseManager:
     def get_scorte_per_fornitore(self, nome_fornitore):
         """Restituisce le scorte dei materiali di un fornitore specifico.
         Considera sia il campo legacy materiali.fornitore sia la tabella materiale_fornitori."""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT DISTINCT m.id, m.nome,
@@ -1282,7 +1354,7 @@ class DatabaseManager:
 
     def rename_fornitore(self, old_nome, new_nome):
         """Rinomina un fornitore aggiornando anche tutti i materiali collegati"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute("UPDATE fornitori SET nome = ? WHERE nome = ?", (new_nome, old_nome))
@@ -1297,17 +1369,18 @@ class DatabaseManager:
 
     def assegna_materiali_a_fornitore(self, nome_fornitore, materiale_ids):
         """Assegna i materiali selezionati al fornitore (aggiorna campo fornitore)"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             for mat_id in materiale_ids:
                 cursor.execute("UPDATE materiali SET fornitore = ? WHERE id = ?", (nome_fornitore, mat_id))
             conn.commit()
 
+    @riprova_se_occupato("delete_preventivo_e_revisioni")
     def delete_preventivo_e_revisioni(self, preventivo_id):
         """Elimina un preventivo e tutte le sue revisioni se è l'originale,
         oppure solo la revisione se viene passato l'ID di una revisione."""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
 
                 # Controlla se è un originale o una revisione
@@ -1342,6 +1415,10 @@ class DatabaseManager:
                                                f"id {preventivo_id}")
             return eliminato
         except sqlite3.Error as e:
+            # Se il database è solo occupato da un altro computer, l'errore deve
+            # risalire: ci pensa @riprova_se_occupato a ritentare.
+            if isinstance(e, sqlite3.OperationalError) and _e_database_occupato(e):
+                raise
             logging.getLogger('rcs').error(f"DB error in delete_preventivo_e_revisioni: {e}")
             return False
 
@@ -1350,7 +1427,7 @@ class DatabaseManager:
     def get_all_clienti(self):
         """Restituisce tutti i clienti con conteggio preventivi, ordinati per nome"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
                     SELECT c.id, c.nome, COUNT(p.id) as n_preventivi
@@ -1366,14 +1443,14 @@ class DatabaseManager:
 
     def get_cliente_by_id(self, cliente_id):
         """Restituisce un cliente specifico tramite ID"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT id, nome FROM clienti WHERE id = ?", (cliente_id,))
             return cursor.fetchone()
 
     def add_cliente(self, nome, email="", telefono="", note=""):
         """Aggiunge un nuovo cliente"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute("INSERT INTO clienti (nome) VALUES (?)", (nome,))
@@ -1387,7 +1464,7 @@ class DatabaseManager:
 
     def update_cliente(self, cliente_id, nome, email="", telefono="", note=""):
         """Aggiorna un cliente esistente"""
-        with sqlite3.connect(self.db_path) as conn:
+        with self._connessione() as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute("UPDATE clienti SET nome = ? WHERE id = ?", (nome, cliente_id))
@@ -1402,7 +1479,7 @@ class DatabaseManager:
     def delete_cliente(self, cliente_id):
         """Elimina un cliente"""
         try:
-            with sqlite3.connect(self.db_path) as conn:
+            with self._connessione() as conn:
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM clienti WHERE id = ?", (cliente_id,))
                 conn.commit()
