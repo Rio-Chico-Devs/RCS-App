@@ -30,6 +30,7 @@ from PyQt5.QtWidgets import (QMessageBox, QDialog, QVBoxLayout, QTextEdit,
                              QDialogButtonBox, QLabel, QListWidgetItem, QFileDialog)
 from PyQt5.QtCore import Qt
 from ui.preventivo_window import PreventivoWindow
+from ui import finestre_preventivo
 from ui.gestione_materiali_window import GestioneMaterialiWindow
 from ui.magazzino_window import MagazzinoWindow
 from ui.document_utils import DocumentUtils
@@ -219,64 +220,72 @@ class MainWindowBusinessLogic:
     
     @staticmethod
     def preventivo_gia_aperto(window_instance):
-        """Un preventivo alla volta.
+        """Chiede come procedere quando c'è già una schermata di preventivo
+        aperta.
 
-        Tutte le funzioni che aprono un preventivo scrivono sulla stessa
-        variabile 'preventivo_window'; le finestre non hanno un genitore, quindi
-        aprendone una seconda la prima perderebbe l'unico riferimento che la
-        tiene in vita e sparirebbe insieme al lavoro non salvato.
+        Si possono tenere aperti quanti preventivi si vuole: le schermate sono
+        registrate in ui/finestre_preventivo.py, che ne conserva il riferimento
+        (senza, Qt le distruggerebbe insieme al lavoro non salvato).
 
-        Qui si intercetta il caso: si chiede all'utente cosa vuole fare.
-        Ritorna True se l'apertura della nuova finestra va interrotta."""
-        esistente = getattr(window_instance, 'preventivo_window', None)
-        try:
-            if not esistente or not esistente.isVisible():
-                return False
-        except RuntimeError:
-            return False   # finestra già chiusa e distrutta da Qt
+        Ritorna True se la nuova schermata NON va aperta."""
+        aperte = finestre_preventivo.aperte()
+        if not aperte:
+            return False
 
-        try:
-            dati = esistente.get_dati_cliente()
-            cliente = (dati.get('nome_cliente') or '').strip()
-        except Exception:
-            cliente = ''
-        descrizione = "«{}»".format(cliente) if cliente else "senza cliente indicato"
+        precedente = aperte[-1]
+        if len(aperte) == 1:
+            descrizione = "Hai una schermata già aperta per un altro preventivo ({}).".format(
+                finestre_preventivo.descrivi(precedente))
+        else:
+            descrizione = "Hai {} schermate già aperte per altri preventivi.".format(len(aperte))
 
         finestra = QMessageBox(window_instance)
         finestra.setIcon(QMessageBox.Question)
         finestra.setWindowTitle("Preventivo già aperto")
-        finestra.setText(
-            "C'è già un preventivo aperto ({}).\n\n"
-            "Per sicurezza si lavora a un preventivo alla volta: "
-            "cosa vuoi fare?".format(descrizione))
-        btn_torna = finestra.addButton("Torna a quello aperto", QMessageBox.AcceptRole)
-        finestra.addButton("Chiudi quello e iniziane uno nuovo", QMessageBox.DestructiveRole)
-        finestra.setDefaultButton(btn_torna)
+        finestra.setText(descrizione + "\n\nCome vuoi procedere?")
+        btn_chiudi = finestra.addButton("Chiudi preventivo precedente", QMessageBox.DestructiveRole)
+        btn_continua = finestra.addButton("Continua la compilazione", QMessageBox.RejectRole)
+        btn_nuova = finestra.addButton("Apri nuova scheda preventivo", QMessageBox.AcceptRole)
+        finestra.setDefaultButton(btn_nuova)
         finestra.exec_()
 
-        if finestra.clickedButton() is btn_torna:
-            esistente.raise_()
-            esistente.activateWindow()
+        scelta = finestra.clickedButton()
+
+        if scelta is btn_continua:
+            precedente.raise_()
+            precedente.activateWindow()
             return True
 
-        # L'utente vuole chiudere quello aperto: la finestra chiede conferma da
-        # sé se ci sono dati non salvati.
-        esistente.close()
-        try:
-            if esistente.isVisible():
-                return True     # chiusura annullata dall'utente
-        except RuntimeError:
-            pass
+        if scelta is btn_chiudi:
+            # La schermata chiede conferma da sé se ci sono dati non salvati.
+            precedente.close()
+            try:
+                if precedente.isVisible():
+                    return True     # chiusura annullata dall'utente
+            except RuntimeError:
+                pass
+            finestre_preventivo.dimentica(precedente)
+
         return False
+
+    @staticmethod
+    def _apri_schermata_preventivo(window_instance, **parametri):
+        """Crea una schermata di preventivo, la registra (così non viene
+        distrutta) e la mostra."""
+        finestra = PreventivoWindow(window_instance.db_manager, window_instance, **parametri)
+        finestre_preventivo.registra(finestra)
+        window_instance.preventivo_window = finestra   # ultima aperta
+        if parametri.get('modalita') != 'visualizza':
+            finestra.preventivo_salvato.connect(window_instance.preventivo_salvato)
+        finestra.show()
+        return finestra
 
     @staticmethod
     def apri_preventivo(window_instance):
         """Apre la finestra per creare un nuovo preventivo"""
         if MainWindowBusinessLogic.preventivo_gia_aperto(window_instance):
             return
-        window_instance.preventivo_window = PreventivoWindow(window_instance.db_manager, window_instance, modalita='nuovo')
-        window_instance.preventivo_window.preventivo_salvato.connect(window_instance.preventivo_salvato)
-        window_instance.preventivo_window.show()
+        MainWindowBusinessLogic._apri_schermata_preventivo(window_instance, modalita='nuovo')
     
     @staticmethod
     def modifica_preventivo(window_instance):
@@ -290,14 +299,8 @@ class MainWindowBusinessLogic:
             return
 
         preventivo_id = current_item.data(Qt.UserRole)
-        window_instance.preventivo_window = PreventivoWindow(
-            window_instance.db_manager,
-            window_instance,
-            preventivo_id=preventivo_id,
-            modalita='modifica'
-        )
-        window_instance.preventivo_window.preventivo_salvato.connect(window_instance.preventivo_salvato)
-        window_instance.preventivo_window.show()
+        MainWindowBusinessLogic._apri_schermata_preventivo(
+            window_instance, preventivo_id=preventivo_id, modalita='modifica')
     
     @staticmethod
     def crea_revisione(window_instance):
@@ -317,15 +320,9 @@ class MainWindowBusinessLogic:
         if note_revisione is None:  # L'utente ha annullato
             return
         
-        window_instance.preventivo_window = PreventivoWindow(
-            window_instance.db_manager, 
-            window_instance, 
-            preventivo_id=preventivo_id, 
-            modalita='revisione',
-            note_revisione=note_revisione
-        )
-        window_instance.preventivo_window.preventivo_salvato.connect(window_instance.preventivo_salvato)
-        window_instance.preventivo_window.show()
+        MainWindowBusinessLogic._apri_schermata_preventivo(
+            window_instance, preventivo_id=preventivo_id, modalita='revisione',
+            note_revisione=note_revisione)
     
     @staticmethod
     def genera_documento_preventivo(window_instance):
@@ -577,19 +574,11 @@ class MainWindowBusinessLogic:
             QMessageBox.warning(window_instance, "Attenzione", "Seleziona un preventivo da visualizzare.")
             return
         
-        if MainWindowBusinessLogic.preventivo_gia_aperto(window_instance):
-            return
-
         preventivo_id = current_item.data(Qt.UserRole)
 
-        # Apre in modalità visualizzazione (sola lettura)
-        window_instance.preventivo_window = PreventivoWindow(
-            window_instance.db_manager, 
-            window_instance, 
-            preventivo_id=preventivo_id, 
-            modalita='visualizza'
-        )
-        window_instance.preventivo_window.show()
+        # Sola lettura: non c'è lavoro da perdere, quindi nessuna domanda.
+        MainWindowBusinessLogic._apri_schermata_preventivo(
+            window_instance, preventivo_id=preventivo_id, modalita='visualizza')
     
     @staticmethod
     def elimina_preventivo(window_instance):
@@ -724,9 +713,9 @@ class MainWindowBusinessLogic:
     
     @staticmethod
     def aggiorna_preventivi_aperti(window_instance):
-        """Aggiorna i preventivi aperti quando i materiali vengono modificati"""
-        if window_instance.preventivo_window and window_instance.preventivo_window.isVisible():
-            window_instance.preventivo_window.aggiorna_prezzi_materiali()
+        """Aggiorna i preventivi aperti quando i materiali vengono modificati.
+        Vale per TUTTE le schermate aperte, non solo per l'ultima."""
+        finestre_preventivo.aggiorna_prezzi_ovunque()
     
     @staticmethod
     def preventivo_salvato(window_instance):

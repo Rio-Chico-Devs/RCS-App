@@ -36,6 +36,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QColor
 from typing import Optional, Any
 from ui.responsive import get_metrics
+from ui import finestre_preventivo
 
 class VisualizzaPreventiviWindow(QMainWindow):
     preventivo_modificato = pyqtSignal()  # Signal per notificare modifiche
@@ -692,6 +693,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
             modalita='visualizza'
         )
         self.preventivo_window.preventivo_salvato.connect(self.on_preventivo_modificato)
+        finestre_preventivo.registra(self.preventivo_window)
         self.preventivo_window.show()
 
     def modifica_preventivo(self) -> None:
@@ -710,6 +712,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
             modalita='modifica'
         )
         self.preventivo_window.preventivo_salvato.connect(self.on_preventivo_modificato)
+        finestre_preventivo.registra(self.preventivo_window)
         self.preventivo_window.show()
 
     def crea_revisione(self) -> None:
@@ -735,6 +738,7 @@ class VisualizzaPreventiviWindow(QMainWindow):
             note_revisione=note_revisione
         )
         self.preventivo_window.preventivo_salvato.connect(self.on_preventivo_modificato)
+        finestre_preventivo.registra(self.preventivo_window)
         self.preventivo_window.show()
 
     def visualizza_modifiche(self) -> None:

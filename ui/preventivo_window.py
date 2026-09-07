@@ -147,6 +147,16 @@ class PreventivoWindow(QMainWindow):
         except Exception:
             pass  # la bozza non deve mai disturbare il lavoro in corso
 
+    def _togliti_dal_registro(self):
+        """Si toglie dall'elenco delle schermate aperte, liberando le risorse.
+        Si possono tenere aperti quanti preventivi si vuole: è importante che
+        quelli chiusi non restino a occupare memoria."""
+        try:
+            from ui import finestre_preventivo
+            finestre_preventivo.dimentica(self)
+        except Exception:
+            pass
+
     def _elimina_bozza(self):
         """Toglie la bozza: il preventivo è stato salvato o chiuso di proposito."""
         try:
@@ -1518,6 +1528,7 @@ class PreventivoWindow(QMainWindow):
         # Non mostrare popup se operazione completata o in modalità visualizzazione
         if self.operazione_completata or self.modalita == 'visualizza':
             self._elimina_bozza()   # salvato o nulla da salvare: bozza inutile
+            self._togliti_dal_registro()
             event.accept()
             return
 
@@ -1543,4 +1554,5 @@ class PreventivoWindow(QMainWindow):
 
         # Chiusura decisa dall'utente: la bozza non serve più
         self._elimina_bozza()
+        self._togliti_dal_registro()
         event.accept()
