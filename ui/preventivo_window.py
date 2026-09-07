@@ -43,6 +43,11 @@ from models.materiale import MaterialeCalcolato
 from ui.materiale_window import MaterialeWindow
 from ui.responsive import get_metrics
 import json
+from datetime import datetime
+
+# Dopo quanti minuti un preventivo lasciato in sospeso comincia a segnalarsi
+# (lampeggio dell'icona nella barra, senza finestre in primo piano).
+MINUTI_PRIMA_DEL_PROMEMORIA = 20
 
 class PreventivoWindow(QMainWindow):
     preventivo_salvato = pyqtSignal()
@@ -77,13 +82,40 @@ class PreventivoWindow(QMainWindow):
         # mancanza di corrente) il lavoro fatto in questa finestra non va perso.
         try:
             if self.modalita in ('nuovo', 'modifica', 'revisione'):
-                from datetime import datetime as _dt
-                self._chiave_bozza = _dt.now().strftime("%Y%m%d_%H%M%S_%f")
+                self._chiave_bozza = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
                 self._timer_bozza = QTimer(self)
                 self._timer_bozza.timeout.connect(self._salva_bozza_automatica)
                 self._timer_bozza.start(15000)   # ogni 15 secondi
+
+                # Promemoria discreto per i preventivi lasciati in sospeso
+                self._aperta_alle = datetime.now()
+                self._timer_promemoria = QTimer(self)
+                self._timer_promemoria.timeout.connect(self._promemoria_discreto)
+                self._timer_promemoria.start(5 * 60 * 1000)   # controlla ogni 5 minuti
         except Exception:
             pass  # senza bozze si lavora comunque: non deve impedire l'apertura
+
+    def _promemoria_discreto(self):
+        """Se il preventivo è aperto da parecchio senza essere salvato e la
+        finestra è finita in secondo piano, fa lampeggiare la sua icona nella
+        barra delle applicazioni.
+
+        Volutamente discreto: nessuna finestra che compare davanti al lavoro in
+        corso. Se l'utente ci sta lavorando sopra, non viene disturbato."""
+        try:
+            if self.operazione_completata or not self._ha_contenuto_da_salvare():
+                return
+            aperta_alle = getattr(self, "_aperta_alle", None)
+            if not aperta_alle:
+                return
+            minuti = (datetime.now() - aperta_alle).total_seconds() / 60.0
+            if minuti < MINUTI_PRIMA_DEL_PROMEMORIA:
+                return
+            if self.isActiveWindow():
+                return   # ci sta lavorando adesso: non serve richiamarlo
+            QApplication.alert(self, 3000)
+        except Exception:
+            pass
 
     def _ha_contenuto_da_salvare(self):
         """True se in questa finestra c'è del lavoro che varrebbe la pena non
@@ -118,9 +150,10 @@ class PreventivoWindow(QMainWindow):
     def _elimina_bozza(self):
         """Toglie la bozza: il preventivo è stato salvato o chiuso di proposito."""
         try:
-            timer = getattr(self, "_timer_bozza", None)
-            if timer:
-                timer.stop()
+            for nome_timer in ("_timer_bozza", "_timer_promemoria"):
+                timer = getattr(self, nome_timer, None)
+                if timer:
+                    timer.stop()
             chiave = getattr(self, "_chiave_bozza", None)
             if chiave:
                 from utils import bozze

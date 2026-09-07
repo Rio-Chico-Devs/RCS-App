@@ -12,8 +12,8 @@ import traceback
 from PyQt5.QtWidgets import (QApplication, QMessageBox, QDialog, QVBoxLayout,
                               QHBoxLayout, QLabel, QPushButton, QLineEdit,
                               QFileDialog, QFrame, QButtonGroup, QRadioButton)
-from PyQt5.QtCore import QDir, Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtCore import QDir, Qt, QUrl
+from PyQt5.QtGui import QFont, QDesktopServices
 
 # Aggiungi la directory corrente al path per importare i moduli
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -256,14 +256,22 @@ def _controlla_sessione_precedente():
         for evento in eventi[:5]:
             messaggio.append("  • " + evento)
 
+    percorso_recupero = None
     if bozze_rimaste:
+        percorso_recupero = bozze.genera_file_recupero(bozze_rimaste)
         messaggio.append(
-            "\nErano rimasti aperti {} preventivi non salvati. "
-            "Il loro contenuto è stato conservato:".format(len(bozze_rimaste)))
+            "\n{} non salvat{}. Ho preparato un foglio con TUTTI i dati che "
+            "erano stati inseriti (cliente, materiali, minuti, importi), così "
+            "puoi ricompilarli senza ricostruirli a memoria:".format(
+                "Era rimasto 1 preventivo" if len(bozze_rimaste) == 1
+                else "Erano rimasti {} preventivi".format(len(bozze_rimaste)),
+                "o" if len(bozze_rimaste) == 1 else "i"))
         for bozza in bozze_rimaste[:5]:
             messaggio.append("  • " + bozze.descrivi_bozza(bozza))
-        messaggio.append(
-            "\nI dati si trovano nella cartella:\n{}".format(bozze.cartella_bozze()))
+        if len(bozze_rimaste) > 5:
+            messaggio.append("  • ... e altri {}".format(len(bozze_rimaste) - 5))
+        if percorso_recupero:
+            messaggio.append("\nVuoi aprire subito il foglio di recupero?")
     else:
         messaggio.append("\nNon risultano preventivi non salvati da recuperare.")
 
@@ -271,7 +279,22 @@ def _controlla_sessione_precedente():
         "\nIl database è stato controllato: se ci fossero problemi verrebbe "
         "segnalato subito dopo questo messaggio.")
 
-    QMessageBox.warning(None, "Chiusura anomala rilevata", "\n".join(messaggio))
+    testo = "\n".join(messaggio)
+
+    if percorso_recupero:
+        risposta = QMessageBox.question(
+            None, "Chiusura anomala rilevata", testo,
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if risposta == QMessageBox.Yes:
+            try:
+                QDesktopServices.openUrl(QUrl.fromLocalFile(percorso_recupero))
+            except Exception:
+                QMessageBox.information(
+                    None, "Foglio di recupero",
+                    "Il foglio si trova qui:\n{}".format(percorso_recupero))
+    else:
+        QMessageBox.warning(None, "Chiusura anomala rilevata", testo)
+
     bozze.pulisci_vecchie()
 
 

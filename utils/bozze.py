@@ -130,6 +130,138 @@ def descrivi_bozza(bozza):
     return "{} — {}".format(quando, " · ".join(pezzi))
 
 
+def _riga(etichetta, valore, larghezza=24):
+    """Riga allineata con i puntini: 'Nome ......... Bianchi SpA'."""
+    testo = "" if valore is None else str(valore)
+    return "  {} {}".format((etichetta + " ").ljust(larghezza, "."), testo)
+
+
+def _euro(valore):
+    try:
+        return "€ {:,.2f}".format(float(valore or 0)).replace(",", "X").replace(".", ",").replace("X", ".")
+    except (TypeError, ValueError):
+        return "€ 0,00"
+
+
+def _numero(valore, unita=""):
+    try:
+        n = float(valore or 0)
+    except (TypeError, ValueError):
+        return "0"
+    testo = "{:g}".format(round(n, 2)).replace(".", ",")   # virgola decimale
+    return "{} {}".format(testo, unita).strip()
+
+
+def _blocco_bozza(bozza, progressivo):
+    """Costruisce il testo di UNA bozza, pensato per essere letto accanto al
+    programma mentre si ricompila il preventivo."""
+    dati = bozza.get("dati") or {}
+    righe = []
+
+    quando = bozza.get("salvata_il", "")
+    try:
+        quando = datetime.fromisoformat(quando).strftime("%d/%m/%Y alle %H:%M")
+    except Exception:
+        pass
+
+    righe.append("=" * 66)
+    righe.append("PREVENTIVO NON SALVATO n. {}".format(progressivo))
+    righe.append("Ultimo aggiornamento automatico: {}".format(quando or "sconosciuto"))
+    modalita = bozza.get("modalita")
+    if modalita and modalita != "nuovo":
+        righe.append("Era una {} del preventivo esistente n. {}".format(
+            modalita, bozza.get("preventivo_id") or "?"))
+    righe.append("=" * 66)
+    righe.append("")
+
+    righe.append("DATI CLIENTE")
+    righe.append(_riga("Cliente", dati.get("nome_cliente") or "(non indicato)"))
+    righe.append(_riga("Numero ordine", dati.get("numero_ordine")))
+    righe.append(_riga("Descrizione", dati.get("descrizione")))
+    righe.append(_riga("Codice", dati.get("codice")))
+    righe.append(_riga("Misura", dati.get("misura")))
+    righe.append(_riga("Finitura", dati.get("finitura")))
+    righe.append("")
+
+    materiali = dati.get("materiali_utilizzati") or []
+    righe.append("MATERIALI INSERITI ({})".format(len(materiali)))
+    if not materiali:
+        righe.append("  (nessun materiale era ancora stato inserito)")
+    for indice, materiale in enumerate(materiali, start=1):
+        if not isinstance(materiale, dict):
+            continue
+        nome = materiale.get("materiale_nome") or "materiale senza nome"
+        righe.append("  {}. {}".format(indice, nome))
+        righe.append(_riga("   diametro", _numero(materiale.get("diametro"), "mm"), 22))
+        righe.append(_riga("   lunghezza", _numero(materiale.get("lunghezza"), "mm"), 22))
+        righe.append(_riga("   giri", _numero(materiale.get("giri")), 22))
+        righe.append(_riga("   spessore", _numero(materiale.get("spessore"), "mm"), 22))
+        if materiale.get("is_conica"):
+            righe.append(_riga("   conica", "sì", 22))
+            righe.append(_riga("   conicità lato", _numero(materiale.get("conicita_lato")), 22))
+        righe.append(_riga("   maggiorazione", _numero(materiale.get("maggiorazione"), "%"), 22))
+        righe.append(_riga("   costo", _euro(materiale.get("costo_totale")), 22))
+    righe.append("")
+
+    righe.append("MINUTI DI LAVORAZIONE")
+    righe.append(_riga("Taglio", _numero(dati.get("minuti_taglio"), "min")))
+    righe.append(_riga("Avvolgimento", _numero(dati.get("minuti_avvolgimento"), "min")))
+    righe.append(_riga("Pulizia", _numero(dati.get("minuti_pulizia"), "min")))
+    righe.append(_riga("Rettifica", _numero(dati.get("minuti_rettifica"), "min")))
+    righe.append(_riga("Imballaggio", _numero(dati.get("minuti_imballaggio"), "min")))
+    righe.append("")
+
+    righe.append("IMPORTI CALCOLATI")
+    righe.append(_riga("Costo materiali", _euro(dati.get("costo_totale_materiali"))))
+    righe.append(_riga("Costi accessori", _euro(dati.get("costi_accessori"))))
+    righe.append(_riga("Manodopera", _euro(dati.get("tot_mano_opera"))))
+    righe.append(_riga("Subtotale", _euro(dati.get("subtotale"))))
+    righe.append(_riga("Maggiorazione 25%", _euro(dati.get("maggiorazione_25"))))
+    righe.append(_riga("Preventivo finale", _euro(dati.get("preventivo_finale"))))
+    righe.append(_riga("Prezzo al cliente", _euro(dati.get("prezzo_cliente"))))
+    righe.append("")
+
+    return "\n".join(righe)
+
+
+def genera_file_recupero(elenco=None):
+    """Scrive un file di testo con TUTTI i preventivi non salvati, formattato
+    per essere tenuto aperto accanto al programma mentre si ricompila.
+
+    Ritorna il percorso del file, oppure None se non c'era nulla da recuperare."""
+    elenco = elenco if elenco is not None else elenca_bozze()
+    if not elenco:
+        return None
+
+    testo = [
+        "RECUPERO PREVENTIVI NON SALVATI",
+        "Generato il {}".format(datetime.now().strftime("%d/%m/%Y alle %H:%M")),
+        "",
+        "Il programma si è chiuso in modo anomalo mentre {} in lavorazione.".format(
+            "c'era 1 preventivo" if len(elenco) == 1
+            else "c'erano {} preventivi".format(len(elenco))),
+        "Qui sotto trovi tutti i dati che erano stati inseriti, così puoi",
+        "ricompilarli senza doverli ricostruire a memoria.",
+        "",
+    ]
+    for progressivo, bozza in enumerate(elenco, start=1):
+        testo.append(_blocco_bozza(bozza, progressivo))
+
+    testo.append("=" * 66)
+    testo.append("Fine del recupero. Questo file può essere cancellato una volta")
+    testo.append("reinseriti i preventivi.")
+
+    try:
+        nome = "RECUPERO_preventivi_{}.txt".format(datetime.now().strftime("%Y%m%d_%H%M%S"))
+        percorso = os.path.join(cartella_bozze(), nome)
+        with open(percorso, "w", encoding="utf-8") as f:
+            f.write("\n".join(testo))
+        return percorso
+    except Exception as e:
+        _log().error("File di recupero non scrivibile: %s", e)
+        return None
+
+
 def pulisci_vecchie(giorni=GIORNI_CONSERVAZIONE):
     """Elimina le bozze più vecchie di 'giorni'."""
     limite = datetime.now() - timedelta(days=giorni)

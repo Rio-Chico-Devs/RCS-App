@@ -218,8 +218,62 @@ class MainWindowBusinessLogic:
         MainWindowBusinessLogic.load_preventivi(window_instance)
     
     @staticmethod
+    def preventivo_gia_aperto(window_instance):
+        """Un preventivo alla volta.
+
+        Tutte le funzioni che aprono un preventivo scrivono sulla stessa
+        variabile 'preventivo_window'; le finestre non hanno un genitore, quindi
+        aprendone una seconda la prima perderebbe l'unico riferimento che la
+        tiene in vita e sparirebbe insieme al lavoro non salvato.
+
+        Qui si intercetta il caso: si chiede all'utente cosa vuole fare.
+        Ritorna True se l'apertura della nuova finestra va interrotta."""
+        esistente = getattr(window_instance, 'preventivo_window', None)
+        try:
+            if not esistente or not esistente.isVisible():
+                return False
+        except RuntimeError:
+            return False   # finestra già chiusa e distrutta da Qt
+
+        try:
+            dati = esistente.get_dati_cliente()
+            cliente = (dati.get('nome_cliente') or '').strip()
+        except Exception:
+            cliente = ''
+        descrizione = "«{}»".format(cliente) if cliente else "senza cliente indicato"
+
+        finestra = QMessageBox(window_instance)
+        finestra.setIcon(QMessageBox.Question)
+        finestra.setWindowTitle("Preventivo già aperto")
+        finestra.setText(
+            "C'è già un preventivo aperto ({}).\n\n"
+            "Per sicurezza si lavora a un preventivo alla volta: "
+            "cosa vuoi fare?".format(descrizione))
+        btn_torna = finestra.addButton("Torna a quello aperto", QMessageBox.AcceptRole)
+        finestra.addButton("Chiudi quello e iniziane uno nuovo", QMessageBox.DestructiveRole)
+        finestra.setDefaultButton(btn_torna)
+        finestra.exec_()
+
+        if finestra.clickedButton() is btn_torna:
+            esistente.raise_()
+            esistente.activateWindow()
+            return True
+
+        # L'utente vuole chiudere quello aperto: la finestra chiede conferma da
+        # sé se ci sono dati non salvati.
+        esistente.close()
+        try:
+            if esistente.isVisible():
+                return True     # chiusura annullata dall'utente
+        except RuntimeError:
+            pass
+        return False
+
+    @staticmethod
     def apri_preventivo(window_instance):
         """Apre la finestra per creare un nuovo preventivo"""
+        if MainWindowBusinessLogic.preventivo_gia_aperto(window_instance):
+            return
         window_instance.preventivo_window = PreventivoWindow(window_instance.db_manager, window_instance, modalita='nuovo')
         window_instance.preventivo_window.preventivo_salvato.connect(window_instance.preventivo_salvato)
         window_instance.preventivo_window.show()
@@ -232,11 +286,14 @@ class MainWindowBusinessLogic:
             QMessageBox.warning(window_instance, "Attenzione", "Seleziona un preventivo da modificare.")
             return
         
+        if MainWindowBusinessLogic.preventivo_gia_aperto(window_instance):
+            return
+
         preventivo_id = current_item.data(Qt.UserRole)
         window_instance.preventivo_window = PreventivoWindow(
-            window_instance.db_manager, 
-            window_instance, 
-            preventivo_id=preventivo_id, 
+            window_instance.db_manager,
+            window_instance,
+            preventivo_id=preventivo_id,
             modalita='modifica'
         )
         window_instance.preventivo_window.preventivo_salvato.connect(window_instance.preventivo_salvato)
@@ -250,8 +307,11 @@ class MainWindowBusinessLogic:
             QMessageBox.warning(window_instance, "Attenzione", "Seleziona un preventivo per creare una revisione.")
             return
         
+        if MainWindowBusinessLogic.preventivo_gia_aperto(window_instance):
+            return
+
         preventivo_id = current_item.data(Qt.UserRole)
-        
+
         # Dialog per inserire note sulla revisione
         note_revisione = MainWindowBusinessLogic.richiedi_note_revisione(window_instance)
         if note_revisione is None:  # L'utente ha annullato
@@ -517,8 +577,11 @@ class MainWindowBusinessLogic:
             QMessageBox.warning(window_instance, "Attenzione", "Seleziona un preventivo da visualizzare.")
             return
         
+        if MainWindowBusinessLogic.preventivo_gia_aperto(window_instance):
+            return
+
         preventivo_id = current_item.data(Qt.UserRole)
-        
+
         # Apre in modalità visualizzazione (sola lettura)
         window_instance.preventivo_window = PreventivoWindow(
             window_instance.db_manager, 

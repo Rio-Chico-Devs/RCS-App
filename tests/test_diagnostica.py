@@ -179,6 +179,86 @@ class TestBozze(BaseCartellaFinta):
                             "il nome file non deve uscire dalla cartella prevista")
 
 
+class TestFileRecupero(BaseCartellaFinta):
+    """Il foglio che permette di ricompilare i preventivi persi."""
+
+    def _bozza_completa(self, cliente="Bianchi SpA"):
+        return {
+            "nome_cliente": cliente, "numero_ordine": "ORD-77",
+            "descrizione": "Tubo carbonio", "codice": "TC-1",
+            "misura": "1200 mm", "finitura": "Lucida",
+            "costo_totale_materiali": 250.0, "costi_accessori": 30.0,
+            "tot_mano_opera": 120.5, "minuti_taglio": 15, "minuti_avvolgimento": 40,
+            "minuti_pulizia": 10, "minuti_rettifica": 5, "minuti_imballaggio": 8,
+            "subtotale": 400.0, "maggiorazione_25": 100.0,
+            "preventivo_finale": 500.0, "prezzo_cliente": 1250.75,
+            "materiali_utilizzati": [
+                {"materiale_nome": "Fibra 200g", "diametro": 40, "lunghezza": 1200,
+                 "giri": 6, "spessore": 0.25, "maggiorazione": 10,
+                 "costo_totale": 180.0, "is_conica": False},
+            ],
+        }
+
+    def test_nessuna_bozza_nessun_file(self):
+        self.assertIsNone(bozze.genera_file_recupero())
+
+    def test_contiene_tutti_i_dati_per_ricompilare(self):
+        bozze.salva_bozza("f1", self._bozza_completa())
+        percorso = bozze.genera_file_recupero()
+        self.assertIsNotNone(percorso)
+        with open(percorso, encoding="utf-8") as f:
+            testo = f.read()
+
+        for atteso in ["Bianchi SpA", "ORD-77", "Tubo carbonio", "TC-1",
+                       "1200 mm", "Lucida", "Fibra 200g"]:
+            self.assertIn(atteso, testo, f"manca '{atteso}' nel foglio di recupero")
+
+        # importi e minuti servono per ricostruire il preventivo
+        self.assertIn("1.250,75", testo, "il prezzo al cliente deve esserci")
+        self.assertIn("15 min", testo)
+        self.assertIn("40 min", testo)
+
+    def test_piu_pagine_aperte_finiscono_tutte_nel_file(self):
+        """Lo scenario delle 'più pagine aperte'."""
+        for i, nome in enumerate(["Bianchi SpA", "Verdi Srl", "Neri & Co"]):
+            bozze.salva_bozza(f"f{i}", self._bozza_completa(nome))
+
+        percorso = bozze.genera_file_recupero()
+        with open(percorso, encoding="utf-8") as f:
+            testo = f.read()
+
+        for nome in ["Bianchi SpA", "Verdi Srl", "Neri & Co"]:
+            self.assertIn(nome, testo)
+        self.assertIn("PREVENTIVO NON SALVATO n. 1", testo)
+        self.assertIn("PREVENTIVO NON SALVATO n. 3", testo)
+        self.assertIn("c'erano 3 preventivi", testo)
+
+    def test_bozza_quasi_vuota_non_rompe_il_file(self):
+        bozze.salva_bozza("f1", {"materiali_utilizzati": []})
+        percorso = bozze.genera_file_recupero()
+        with open(percorso, encoding="utf-8") as f:
+            testo = f.read()
+        self.assertIn("(non indicato)", testo)
+        self.assertIn("nessun materiale", testo)
+
+    def test_numeri_in_formato_italiano(self):
+        bozze.salva_bozza("f1", self._bozza_completa())
+        percorso = bozze.genera_file_recupero()
+        with open(percorso, encoding="utf-8") as f:
+            testo = f.read()
+        self.assertIn("0,25 mm", testo, "i decimali usano la virgola")
+        self.assertIn("€ 180,00", testo)
+
+    def test_materiale_malformato_non_blocca_tutto(self):
+        dati = self._bozza_completa()
+        dati["materiali_utilizzati"] = ["non è un dizionario", {"materiale_nome": "Buono"}]
+        bozze.salva_bozza("f1", dati)
+        percorso = bozze.genera_file_recupero()
+        self.assertIsNotNone(percorso, "un dato sporco non deve impedire il recupero")
+        with open(percorso, encoding="utf-8") as f:
+            self.assertIn("Buono", f.read())
+
+
 class TestScenarioSpegnimentoImprovviso(BaseCartellaFinta):
     """Lo scenario concreto: tre schede preventivo aperte e il PC si spegne per
     un aggiornamento di Windows. Al riavvio si deve poter dire all'utente cosa
