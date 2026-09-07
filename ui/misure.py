@@ -21,7 +21,7 @@ def larghezza_testo(metriche, testo):
         return metriche.width(testo)
 
 
-def larghezza_linguetta(testo, metriche, larghezza_proposta, margine=56):
+def larghezza_linguetta(testo, metriche, larghezza_proposta, margine=90):
     """Larghezza da dare a una linguetta perché il testo non venga tagliato.
 
     Non è mai inferiore a quella proposta da Qt: la correzione può solo

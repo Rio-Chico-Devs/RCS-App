@@ -141,6 +141,7 @@ class MagazzinoWindow(QMainWindow):
                 font-weight: 600;
                 font-family: system-ui, -apple-system, sans-serif;
                 margin-right: 4px;
+                min-width: 110px;
             }
             QTabBar::tab:selected {
                 background-color: #ffffff;

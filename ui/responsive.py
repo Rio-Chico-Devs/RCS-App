@@ -27,14 +27,17 @@ class BarraLinguette(QTabBar):
     Qui la larghezza viene ricalcolata sul testo effettivo, con un margine per
     il riempimento laterale, e non e' mai inferiore a quella proposta da Qt."""
 
-    def __init__(self, margine=56, grassetto=True, parent=None):
+    def __init__(self, margine=90, pixel_carattere=13, grassetto=True, parent=None):
         super().__init__(parent)
         self._margine = margine
-        # Stesso carattere che verra' disegnato: cosi' la misura corrisponde.
-        if grassetto:
-            carattere = self.font()
-            carattere.setBold(True)
-            self.setFont(carattere)
+        # Il carattere della barra deve essere lo STESSO che il foglio di stile
+        # disegnera' (dimensione e grassetto): se si misura con un carattere
+        # piu' piccolo, il testo disegnato non ci sta e viene tagliato.
+        carattere = self.font()
+        if pixel_carattere:
+            carattere.setPixelSize(pixel_carattere)
+        carattere.setBold(grassetto)
+        self.setFont(carattere)
         self.setElideMode(Qt.ElideNone)       # mai puntini di sospensione
         self.setUsesScrollButtons(False)      # mai frecce di scorrimento
 
@@ -46,13 +49,17 @@ class BarraLinguette(QTabBar):
         return QSize(larghezza, dimensione.height())
 
 
-def adatta_linguette(tab_widget, margine=56, grassetto=True):
+def adatta_linguette(tab_widget, margine=90, pixel_carattere=13, grassetto=True):
     """Applica BarraLinguette a un QTabWidget.
+
+    'pixel_carattere' deve corrispondere al font-size dichiarato nel foglio di
+    stile per QTabBar::tab di quella finestra.
 
     Va chiamata PRIMA di aggiungere le schede: QTabWidget.setTabBar() sostituisce
     la barra esistente."""
     try:
-        tab_widget.setTabBar(BarraLinguette(margine=margine, grassetto=grassetto))
+        tab_widget.setTabBar(BarraLinguette(
+            margine=margine, pixel_carattere=pixel_carattere, grassetto=grassetto))
     except Exception:
         # Se qualcosa andasse storto, meglio linguette imperfette che una
         # finestra che non si apre.

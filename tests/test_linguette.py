@@ -46,7 +46,7 @@ class FinteMetricheVecchie(FinteMetriche):
         return len(testo) * self.pixel_per_carattere
 
 
-def larghezza_calcolata(testo, metriche, larghezza_proposta_da_qt, margine=56):
+def larghezza_calcolata(testo, metriche, larghezza_proposta_da_qt, margine=90):
     """E' esattamente la regola usata da BarraLinguette.tabSizeHint()."""
     return larghezza_linguetta(testo, metriche, larghezza_proposta_da_qt, margine)
 
@@ -79,8 +79,8 @@ class TestRegolaDiCalcolo(unittest.TestCase):
     def test_resta_spazio_per_il_riempimento_laterale(self):
         """Oltre al testo serve il margine del foglio di stile (padding)."""
         metriche = FinteMetriche(9)
-        larghezza = larghezza_calcolata("Scorte", metriche, 0, margine=56)
-        self.assertEqual(larghezza, 6 * 9 + 56)
+        larghezza = larghezza_calcolata("Scorte", metriche, 0, margine=90)
+        self.assertEqual(larghezza, 6 * 9 + 90)
 
     def test_non_stringe_mai_una_linguetta_gia_corretta(self):
         """Se Qt propone gia' una larghezza generosa, va tenuta quella:
@@ -100,7 +100,7 @@ class TestRegolaDiCalcolo(unittest.TestCase):
         self.assertGreaterEqual(largo, len(testo) * 14)
 
     def test_linguetta_vuota_non_rompe_il_calcolo(self):
-        self.assertEqual(larghezza_calcolata("", FinteMetriche(9), 0), 56)
+        self.assertEqual(larghezza_calcolata("", FinteMetriche(9), 0), 90)
 
 
 if __name__ == "__main__":

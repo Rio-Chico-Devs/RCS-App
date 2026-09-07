@@ -210,8 +210,9 @@ class GestioneMaterialiWindow(QMainWindow):
         # Tab widget
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabPosition(QTabWidget.North)
-        # Linguette dimensionate sul testo reale (prima di aggiungerle)
-        adatta_linguette(self.tab_widget)
+        # Linguette dimensionate sul testo reale (prima di aggiungerle).
+        # Qui il foglio di stile usa 14px, non 13.
+        adatta_linguette(self.tab_widget, pixel_carattere=14)
 
         self.tab_materiali = QWidget()
         self._build_tab_materiali(self.tab_materiali)

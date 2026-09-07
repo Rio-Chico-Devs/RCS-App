@@ -46,6 +46,7 @@ class ImpostazioniArchiviazioneWindow(QMainWindow):
                 background: #f7fafc; border: 1px solid {COLORE_BORDO};
                 border-bottom: none; border-radius: 6px 6px 0 0;
                 padding: 8px 22px; font-size: 13px; font-weight: 600;
+                min-width: 140px;
             }}
             QTabBar::tab:selected {{ background: #ffffff; }}
             QPushButton {{
