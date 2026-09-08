@@ -237,11 +237,40 @@ def chiudi_sessione(db_path):
 # ---------------------------------------------------------------------------
 
 def _timestamp_da_nome(nome, prefisso=PREFISSO_BACKUP):
-    """Estrae data/ora dal nome del backup. None se non riconoscibile."""
+    """Estrae data/ora dal nome del backup. None se non riconoscibile.
+
+    Dopo la data puo' esserci il nome del computer (vedi _nome_univoco), quindi
+    si legge solo la parte iniziale. I nomi vecchi, senza quel pezzo, restano
+    leggibili."""
     try:
-        return datetime.strptime(nome[len(prefisso):-3], FORMATO_TIMESTAMP)
+        return datetime.strptime(
+            nome[len(prefisso):len(prefisso) + 15], FORMATO_TIMESTAMP)
     except Exception:
         return None
+
+
+def _nome_univoco(cartella, prefisso, momento=None, estensione=".db"):
+    """Costruisce un nome di file che non puo' collidere con altri.
+
+    Con la sola data al secondo, due copie fatte nello stesso secondo
+    finirebbero sullo stesso file. Sulla cartella di rete condivisa questo
+    significa due computer che scrivono contemporaneamente sullo stesso nome:
+    una copia va persa, o peggio ne esce una rovinata. Aggiungendo il nome del
+    computer il problema sparisce, e in piu' si vede da quale postazione
+    proviene ogni copia."""
+    momento = momento or datetime.now()
+    base = prefisso + momento.strftime(FORMATO_TIMESTAMP)
+
+    computer = "".join(c for c in platform.node() if c.isalnum())[:12]
+    if computer:
+        base = "{}_{}".format(base, computer)
+
+    percorso = os.path.join(cartella, base + estensione)
+    contatore = 2
+    while os.path.exists(percorso):     # stesso PC, stesso secondo
+        percorso = os.path.join(cartella, "{}_{}{}".format(base, contatore, estensione))
+        contatore += 1
+    return percorso
 
 
 def elenca_backup(cartella_backup, prefisso=PREFISSO_BACKUP):
@@ -260,12 +289,13 @@ def elenca_backup(cartella_backup, prefisso=PREFISSO_BACKUP):
     return risultato
 
 
-def applica_retention(cartella_backup):
+def applica_retention(cartella_backup, adesso=None):
     """Conserva: tutto delle ultime 48 ore, uno al giorno per 30 giorni, uno al
     mese per 12 mesi. Cancella il resto. I file non riconosciuti non si toccano.
 
+    'adesso' serve ai test per simulare il passare dei mesi.
     Ritorna (tenuti, eliminati)."""
-    adesso = datetime.now()
+    adesso = adesso or datetime.now()
     backup = elenca_backup(cartella_backup)
     da_tenere = set()
     giorni_visti = set()
@@ -323,13 +353,74 @@ def trova_ultimo_backup_valido(cartella_backup):
     return None
 
 
+def recupera_dopo_arresto(db_path):
+    """Fa completare a SQLite il recupero rimasto in sospeso.
+
+    Quando il programma viene terminato di colpo (spegnimento, aggiornamento
+    di Windows, blocco) resta accanto al database un file di appoggio
+    '-journal' con la scrittura interrotta. SQLite lo risolve da solo alla
+    prima scrittura, ma finche' resta li' il database e' in uno stato
+    "da recuperare": il backup fotograferebbe quello stato, e sulla cartella
+    di rete condivisa un file di appoggio in sospeso e' proprio una delle
+    situazioni da cui nascono i danneggiamenti.
+
+    Aprire il database in scrittura e chiedere un blocco forza il recupero."""
+    try:
+        conn = sqlite3.connect(db_path, timeout=TIMEOUT_SQLITE)
+        try:
+            conn.execute("BEGIN IMMEDIATE")   # il blocco fa scattare il recupero
+            conn.rollback()
+        finally:
+            conn.close()
+        return True
+    except Exception as e:
+        # Puo' fallire se un altro computer sta scrivendo proprio adesso:
+        # non e' grave, il recupero avverra' comunque alla prima scrittura.
+        _log().warning("Recupero dopo arresto non completato (%s)", e)
+        return False
+
+
+def _copia_database(sorgente, destinazione):
+    """Copia il database usando il meccanismo di SQLite invece di copiare il
+    file.
+
+    E' il modo documentato di copiare un database mentre e' in uso: SQLite
+    prende i blocchi che servono e garantisce una copia coerente anche se in
+    quel momento qualcuno sta scrivendo. Copiare il file e' rapido ma non da'
+    questa garanzia, soprattutto su una cartella di rete dove la copia non e'
+    istantanea e un altro computer puo' scrivere nel frattempo.
+
+    Se il meccanismo di SQLite non e' utilizzabile si ripiega sulla copia del
+    file: meglio un backup imperfetto che nessun backup."""
+    try:
+        origine = sqlite3.connect(sorgente, timeout=TIMEOUT_SQLITE)
+        try:
+            copia = sqlite3.connect(destinazione)
+            try:
+                origine.backup(copia)
+            finally:
+                copia.close()
+        finally:
+            origine.close()
+        return True
+    except Exception as e:
+        _log().warning(
+            "Backup: copia tramite SQLite non riuscita (%s), ripiego sulla copia del file", e)
+
+    try:
+        if os.path.exists(destinazione):
+            os.remove(destinazione)
+        shutil.copy2(sorgente, destinazione)
+        return True
+    except Exception as e:
+        _log().error("Backup: copia fallita verso %s (%s)", destinazione, e)
+        return False
+
+
 def _copia_verificata(sorgente, destinazione):
     """Copia e poi RIVERIFICA la copia: su cartella di rete anche la copia puo'
     arrivare danneggiata. Ritorna True solo se la copia e' sana."""
-    try:
-        shutil.copy2(sorgente, destinazione)
-    except Exception as e:
-        _log().error("Backup: copia fallita verso %s (%s)", destinazione, e)
+    if not _copia_database(sorgente, destinazione):
         return False
 
     ok, msg, _ms = verifica_integrita(destinazione)
@@ -348,8 +439,7 @@ def _proteggi_copia_buona(percorso_buono, cartella_sicurezza):
     """Mette una copia del backup buono al riparo dalla rotazione."""
     try:
         os.makedirs(cartella_sicurezza, exist_ok=True)
-        nome = PREFISSO_SICUREZZA + datetime.now().strftime(FORMATO_TIMESTAMP) + ".db"
-        destinazione = os.path.join(cartella_sicurezza, nome)
+        destinazione = _nome_univoco(cartella_sicurezza, PREFISSO_SICUREZZA)
         if _copia_verificata(percorso_buono, destinazione):
             _limita_numero_file(cartella_sicurezza, PREFISSO_SICUREZZA, MAX_SICUREZZA)
             return destinazione
@@ -415,6 +505,11 @@ def esegui_backup_avvio(db_path):
         cartella_sicurezza = os.path.join(cartella_backup, "sicurezza")
         os.makedirs(cartella_backup, exist_ok=True)
 
+        # Prima di ogni altra cosa: se un arresto improvviso ha lasciato una
+        # scrittura a meta', la si fa completare a SQLite. Cosi' la verifica e
+        # il backup lavorano su uno stato pulito.
+        recupera_dopo_arresto(db_path)
+
         info = diagnostica_ambiente(db_path)
         esito["diagnostica"] = info
 
@@ -436,10 +531,8 @@ def esegui_backup_avvio(db_path):
             log.warning("ATTENZIONE: il database risulta aperto anche da: %s",
                         ", ".join(altri_pc))
 
-        timestamp = datetime.now().strftime(FORMATO_TIMESTAMP)
-
         if integro:
-            destinazione = os.path.join(cartella_backup, PREFISSO_BACKUP + timestamp + ".db")
+            destinazione = _nome_univoco(cartella_backup, PREFISSO_BACKUP)
             if _copia_verificata(db_path, destinazione):
                 esito["backup"] = destinazione
                 esito["copia_sicura"] = _proteggi_copia_buona(destinazione, cartella_sicurezza)
@@ -463,7 +556,7 @@ def esegui_backup_avvio(db_path):
 
         try:
             os.makedirs(cartella_corrotti, exist_ok=True)
-            quarantena = os.path.join(cartella_corrotti, PREFISSO_CORROTTO + timestamp + ".db")
+            quarantena = _nome_univoco(cartella_corrotti, PREFISSO_CORROTTO)
             shutil.copy2(db_path, quarantena)
             _limita_numero_file(cartella_corrotti, PREFISSO_CORROTTO, MAX_CORROTTI)
             log.error("Copia del file corrotto messa in quarantena: %s", quarantena)

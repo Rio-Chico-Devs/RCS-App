@@ -177,9 +177,8 @@ def ripristina_backup(db_path, percorso_backup):
         if os.path.exists(db_path):
             cartella = os.path.join(cartella_backup(db_path), "prima_del_ripristino")
             os.makedirs(cartella, exist_ok=True)
-            nome = PREFISSO_PRIMA_RIPRISTINO + datetime.now().strftime(
-                backup_manager.FORMATO_TIMESTAMP) + ".db"
-            copia_precedente = os.path.join(cartella, nome)
+            copia_precedente = backup_manager._nome_univoco(
+                cartella, PREFISSO_PRIMA_RIPRISTINO)
             shutil.copy2(db_path, copia_precedente)
             _log().info("Ripristino: database attuale messo da parte in %s", copia_precedente)
     except Exception as e:
