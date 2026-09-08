@@ -15,8 +15,10 @@ from PyQt5.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
                              QTableWidget, QTableWidgetItem, QHeaderView,
                              QAbstractItemView, QMessageBox, QGroupBox,
                              QApplication)
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt, QUrl
+from PyQt5.QtGui import QFont, QDesktopServices
+
+import os
 
 from database import archivio
 from ui.responsive import adatta_linguette
@@ -135,9 +137,68 @@ class ImpostazioniArchiviazioneWindow(QMainWindow):
         btn_aggiorna = QPushButton("Ricontrolla adesso")
         btn_aggiorna.clicked.connect(self.aggiorna_tutto)
         pulsanti.addWidget(btn_aggiorna)
+
+        btn_esporta = QPushButton("Esporta i dati per Excel")
+        btn_esporta.setToolTip(
+            "Salva una copia dei dati in file leggibili con Excel, "
+            "che non dipendono da questo programma")
+        btn_esporta.clicked.connect(self._esporta_dati)
+        pulsanti.addWidget(btn_esporta)
+
+        btn_segnala = QPushButton("Prepara segnalazione")
+        btn_segnala.setToolTip(
+            "Raccoglie i registri tecnici in un unico file da inviare "
+            "all'assistenza (nessun dato aziendale)")
+        btn_segnala.clicked.connect(self._prepara_segnalazione)
+        pulsanti.addWidget(btn_segnala)
+
         pulsanti.addStretch()
         layout.addLayout(pulsanti)
         return scheda
+
+    def _esporta_dati(self):
+        """Scrive i dati in file CSV apribili con Excel."""
+        from database import esportazione
+        try:
+            cartella, conteggi = esportazione.esporta(self.db_manager.db_path)
+        except Exception as e:
+            QMessageBox.critical(self, "Esportazione non riuscita", str(e))
+            return
+
+        righe = "\n".join("  {}: {} righe".format(t, n) for t, n in conteggi.items())
+        risposta = QMessageBox.question(
+            self, "Esportazione completata",
+            "I dati sono stati salvati in file leggibili con Excel:\n\n{}\n\n"
+            "Cartella:\n{}\n\nVuoi aprirla adesso?".format(righe, cartella),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if risposta == QMessageBox.Yes:
+            self._apri_cartella(cartella)
+
+    def _prepara_segnalazione(self):
+        """Raccoglie i registri tecnici in un file da inviare all'assistenza."""
+        from utils import segnalazione
+        try:
+            percorso = segnalazione.prepara(self.db_manager.db_path)
+        except Exception as e:
+            QMessageBox.critical(self, "Segnalazione non riuscita", str(e))
+            return
+
+        risposta = QMessageBox.question(
+            self, "Segnalazione pronta",
+            "È stato preparato un file con i registri tecnici, da inviare "
+            "all'assistenza:\n\n{}\n\nNon contiene dati aziendali: nessun "
+            "preventivo, nessun nominativo di clienti.\n\n"
+            "Vuoi aprire la cartella che lo contiene?".format(percorso),
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
+        if risposta == QMessageBox.Yes:
+            self._apri_cartella(os.path.dirname(percorso))
+
+    def _apri_cartella(self, percorso):
+        try:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(percorso))
+        except Exception:
+            QMessageBox.information(self, "Percorso",
+                                    "La trovi qui:\n{}".format(percorso))
 
     # ------------------------------------------------------------------
     # Scheda: Copie di sicurezza

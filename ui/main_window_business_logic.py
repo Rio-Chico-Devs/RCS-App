@@ -28,7 +28,8 @@ import json
 import subprocess
 from PyQt5.QtWidgets import (QMessageBox, QDialog, QVBoxLayout, QTextEdit,
                              QDialogButtonBox, QLabel, QListWidgetItem, QFileDialog)
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QUrl
+from PyQt5.QtGui import QDesktopServices
 from ui.preventivo_window import PreventivoWindow
 from ui import finestre_preventivo
 from ui.gestione_materiali_window import GestioneMaterialiWindow
@@ -730,6 +731,81 @@ class MainWindowBusinessLogic:
             # Mostra un messaggio di successo
             QMessageBox.information(window_instance, "Successo",
                                   "Preventivo salvato con successo!\n\nUsa 'Visualizza Preventivi Salvati' per vederlo nella lista.")
+
+    @staticmethod
+    def proponi_recupero_bozze(window_instance):
+        """Dopo uno spegnimento improvviso, propone di riaprire i preventivi
+        rimasti non salvati.
+
+        Le schermate vengono riaperte GIA' COMPILATE: l'utente controlla e
+        salva, senza dover ribattere nulla. Chi preferisce puo' comunque
+        leggere il foglio di recupero."""
+        from utils import bozze, diagnostica
+
+        stato = diagnostica.esito_avvio_precedente()
+        if stato.get("chiusura_precedente_regolare") is not False:
+            return
+
+        rimaste = bozze.elenca_bozze()
+        if not rimaste:
+            return
+
+        quante = len(rimaste)
+        elenco = "\n".join("  • " + bozze.descrivi_bozza(b) for b in rimaste[:6])
+        if quante > 6:
+            elenco += "\n  • ... e altri {}".format(quante - 6)
+
+        finestra = QMessageBox(window_instance)
+        finestra.setIcon(QMessageBox.Warning)
+        finestra.setWindowTitle("Preventivi non salvati")
+        finestra.setText(
+            "L'ultima volta il programma non è stato chiuso normalmente.\n\n"
+            "{} non salvat{}:\n{}\n\n"
+            "Vuoi riaprirli già compilati, così da controllarli e salvarli?".format(
+                "Era rimasto 1 preventivo" if quante == 1
+                else "Erano rimasti {} preventivi".format(quante),
+                "o" if quante == 1 else "i", elenco))
+        btn_riapri = finestra.addButton("Riapri i preventivi", QMessageBox.AcceptRole)
+        btn_foglio = finestra.addButton("Apri solo il foglio di recupero",
+                                        QMessageBox.ActionRole)
+        finestra.addButton("Per ora niente", QMessageBox.RejectRole)
+        finestra.setDefaultButton(btn_riapri)
+        finestra.exec_()
+        scelta = finestra.clickedButton()
+
+        if scelta is btn_foglio:
+            percorso = bozze.genera_file_recupero(rimaste)
+            if percorso:
+                try:
+                    QDesktopServices.openUrl(QUrl.fromLocalFile(percorso))
+                except Exception:
+                    QMessageBox.information(window_instance, "Foglio di recupero",
+                                            "Il foglio si trova qui:\n{}".format(percorso))
+            return
+
+        if scelta is not btn_riapri:
+            return
+
+        # Il foglio viene comunque preparato: se la riapertura non riuscisse
+        # del tutto, i dati restano leggibili da qualche parte.
+        bozze.genera_file_recupero(rimaste)
+
+        riaperti, falliti = 0, 0
+        for bozza in rimaste:
+            try:
+                MainWindowBusinessLogic._apri_schermata_preventivo(
+                    window_instance, modalita='nuovo', dati_bozza=bozza.get("dati") or {})
+                bozze.elimina_bozza_da_file(bozza)
+                riaperti += 1
+            except Exception:
+                falliti += 1
+
+        if falliti:
+            QMessageBox.warning(
+                window_instance, "Recupero parziale",
+                "Riaperti {} preventivi su {}.\n\nPer quelli non riaperti, i dati "
+                "sono nel foglio di recupero nella cartella:\n{}".format(
+                    riaperti, quante, bozze.cartella_bozze()))
 
     @staticmethod
     def apri_impostazioni_archiviazione(window_instance):

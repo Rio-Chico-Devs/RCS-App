@@ -79,6 +79,21 @@ def elimina_bozza(chiave):
         pass
 
 
+def elimina_bozza_da_file(bozza):
+    """Cancella una bozza a partire dalla voce restituita da elenca_bozze().
+
+    Serve dopo averla riaperta nel programma: da quel momento il lavoro e' di
+    nuovo in una schermata, che salvera' la propria bozza per conto suo."""
+    try:
+        percorso = bozza.get("_file") if isinstance(bozza, dict) else None
+        if percorso and os.path.exists(percorso):
+            os.remove(percorso)
+            return True
+    except Exception as e:
+        _log().warning("Bozza non eliminata: %s", e)
+    return False
+
+
 def elenca_bozze():
     """Ritorna le bozze presenti, dalla più recente."""
     trovate = []

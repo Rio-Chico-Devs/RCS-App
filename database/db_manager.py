@@ -171,6 +171,13 @@ class DatabaseManager:
         try:
             esito = backup_manager.esegui_backup_avvio(self.db_path)
             self.avviso_integrita = esito.get("avviso")
+
+            # Rete di sicurezza in formato leggibile: una volta al mese i dati
+            # vengono scritti anche in file apribili con Excel, che non
+            # dipendono da questo programma né da SQLite.
+            if esito.get("integro", True) and not esito.get("primo_avvio"):
+                from database import esportazione
+                esportazione.esporta_se_serve(self.db_path)
         except Exception as e:
             # Il backup non deve mai impedire l'avvio dell'applicazione.
             logging.getLogger('rcs').error(f"Backup all'avvio non riuscito: {e}")

@@ -61,6 +61,14 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Problema con il database",
                                  self.db_manager.avviso_integrita)
 
+        # Dopo uno spegnimento improvviso: proponi di riaprire i preventivi
+        # rimasti non salvati. Va fatto qui e non prima, perché serve
+        # l'interfaccia già pronta per poterli riaprire davvero.
+        try:
+            MainWindowBusinessLogic.proponi_recupero_bozze(self)
+        except Exception:
+            pass   # il recupero non deve mai impedire l'uso del programma
+
     def closeEvent(self, event):
         """Chiusura regolare: toglie questo PC dall'elenco delle sessioni aperte
         e cancella il marcatore, così al prossimo avvio si sa che la chiusura

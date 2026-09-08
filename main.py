@@ -248,52 +248,20 @@ def _controlla_sessione_precedente():
     if riepilogo:
         logging.getLogger('rcs').warning("Riepilogo sessione precedente:\n%s", riepilogo)
 
-    bozze_rimaste = bozze.elenca_bozze()
-
-    messaggio = ["L'ultima volta il programma non è stato chiuso normalmente."]
-    if eventi:
-        messaggio.append("\nWindows ha registrato:")
-        for evento in eventi[:5]:
-            messaggio.append("  • " + evento)
-
-    percorso_recupero = None
-    if bozze_rimaste:
-        percorso_recupero = bozze.genera_file_recupero(bozze_rimaste)
-        messaggio.append(
-            "\n{} non salvat{}. Ho preparato un foglio con TUTTI i dati che "
-            "erano stati inseriti (cliente, materiali, minuti, importi), così "
-            "puoi ricompilarli senza ricostruirli a memoria:".format(
-                "Era rimasto 1 preventivo" if len(bozze_rimaste) == 1
-                else "Erano rimasti {} preventivi".format(len(bozze_rimaste)),
-                "o" if len(bozze_rimaste) == 1 else "i"))
-        for bozza in bozze_rimaste[:5]:
-            messaggio.append("  • " + bozze.descrivi_bozza(bozza))
-        if len(bozze_rimaste) > 5:
-            messaggio.append("  • ... e altri {}".format(len(bozze_rimaste) - 5))
-        if percorso_recupero:
-            messaggio.append("\nVuoi aprire subito il foglio di recupero?")
-    else:
+    # I preventivi rimasti non salvati li propone la finestra principale, che
+    # può riaprirli davvero (qui l'interfaccia non esiste ancora). Se però non
+    # ce ne sono, tanto vale dirlo subito insieme a cosa dice Windows.
+    if not bozze.elenca_bozze():
+        messaggio = ["L'ultima volta il programma non è stato chiuso normalmente."]
+        if eventi:
+            messaggio.append("\nWindows ha registrato:")
+            for evento in eventi[:5]:
+                messaggio.append("  • " + evento)
         messaggio.append("\nNon risultano preventivi non salvati da recuperare.")
-
-    messaggio.append(
-        "\nIl database è stato controllato: se ci fossero problemi verrebbe "
-        "segnalato subito dopo questo messaggio.")
-
-    testo = "\n".join(messaggio)
-
-    if percorso_recupero:
-        risposta = QMessageBox.question(
-            None, "Chiusura anomala rilevata", testo,
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes)
-        if risposta == QMessageBox.Yes:
-            try:
-                QDesktopServices.openUrl(QUrl.fromLocalFile(percorso_recupero))
-            except Exception:
-                QMessageBox.information(
-                    None, "Foglio di recupero",
-                    "Il foglio si trova qui:\n{}".format(percorso_recupero))
-    else:
-        QMessageBox.warning(None, "Chiusura anomala rilevata", testo)
+        messaggio.append(
+            "\nIl database viene controllato adesso: se ci fossero problemi "
+            "verrebbero segnalati subito dopo questo messaggio.")
+        QMessageBox.warning(None, "Chiusura anomala rilevata", "\n".join(messaggio))
 
     bozze.pulisci_vecchie()
 

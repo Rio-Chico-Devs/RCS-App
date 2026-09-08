@@ -52,7 +52,8 @@ MINUTI_PRIMA_DEL_PROMEMORIA = 20
 class PreventivoWindow(QMainWindow):
     preventivo_salvato = pyqtSignal()
     
-    def __init__(self, db_manager, parent=None, preventivo_id=None, modalita='nuovo', note_revisione=""):
+    def __init__(self, db_manager, parent=None, preventivo_id=None, modalita='nuovo',
+                 note_revisione="", dati_bozza=None):
         super().__init__(None)  # No parent per evitare bug ridimensionamento
         self.db_manager = db_manager
         
@@ -74,7 +75,18 @@ class PreventivoWindow(QMainWindow):
         # Se stiamo caricando un preventivo esistente
         if preventivo_id:
             self.carica_preventivo_esistente()
-        
+        elif dati_bozza:
+            # Riapertura di un preventivo rimasto non salvato dopo uno
+            # spegnimento improvviso: stesso percorso di caricamento.
+            try:
+                self._popola_da_dati(dati_bozza)
+            except Exception as e:
+                QMessageBox.warning(
+                    self, "Recupero parziale",
+                    "Non e' stato possibile ricaricare tutti i dati del "
+                    "preventivo non salvato.\n\nQuello che manca lo trovi nel "
+                    "foglio di recupero.\n\nDettaglio: {}".format(e))
+
         self.init_ui()
         # RIMOSSA: self.aggiorna_totali() - causava azzeramento dei valori caricati
 
@@ -177,7 +189,15 @@ class PreventivoWindow(QMainWindow):
         if not preventivo_data:
             QMessageBox.critical(self, "Errore", "Preventivo non trovato nel database.")
             return
-        
+        self._popola_da_dati(preventivo_data)
+
+    def _popola_da_dati(self, preventivo_data):
+        """Riempie la finestra con i dati di un preventivo.
+
+        Usata sia per i preventivi letti dal database, sia per riaprire una
+        bozza salvata automaticamente dopo uno spegnimento improvviso: e' lo
+        stesso percorso, gia' collaudato, in modo che il recupero non dipenda
+        da codice scritto apposta."""
         # Carica i dati del preventivo (inclusi i nuovi campi)
         self.nome_cliente_data = preventivo_data.get('nome_cliente', '')
         self.numero_ordine_data = preventivo_data.get('numero_ordine', '')

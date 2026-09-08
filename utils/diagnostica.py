@@ -78,6 +78,18 @@ def _percorso_marcatore():
     return os.path.join(cartella_locale(), NOME_MARCATORE)
 
 
+_esito_ultimo_avvio = {}
+
+
+def esito_avvio_precedente():
+    """Com'e' andata la chiusura precedente, per chi lo chiede piu' tardi.
+
+    segna_avvio() viene chiamata prestissimo, prima che l'interfaccia esista;
+    la finestra principale ha bisogno di quell'informazione dopo, per poter
+    proporre il recupero dei preventivi non salvati."""
+    return dict(_esito_ultimo_avvio)
+
+
 def segna_avvio(db_path=""):
     """Scrive il marcatore di sessione in corso e riferisce com'è andata la
     volta precedente.
@@ -120,6 +132,8 @@ def segna_avvio(db_path=""):
     except Exception as e:
         _log().error("Marcatore di sessione non scrivibile: %s", e)
 
+    _esito_ultimo_avvio.clear()
+    _esito_ultimo_avvio.update(esito)
     return esito
 
 
