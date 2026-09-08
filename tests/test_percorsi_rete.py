@@ -92,6 +92,9 @@ class TestRipiegoDettagliBackup(unittest.TestCase):
         conn = sqlite3.connect(self.copia)
         conn.execute("CREATE TABLE preventivi (id INTEGER PRIMARY KEY, data_creazione TEXT)")
         conn.execute("CREATE TABLE clienti (id INTEGER PRIMARY KEY, nome TEXT)")
+        # 'materiali' serve: una copia priva delle tabelle attese viene ora
+        # scartata, per non poter mai ripristinare un file vuoto o sbagliato.
+        conn.execute("CREATE TABLE materiali (id INTEGER PRIMARY KEY, nome TEXT)")
         conn.executemany("INSERT INTO preventivi (data_creazione) VALUES (?)",
                          [("2026-01-0%d" % (i + 1),) for i in range(5)])
         conn.execute("INSERT INTO clienti (nome) VALUES ('Prova')")

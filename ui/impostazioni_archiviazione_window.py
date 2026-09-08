@@ -296,6 +296,27 @@ class ImpostazioniArchiviazioneWindow(QMainWindow):
         try:
             riuscito, messaggio, _copia = archivio.ripristina_backup(
                 self.db_manager.db_path, voce["percorso"])
+
+            # Bloccato perché altri computer risultano collegati: si può
+            # forzare solo se l'utente conferma che in realtà sono chiusi
+            # (capita dopo un blocco o uno spegnimento improvviso).
+            if not riuscito and "altri computer" in messaggio:
+                forzatura = QMessageBox(self)
+                forzatura.setIcon(QMessageBox.Warning)
+                forzatura.setWindowTitle("Altri computer collegati")
+                forzatura.setText(
+                    messaggio + "\n\nSe sei certo che su quelle postazioni "
+                    "l'applicazione sia in realtà chiusa (per esempio dopo un "
+                    "blocco), puoi procedere lo stesso — ma solo in quel caso.")
+                btn_annulla = forzatura.addButton("Annulla", QMessageBox.RejectRole)
+                forzatura.addButton("Sono chiuse, procedi",
+                                    QMessageBox.DestructiveRole)
+                forzatura.setDefaultButton(btn_annulla)
+                forzatura.exec_()
+                if forzatura.clickedButton() is btn_annulla:
+                    return
+                riuscito, messaggio, _copia = archivio.ripristina_backup(
+                    self.db_manager.db_path, voce["percorso"], forza=True)
         except Exception as e:
             QMessageBox.critical(self, "Ripristino non riuscito",
                                  "Errore imprevisto: {}".format(e))

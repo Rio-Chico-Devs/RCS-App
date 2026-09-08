@@ -89,6 +89,24 @@ def elenco_backup(db_path):
     return voci
 
 
+TABELLE_ATTESE = ("preventivi", "materiali")
+
+
+def _e_un_database_del_gestionale(conn):
+    """Verifica che il file sia davvero un database di questo programma.
+
+    Serve perche' un file VUOTO (zero byte) per SQLite e' un database valido:
+    supera il controllo di integrita' senza problemi. Senza questo controllo
+    comparirebbe fra le copie buone, e ripristinarlo cancellerebbe tutti i
+    dati sostituendoli con il nulla."""
+    try:
+        tabelle = {r[0] for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'")}
+    except Exception:
+        return False
+    return all(t in tabelle for t in TABELLE_ATTESE)
+
+
 def dettagli_backup(percorso):
     """Apre UNA copia e ne riferisce lo stato e il contenuto.
 
@@ -114,6 +132,12 @@ def dettagli_backup(percorso):
             conn.execute("PRAGMA schema_version")
         except Exception:
             conn = sqlite3.connect(percorso, timeout=backup_manager.TIMEOUT_SQLITE)
+        if not _e_un_database_del_gestionale(conn):
+            esito["integro"] = False
+            esito["messaggio"] = ("il file non contiene i dati del gestionale "
+                                  "(potrebbe essere vuoto o non essere una copia valida)")
+            return esito
+
         cur = conn.cursor()
         tabelle = {r[0] for r in cur.execute(
             "SELECT name FROM sqlite_master WHERE type='table'")}
@@ -156,7 +180,19 @@ def descrivi_contenuto(dettagli):
 # Ripristino
 # ---------------------------------------------------------------------------
 
-def ripristina_backup(db_path, percorso_backup):
+def altri_computer_collegati(db_path):
+    """Altri computer che in questo momento hanno l'applicazione aperta sullo
+    stesso database. Elenco vuoto se si e' soli (o se non si riesce a saperlo)."""
+    try:
+        sessioni = backup_manager._pulisci_sessioni_scadute(
+            backup_manager._leggi_sessioni(backup_manager._percorso_sessioni(db_path)))
+        mia = backup_manager._chiave_sessione()
+        return [chiave for chiave in sessioni if chiave != mia]
+    except Exception:
+        return []
+
+
+def ripristina_backup(db_path, percorso_backup, forza=False):
     """Rimette in uso una copia di backup, in sicurezza.
 
     Passaggi, in quest'ordine:
@@ -168,15 +204,44 @@ def ripristina_backup(db_path, percorso_backup):
       4. il risultato viene verificato: se qualcosa è andato storto si torna
          automaticamente indietro.
 
+    Se altri computer hanno l'applicazione aperta ci si ferma: sovrascrivere il
+    file mentre un'altra postazione ci scrive e' il modo classico per
+    danneggiare il database, proprio nell'operazione che dovrebbe ripararlo.
+    'forza' serve solo per il caso di una postazione che risulta aperta ma non
+    lo e' piu' (per esempio dopo un blocco), e va usato con cognizione.
+
     Ritorna (riuscito, messaggio, percorso_copia_precedente)."""
     if not os.path.exists(percorso_backup):
         return False, "La copia selezionata non esiste più.", None
+
+    altri = altri_computer_collegati(db_path)
+    if altri and not forza:
+        return (False,
+                "Il ripristino è stato annullato: risultano altri computer con "
+                "l'applicazione aperta su questo database.\n\n{}\n\n"
+                "Sovrascrivere il database mentre un'altra postazione ci sta "
+                "lavorando lo danneggerebbe. Chiudi l'applicazione su tutti gli "
+                "altri computer e riprova.".format(
+                    "\n".join("  • " + pc for pc in altri)),
+                None)
 
     integro, messaggio, _ms = backup_manager.verifica_integrita(percorso_backup)
     if not integro:
         return (False,
                 "La copia selezionata è danneggiata e NON è stata ripristinata "
                 "({}).\n\nIl database attuale non è stato toccato.".format(messaggio),
+                None)
+
+    # Il controllo di integrità non basta: un file VUOTO per SQLite è un
+    # database valido. Ripristinarlo cancellerebbe tutto sostituendolo con il
+    # nulla, e sarebbe il danno peggiore possibile proprio nell'operazione
+    # pensata per rimediare a un danno.
+    dettagli = dettagli_backup(percorso_backup)
+    if not dettagli["integro"]:
+        return (False,
+                "La copia selezionata non contiene i dati del gestionale e NON "
+                "è stata ripristinata ({}).\n\nIl database attuale non è stato "
+                "toccato.".format(dettagli["messaggio"]),
                 None)
 
     # 2. Da parte il database attuale
