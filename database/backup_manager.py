@@ -20,7 +20,6 @@ import os
 import platform
 import shutil
 import sqlite3
-import sys
 from datetime import datetime, timedelta
 
 PREFISSO_BACKUP = "materiali_backup_"
@@ -53,10 +52,11 @@ def _log():
 
 
 def cartella_app():
-    """Cartella dell'applicazione (accanto all'eseguibile se compilata)."""
-    if getattr(sys, 'frozen', False):
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    """Cartella dell'applicazione. La logica sta in utils/percorsi.py, in un
+    posto solo; questa funzione resta come punto di riferimento per il resto
+    del modulo (e per i test, che la deviano su una cartella temporanea)."""
+    from utils import percorsi
+    return percorsi.cartella_applicazione()
 
 
 # ---------------------------------------------------------------------------
@@ -510,6 +510,79 @@ def _mirror_locale(percorso_backup):
 # Routine principale, chiamata all'avvio
 # ---------------------------------------------------------------------------
 
+def _registra_avvio_nel_diario(db_path, esito, messaggio, durata_ms):
+    """Raccoglie e annota le informazioni sull'avvio.
+
+    Serve a rispondere, la prossima volta che qualcosa va storto, alle domande:
+    quale computer, quale utente, il database era su rete, quanto ha impiegato
+    il controllo, e soprattutto se in quel momento c'erano altre postazioni
+    collegate."""
+    log = _log()
+    info = diagnostica_ambiente(db_path)
+    info["integrita"] = messaggio
+    info["verifica_ms"] = round(durata_ms)
+
+    altri_pc = registra_sessione(db_path)
+    info["altri_pc_aperti"] = altri_pc
+    esito["diagnostica"] = info
+
+    log.info(
+        "AVVIO | pc=%s utente=%s | db=%s (rete=%s, %s byte) | integrita=%s in %d ms | "
+        "altri PC aperti: %s",
+        info.get("pc"), info.get("utente"), db_path, info.get("su_rete"),
+        info.get("dimensione_db"), messaggio, info.get("verifica_ms", 0),
+        ", ".join(altri_pc) if altri_pc else "nessuno")
+
+    if altri_pc:
+        log.warning("ATTENZIONE: il database risulta aperto anche da: %s",
+                    ", ".join(altri_pc))
+    return info
+
+
+def _avvio_database_sano(db_path, esito, cartelle):
+    """Database in ordine: crea il backup, lo protegge, applica la rotazione."""
+    log = _log()
+    destinazione = _nome_univoco(cartelle["backup"], PREFISSO_BACKUP)
+
+    if not _copia_verificata(db_path, destinazione):
+        # La copia non e' venuta bene: meglio non toccare nulla, soprattutto
+        # non applicare la rotazione, che cancellerebbe copie buone.
+        esito["avviso"] = (
+            "Non e' stato possibile creare un backup valido del database.\n\n"
+            "I backup precedenti sono stati lasciati intatti. "
+            "Se il problema si ripete, segnalalo: potrebbe indicare un problema "
+            "sulla cartella di rete.")
+        log.error("Backup NON creato: la copia non ha superato la verifica.")
+        return esito
+
+    esito["backup"] = destinazione
+    esito["copia_sicura"] = _proteggi_copia_buona(destinazione, cartelle["sicurezza"])
+    _mirror_locale(destinazione)
+    tenuti, eliminati = applica_retention(cartelle["backup"])
+    log.info("Backup creato: %s | conservati %d, eliminati %d",
+             os.path.basename(destinazione), tenuti, eliminati)
+    return esito
+
+
+def _metti_in_quarantena(db_path, cartella_corrotti):
+    """Conserva una copia del file danneggiato.
+
+    Copia grezza di proposito: serve il file com'e', anche rotto, perche' puo'
+    contenere dati recenti recuperabili (dal danneggiamento del 3 settembre
+    sono stati recuperati cosi' tre preventivi)."""
+    log = _log()
+    try:
+        os.makedirs(cartella_corrotti, exist_ok=True)
+        quarantena = _nome_univoco(cartella_corrotti, PREFISSO_CORROTTO)
+        shutil.copy2(db_path, quarantena)
+        _limita_numero_file(cartella_corrotti, PREFISSO_CORROTTO, MAX_CORROTTI)
+        log.error("Copia del file corrotto messa in quarantena: %s", quarantena)
+        return quarantena
+    except Exception as e:
+        log.error("Quarantena non riuscita (%s)", e)
+        return None
+
+
 def esegui_backup_avvio(db_path):
     """Verifica il database e ne crea un backup.
 
@@ -543,8 +616,11 @@ def esegui_backup_avvio(db_path):
 
     try:
         cartella_backup = os.path.join(os.path.dirname(db_path), "backup")
-        cartella_corrotti = os.path.join(cartella_backup, "corrotti")
-        cartella_sicurezza = os.path.join(cartella_backup, "sicurezza")
+        cartelle = {
+            "backup": cartella_backup,
+            "corrotti": os.path.join(cartella_backup, "corrotti"),
+            "sicurezza": os.path.join(cartella_backup, "sicurezza"),
+        }
         os.makedirs(cartella_backup, exist_ok=True)
 
         # Prima di ogni altra cosa: se un arresto improvviso ha lasciato una
@@ -552,59 +628,18 @@ def esegui_backup_avvio(db_path):
         # il backup lavorano su uno stato pulito.
         recupera_dopo_arresto(db_path)
 
-        info = diagnostica_ambiente(db_path)
-        esito["diagnostica"] = info
-
         integro, messaggio, durata_ms = verifica_integrita(db_path)
-        info["integrita"] = messaggio
-        info["verifica_ms"] = round(durata_ms)
-
-        altri_pc = registra_sessione(db_path)
-        info["altri_pc_aperti"] = altri_pc
-
-        log.info(
-            "AVVIO | pc=%s utente=%s | db=%s (rete=%s, %s byte) | integrita=%s in %d ms | "
-            "altri PC aperti: %s",
-            info.get("pc"), info.get("utente"), db_path, info.get("su_rete"),
-            info.get("dimensione_db"), messaggio, info.get("verifica_ms", 0),
-            ", ".join(altri_pc) if altri_pc else "nessuno")
-
-        if altri_pc:
-            log.warning("ATTENZIONE: il database risulta aperto anche da: %s",
-                        ", ".join(altri_pc))
+        _registra_avvio_nel_diario(db_path, esito, messaggio, durata_ms)
 
         if integro:
-            destinazione = _nome_univoco(cartella_backup, PREFISSO_BACKUP)
-            if _copia_verificata(db_path, destinazione):
-                esito["backup"] = destinazione
-                esito["copia_sicura"] = _proteggi_copia_buona(destinazione, cartella_sicurezza)
-                _mirror_locale(destinazione)
-                tenuti, eliminati = applica_retention(cartella_backup)
-                log.info("Backup creato: %s | conservati %d, eliminati %d",
-                         os.path.basename(destinazione), tenuti, eliminati)
-            else:
-                # La copia non e' venuta bene: meglio non toccare nulla.
-                esito["avviso"] = (
-                    "Non e' stato possibile creare un backup valido del database.\n\n"
-                    "I backup precedenti sono stati lasciati intatti. "
-                    "Se il problema si ripete, segnalalo: potrebbe indicare un problema "
-                    "sulla cartella di rete.")
-                log.error("Backup NON creato: la copia non ha superato la verifica.")
-            return esito
+            return _avvio_database_sano(db_path, esito, cartelle)
 
         # --- Database corrotto -------------------------------------------
         esito["integro"] = False
         log.error("DATABASE CORROTTO rilevato all'avvio: %s (%s)", db_path, messaggio)
+        _metti_in_quarantena(db_path, cartelle["corrotti"])
 
-        try:
-            os.makedirs(cartella_corrotti, exist_ok=True)
-            quarantena = _nome_univoco(cartella_corrotti, PREFISSO_CORROTTO)
-            shutil.copy2(db_path, quarantena)
-            _limita_numero_file(cartella_corrotti, PREFISSO_CORROTTO, MAX_CORROTTI)
-            log.error("Copia del file corrotto messa in quarantena: %s", quarantena)
-        except Exception as e:
-            log.error("Quarantena non riuscita (%s)", e)
-
+        cartella_sicurezza = cartelle["sicurezza"]
         buono = trova_ultimo_backup_valido(cartella_backup)
         if buono:
             esito["copia_sicura"] = _proteggi_copia_buona(

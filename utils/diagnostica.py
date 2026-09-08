@@ -27,8 +27,7 @@ import logging
 import os
 import platform
 import subprocess
-import sys
-from datetime import datetime, timedelta
+from datetime import datetime
 
 NOME_MARCATORE = "sessione_in_corso.json"
 
@@ -53,14 +52,10 @@ def _log():
 
 
 def cartella_locale():
-    """Cartella dei log sul disco locale di questo PC."""
-    if getattr(sys, 'frozen', False):
-        base = os.path.dirname(sys.executable)
-    else:
-        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    cartella = os.path.join(base, "logs")
-    os.makedirs(cartella, exist_ok=True)
-    return cartella
+    """Cartella dei registri, sul disco locale di questo PC.
+    La logica dei percorsi sta in utils/percorsi.py, in un posto solo."""
+    from utils import percorsi
+    return percorsi.cartella_registri()
 
 
 def _utente():
@@ -198,7 +193,6 @@ def eventi_windows(ore=48, massimo=40):
     if os.name != "nt":
         return []
 
-    codici = ",".join(str(c) for c in EVENTI_INTERESSANTI)
     query = ("*[System[(EventID={}) and "
              "TimeCreated[timediff(@SystemTime) <= {}]]]").format(
         " or EventID=".join(str(c) for c in EVENTI_INTERESSANTI),

@@ -36,9 +36,9 @@ def _log():
 
 
 def cartella_app():
-    if getattr(sys, 'frozen', False):
-        return os.path.dirname(sys.executable)
-    return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    """Cartella dell'applicazione. La logica sta in utils/percorsi.py."""
+    from utils import percorsi
+    return percorsi.cartella_applicazione()
 
 
 def _informazioni_sistema(db_path):

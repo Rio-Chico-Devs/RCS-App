@@ -21,7 +21,6 @@ Servono solo a non perdere il lavoro fatto.
 import json
 import logging
 import os
-import sys
 from datetime import datetime, timedelta
 
 GIORNI_CONSERVAZIONE = 30
@@ -32,13 +31,10 @@ def _log():
 
 
 def cartella_bozze():
-    if getattr(sys, 'frozen', False):
-        base = os.path.dirname(sys.executable)
-    else:
-        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    cartella = os.path.join(base, "logs", "bozze")
-    os.makedirs(cartella, exist_ok=True)
-    return cartella
+    """Dove finiscono le bozze dei preventivi aperti.
+    La logica dei percorsi sta in utils/percorsi.py, in un posto solo."""
+    from utils import percorsi
+    return percorsi.cartella_bozze()
 
 
 def _percorso(chiave):
