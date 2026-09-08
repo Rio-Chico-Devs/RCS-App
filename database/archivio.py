@@ -104,8 +104,16 @@ def dettagli_backup(percorso):
 
     conn = None
     try:
-        conn = sqlite3.connect("file:{}?mode=ro".format(percorso.replace("\\", "/")),
-                               uri=True, timeout=backup_manager.TIMEOUT_SQLITE)
+        # Se l'indirizzo in sola lettura non e' utilizzabile (capita sui
+        # percorsi di rete), si apre normalmente: qui si legge soltanto.
+        # Senza questo ripiego OGNI copia risulterebbe "danneggiata" e il
+        # ripristino sarebbe impossibile proprio quando serve.
+        try:
+            conn = sqlite3.connect(backup_manager.uri_sola_lettura(percorso),
+                                   uri=True, timeout=backup_manager.TIMEOUT_SQLITE)
+            conn.execute("PRAGMA schema_version")
+        except Exception:
+            conn = sqlite3.connect(percorso, timeout=backup_manager.TIMEOUT_SQLITE)
         cur = conn.cursor()
         tabelle = {r[0] for r in cur.execute(
             "SELECT name FROM sqlite_master WHERE type='table'")}

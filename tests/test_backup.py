@@ -114,6 +114,55 @@ class TestBackupAvvio(BaseTemp):
         self.assertTrue(os.path.exists(esito["copia_sicura"]))
         self.assertIn("sicurezza", esito["copia_sicura"])
 
+    def test_la_copia_protetta_non_si_rifa_a_ogni_apertura(self):
+        """Rifarla a ogni avvio significherebbe una scrittura in piu' sulla
+        cartella di rete ogni volta, e farebbe ruotare le copie protette per
+        numero di aperture invece che nel tempo: cinque riaperture di fila
+        cancellerebbero tutta la profondita'."""
+        crea_db_valido(self.db)
+        bm.esegui_backup_avvio(self.db)
+        sicurezza = os.path.join(self.backup_dir, "sicurezza")
+        dopo_la_prima = len(os.listdir(sicurezza))
+
+        for _ in range(6):                      # altre sei aperture ravvicinate
+            bm._esito_avvio_cache.clear()
+            bm.esegui_backup_avvio(self.db)
+
+        self.assertEqual(len(os.listdir(sicurezza)), dopo_la_prima,
+                         "entro le 24 ore non deve rifare la copia protetta")
+
+    def test_la_copia_protetta_si_rifa_se_e_passato_un_giorno(self):
+        crea_db_valido(self.db)
+        bm.esegui_backup_avvio(self.db)
+        sicurezza = os.path.join(self.backup_dir, "sicurezza")
+
+        # invecchia la copia protetta rinominandola a ieri
+        for nome in os.listdir(sicurezza):
+            vecchio = (datetime.now() - timedelta(days=2)).strftime(bm.FORMATO_TIMESTAMP)
+            os.rename(os.path.join(sicurezza, nome),
+                      os.path.join(sicurezza, bm.PREFISSO_SICUREZZA + vecchio + ".db"))
+
+        bm._esito_avvio_cache.clear()
+        bm.esegui_backup_avvio(self.db)
+        self.assertEqual(len(os.listdir(sicurezza)), 2,
+                         "passato un giorno, una nuova copia protetta va fatta")
+
+    def test_su_problema_la_copia_protetta_si_fa_subito(self):
+        """Quando si rileva un danno non si aspetta il giorno dopo."""
+        crea_db_valido(self.db)
+        bm.esegui_backup_avvio(self.db)          # copia protetta di oggi
+        sicurezza = os.path.join(self.backup_dir, "sicurezza")
+        prima = len(os.listdir(sicurezza))
+
+        corrompi(self.db)
+        bm._esito_avvio_cache.clear()
+        esito = bm.esegui_backup_avvio(self.db)
+
+        self.assertFalse(esito["integro"])
+        self.assertIsNotNone(esito["copia_sicura"])
+        self.assertEqual(len(os.listdir(sicurezza)), prima + 1,
+                         "in caso di problema la copia va messa al sicuro subito")
+
     def test_database_corrotto_non_cancella_i_backup_buoni(self):
         # Un backup buono già presente
         crea_db_valido(self.db)

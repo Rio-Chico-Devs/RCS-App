@@ -52,6 +52,20 @@ def trova_db_path(cli=None):
     return None
 
 
+def uri_sola_lettura(percorso):
+    """Costruisce l'indirizzo per aprire il database in sola lettura.
+
+    I percorsi di rete ('//NOMEPC/cartella/dati.db' oppure
+    '\\\\NOMEPC\\cartella\\dati.db') vanno trattati a parte: tradotti
+    ingenuamente diventano 'file://NOMEPC/...' e SQLite legge 'NOMEPC' come
+    nome di host, rifiutando l'indirizzo. La forma corretta lascia l'host
+    vuoto: 'file:////NOMEPC/cartella/dati.db'."""
+    normalizzato = percorso.replace("\\", "/")
+    if normalizzato.startswith("//"):
+        return "file://" + "//" + normalizzato.lstrip("/") + "?mode=ro"
+    return "file:" + normalizzato + "?mode=ro"
+
+
 def apri_db_sola_lettura(db_path):
     """Apre il database in SOLA LETTURA. Se manca, spiega come configurarlo."""
     if not db_path or not os.path.exists(db_path):
@@ -64,8 +78,7 @@ def apri_db_sola_lettura(db_path):
             'oppure avvia con:  --db "percorso/materiali.db"\n'
             "(Se config.json non esiste, copia config.example.json in config.json.)\n"
         )
-    uri = "file:{}?mode=ro".format(db_path.replace("\\", "/"))
-    return sqlite3.connect(uri, uri=True)
+    return sqlite3.connect(uri_sola_lettura(db_path), uri=True)
 
 
 def salva_db_path(db_path):
@@ -88,8 +101,7 @@ def database_valido(db_path):
     if not db_path or not os.path.exists(db_path):
         return False
     try:
-        uri = "file:{}?mode=ro".format(db_path.replace("\\", "/"))
-        conn = sqlite3.connect(uri, uri=True)
+        conn = sqlite3.connect(uri_sola_lettura(db_path), uri=True)
         try:
             cur = conn.cursor()
             cur.execute("SELECT name FROM sqlite_master WHERE type='table'")

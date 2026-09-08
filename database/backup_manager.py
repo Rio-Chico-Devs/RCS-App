@@ -63,13 +63,27 @@ def cartella_app():
 # Verifica di integrità
 # ---------------------------------------------------------------------------
 
+def uri_sola_lettura(percorso):
+    """Costruisce l'indirizzo per aprire un file in sola lettura.
+
+    Attenzione ai percorsi di rete di Windows: '\\\\NOMEPC\\cartella\\dati.db'
+    tradotto ingenuamente diventa 'file://NOMEPC/cartella/dati.db', e SQLite
+    legge 'NOMEPC' come nome di host e rifiuta l'indirizzo
+    ("invalid uri authority"). La forma corretta lascia l'host vuoto e mette
+    il percorso completo: 'file:////NOMEPC/cartella/dati.db'."""
+    normalizzato = percorso.replace("\\", "/")
+    if normalizzato.startswith("//"):
+        # percorso di rete: host vuoto + percorso che inizia con //
+        return "file://" + "//" + normalizzato.lstrip("/") + "?mode=ro"
+    return "file:" + normalizzato + "?mode=ro"
+
+
 def _connessione_sola_lettura(db_path):
     """Apre il database in sola lettura. Se l'URI non e' supportato (capita su
     certi percorsi di rete UNC) ripiega su una connessione normale, comunque
     usata solo per leggere."""
     try:
-        uri = "file:{}?mode=ro".format(db_path.replace("\\", "/"))
-        conn = sqlite3.connect(uri, uri=True, timeout=TIMEOUT_SQLITE)
+        conn = sqlite3.connect(uri_sola_lettura(db_path), uri=True, timeout=TIMEOUT_SQLITE)
         conn.execute("PRAGMA schema_version")  # verifica che l'URI funzioni davvero
         return conn
     except Exception:
@@ -364,11 +378,16 @@ def recupera_dopo_arresto(db_path):
     di rete condivisa un file di appoggio in sospeso e' proprio una delle
     situazioni da cui nascono i danneggiamenti.
 
-    Aprire il database in scrittura e chiedere un blocco forza il recupero."""
+    Serve una transazione di scrittura CHE LEGGA davvero qualcosa: verificato
+    sul campo, il solo blocco non basta (SQLite non ha motivo di toccare le
+    pagine e lascia il file dov'e'), e nemmeno una lettura semplice o un
+    quick_check. La combinazione blocco + lettura risolve il recupero senza
+    modificare nulla."""
     try:
         conn = sqlite3.connect(db_path, timeout=TIMEOUT_SQLITE)
         try:
-            conn.execute("BEGIN IMMEDIATE")   # il blocco fa scattare il recupero
+            conn.execute("BEGIN IMMEDIATE")
+            conn.execute("SELECT count(*) FROM sqlite_master").fetchone()
             conn.rollback()
         finally:
             conn.close()
@@ -435,10 +454,33 @@ def _copia_verificata(sorgente, destinazione):
     return False
 
 
-def _proteggi_copia_buona(percorso_buono, cartella_sicurezza):
-    """Mette una copia del backup buono al riparo dalla rotazione."""
+ORE_TRA_COPIE_PROTETTE = 24
+
+
+def _serve_copia_protetta(cartella_sicurezza):
+    """True se vale la pena fare una nuova copia protetta.
+
+    Farla a ogni apertura significherebbe una scrittura in piu' sulla cartella
+    di rete ogni volta (e su una condivisione fragile ogni scrittura e' un
+    rischio), e farebbe ruotare le copie protette per numero di aperture invece
+    che nel tempo: cinque riaperture di fila cancellerebbero tutta la
+    profondita'. Una al giorno e' sufficiente."""
+    esistenti = elenca_backup(cartella_sicurezza, PREFISSO_SICUREZZA)
+    if not esistenti:
+        return True
+    piu_recente = esistenti[0][0]
+    return (datetime.now() - piu_recente) > timedelta(hours=ORE_TRA_COPIE_PROTETTE)
+
+
+def _proteggi_copia_buona(percorso_buono, cartella_sicurezza, sempre=False):
+    """Mette una copia del backup buono al riparo dalla rotazione.
+
+    'sempre=True' quando si e' rilevato un problema: in quel caso la copia va
+    fatta subito, senza aspettare."""
     try:
         os.makedirs(cartella_sicurezza, exist_ok=True)
+        if not sempre and not _serve_copia_protetta(cartella_sicurezza):
+            return None
         destinazione = _nome_univoco(cartella_sicurezza, PREFISSO_SICUREZZA)
         if _copia_verificata(percorso_buono, destinazione):
             _limita_numero_file(cartella_sicurezza, PREFISSO_SICUREZZA, MAX_SICUREZZA)
@@ -565,7 +607,8 @@ def esegui_backup_avvio(db_path):
 
         buono = trova_ultimo_backup_valido(cartella_backup)
         if buono:
-            esito["copia_sicura"] = _proteggi_copia_buona(buono, cartella_sicurezza)
+            esito["copia_sicura"] = _proteggi_copia_buona(
+                buono, cartella_sicurezza, sempre=True)
             quando = _timestamp_da_nome(os.path.basename(buono))
             quando_txt = quando.strftime("%d/%m/%Y alle %H:%M") if quando else "data sconosciuta"
             esito["avviso"] = (
@@ -614,7 +657,8 @@ def verifica_dopo_scrittura(db_path, operazione):
         cartella_backup = os.path.join(os.path.dirname(db_path), "backup")
         buono = trova_ultimo_backup_valido(cartella_backup)
         if buono:
-            _proteggi_copia_buona(buono, os.path.join(cartella_backup, "sicurezza"))
+            _proteggi_copia_buona(
+                buono, os.path.join(cartella_backup, "sicurezza"), sempre=True)
     except Exception:
         pass
     return False

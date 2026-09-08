@@ -140,16 +140,102 @@ class TestSpegnimentoImprovviso(BaseInterruzioni):
         print(f"\n    [kill ripetuti] {quante} spegnimenti improvvisi, "
               f"{self._conta()} preventivi, database sempre integro")
 
-    def test_nessun_file_di_appoggio_rimasto(self):
-        """Dopo il recupero non devono restare file -journal orfani."""
+    def test_eventuale_file_di_appoggio_rimasto_e_innocuo(self):
+        """Dopo uno spegnimento improvviso puo' restare un file '-journal'
+        accanto al database. Verificato sul campo:
+
+        - se lo spegnimento avviene a scrittura avviata, il file contiene una
+          transazione da annullare e viene risolto alla riapertura;
+        - se avviene PRIMA che l'intestazione del file sia stata scritta per
+          intero, SQLite lo considera non valido, lo IGNORA e lo lascia li'.
+          E' un residuo inerte, non una scrittura in sospeso.
+
+        Quello che conta non e' l'assenza del file, ma che il database sia
+        coerente e utilizzabile in entrambi i casi.
+
+        ATTENZIONE per il futuro: NON cancellare i file '-journal' dal codice.
+        Se uno di essi fosse valido, cancellarlo causerebbe esattamente il tipo
+        di danneggiamento che tutto questo lavoro serve a prevenire."""
         self._uccidi_mentre_scrive()
         bm._esito_avvio_cache.clear()
         DatabaseManager(db_path=self.db)     # la riapertura recupera
 
-        residui = [f for f in os.listdir(self.tmp)
-                   if f.startswith("materiali.db-")]
-        print(f"\n    [file di appoggio] residui dopo il recupero: {residui or 'nessuno'}")
-        self.assertEqual(residui, [], "SQLite deve aver ripulito i file temporanei")
+        residui = [f for f in os.listdir(self.tmp) if f.startswith("materiali.db-")]
+
+        integro, messaggio, _ms = bm.verifica_integrita(self.db)
+        self.assertTrue(integro, f"il database deve essere coerente: {messaggio}")
+
+        # e si deve poter continuare a lavorare normalmente
+        gestore = DatabaseManager(db_path=self.db)
+        self.assertIsNotNone(gestore.add_preventivo(preventivo(12345)))
+        integro_dopo, messaggio_dopo, _ms = bm.verifica_integrita(self.db)
+        self.assertTrue(integro_dopo,
+                        f"il database deve restare coerente scrivendo: {messaggio_dopo}")
+
+        print(f"\n    [file di appoggio] residui: {residui or 'nessuno'} | "
+              f"database coerente e scrivibile: sì")
+
+    def _crea_journal_valido(self):
+        """Produce di proposito un file di appoggio VALIDO e non risolto.
+
+        Non ci si puo' affidare a un kill a caso: a seconda dell'istante il
+        file puo' risultare incompleto e quindi inerte. Qui si apre una
+        transazione, si scrive davvero (cosi' l'intestazione viene completata)
+        e si uccide il processo prima della conferma."""
+        script = os.path.join(self.tmp, "sospeso.py")
+        with open(script, "w", encoding="utf-8") as f:
+            f.write(textwrap.dedent(f"""
+                import sqlite3, time
+                conn = sqlite3.connect({self.db!r}, isolation_level=None)
+                conn.execute("BEGIN IMMEDIATE")
+                conn.execute("INSERT INTO clienti (nome) VALUES ('mai confermato')")
+                print("pronto", flush=True)
+                time.sleep(60)
+            """))
+        processo = subprocess.Popen([sys.executable, script],
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.DEVNULL, text=True)
+        processo.stdout.readline()          # attende che la transazione sia aperta
+        processo.send_signal(signal.SIGKILL)
+        processo.wait(timeout=10)
+
+    def test_il_database_resta_coerente_con_una_scrittura_in_sospeso(self):
+        """Con un file di appoggio presente e una transazione mai confermata,
+        il database deve risultare coerente e utilizzabile.
+
+        NOTA: non si pretende che il file '-journal' sparisca. Verificato sul
+        campo, SQLite lo elimina solo quando c'e' davvero qualcosa da annullare
+        sul file principale; se la transazione interrotta non aveva ancora
+        riversato pagine, non c'e' nulla da fare e il file resta li', inerte.
+        Cio' che conta e' la coerenza dei dati, verificata qui sotto."""
+        self._crea_journal_valido()
+        self.assertTrue(os.path.exists(self.db + "-journal"),
+                        "la prova deve partire da un file di appoggio presente")
+
+        bm.recupera_dopo_arresto(self.db)
+
+        integro, messaggio, _ms = bm.verifica_integrita(self.db)
+        self.assertTrue(integro, f"il database deve essere coerente: {messaggio}")
+
+        bm._esito_avvio_cache.clear()
+        gestore = DatabaseManager(db_path=self.db)
+        self.assertFalse(gestore.database_inutilizzabile)
+        self.assertIsNotNone(gestore.add_preventivo(preventivo(777)),
+                             "si deve poter continuare a lavorare")
+        print("\n    [scrittura in sospeso] database coerente e utilizzabile")
+
+    def test_la_transazione_non_confermata_viene_annullata(self):
+        """Il dato scritto ma mai confermato NON deve comparire nel database:
+        e' esattamente cio' che il recupero deve garantire."""
+        self._crea_journal_valido()
+        bm.recupera_dopo_arresto(self.db)
+
+        with sqlite3.connect(self.db) as conn:
+            quanti = conn.execute(
+                "SELECT COUNT(*) FROM clienti WHERE nome = 'mai confermato'").fetchone()[0]
+        self.assertEqual(quanti, 0,
+                         "una transazione interrotta non deve lasciare traccia")
+        print("    [recupero] la scrittura interrotta e' stata annullata correttamente")
 
 
 # ---------------------------------------------------------------------------

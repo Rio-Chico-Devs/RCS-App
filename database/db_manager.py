@@ -39,6 +39,28 @@ class DatabaseOccupato(Exception):
     """Un altro computer sta scrivendo sul database in questo momento."""
 
 
+class _ConnessioneChiusaAlTermine(sqlite3.Connection):
+    """Connessione che si CHIUDE davvero all'uscita dal blocco 'with'.
+
+    Il comportamento normale della libreria e' sorprendente: uscendo da
+    'with sqlite3.connect(...) as conn' la transazione viene confermata ma la
+    connessione resta APERTA, finche' non interviene il recupero automatico
+    della memoria. Su una cartella di rete condivisa questo significa tenere
+    aperto piu' del necessario un file usato anche da altri computer, e
+    lasciare in giro i file di appoggio di SQLite.
+
+    Con questa classe la chiusura e' immediata e prevedibile."""
+
+    def __exit__(self, tipo, valore, traccia):
+        try:
+            return super().__exit__(tipo, valore, traccia)   # conferma o annulla
+        finally:
+            try:
+                self.close()
+            except Exception:
+                pass
+
+
 def _e_database_occupato(errore):
     testo = str(errore).lower()
     return "locked" in testo or "busy" in testo
@@ -156,8 +178,12 @@ class DatabaseManager:
     def _connessione(self):
         """Apre una connessione al database con un'attesa adeguata a una
         cartella di rete condivisa (il valore predefinito è 5 secondi, troppo
-        poco se un altro computer sta scrivendo)."""
-        return sqlite3.connect(self.db_path, timeout=TIMEOUT_CONNESSIONE)
+        poco se un altro computer sta scrivendo).
+
+        La connessione si chiude da sola all'uscita dal blocco 'with', così il
+        file non resta aperto più del necessario su una cartella condivisa."""
+        return sqlite3.connect(self.db_path, timeout=TIMEOUT_CONNESSIONE,
+                               factory=_ConnessioneChiusaAlTermine)
 
     def _registra_conflitto(self, operazione, tentativo, fallito=False):
         """Annota nel registro che due postazioni hanno scritto insieme.
