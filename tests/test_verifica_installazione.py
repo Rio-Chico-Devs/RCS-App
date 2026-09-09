@@ -120,6 +120,79 @@ class TestNonDiceMaiOkAVuoto(unittest.TestCase):
                       "deve riportare le misure esatte, non solo che c'e' un problema")
 
 
+class TestPyQt5NelPythonSbagliato(unittest.TestCase):
+    """Successo davvero sul PC dell'azienda.
+
+    VERIFICA.bat era partito con Python 3.11 mentre il programma gira con il
+    3.13. PyQt5 e' installato solo nel 3.13, quindi lo strumento ha dichiarato
+    PyQt5 non installato e OTTO file del programma mancanti, consigliando di
+    ricopiare l'aggiornamento. Erano tutti falsi allarmi, ed era saltato
+    proprio il controllo delle linguette - l'unico che si puo' fare solo li'.
+
+    Mandare a caccia di un problema che non esiste fa danno quanto tacere su
+    uno vero: si perde tempo e si perde fiducia nello strumento."""
+
+    def _modulo(self):
+        import importlib
+        if "verifica_installazione" in sys.modules:
+            del sys.modules["verifica_installazione"]
+        modulo = importlib.import_module("verifica_installazione")
+        modulo._righe.clear()
+        modulo._esiti.clear()
+        return modulo
+
+    def _con_import_che_fallisce(self, modulo, errore):
+        import builtins
+        originale = builtins.__import__
+
+        def finto_import(nome, *a, **k):
+            if nome.startswith("ui."):
+                raise errore
+            return originale(nome, *a, **k)
+
+        builtins.__import__ = finto_import
+        try:
+            modulo.verifica_moduli()
+        finally:
+            builtins.__import__ = originale
+        return "\n".join(modulo._righe), list(modulo._esiti)
+
+    def test_manca_solo_pyqt5_non_dice_che_mancano_i_file(self):
+        modulo = self._modulo()
+        testo, esiti = self._con_import_che_fallisce(
+            modulo, ImportError("No module named 'PyQt5'"))
+
+        self.assertNotIn("Ricopia tutti i file", testo,
+                         "e' il consiglio sbagliato: i file ci sono tutti")
+        self.assertNotIn(modulo.ERRORE, [stato for stato, _t in esiti],
+                         "non e' un errore dell'installazione")
+        self.assertIn("I file ci sono tutti", testo)
+
+    def test_un_file_davvero_mancante_resta_un_errore(self):
+        """L'altra direzione: non deve diventare indulgente con i guasti veri."""
+        modulo = self._modulo()
+        testo, esiti = self._con_import_che_fallisce(
+            modulo, ImportError("No module named 'ui.main_window'"))
+
+        self.assertIn(modulo.ERRORE, [stato for stato, _t in esiti])
+        self.assertIn("Ricopia tutti i file", testo)
+
+    def test_dice_quale_python_sta_usando(self):
+        modulo = self._modulo()
+        modulo._pyqt5_mancante(ImportError("No module named 'PyQt5'"))
+        testo = "\n".join(modulo._righe)
+
+        self.assertIn(sys.executable, testo,
+                      "senza sapere QUALE Python e', il messaggio non serve a niente")
+        self.assertIn("piu' versioni di Python", testo,
+                      "deve spiegare che il pacchetto puo' essere su un altro Python")
+
+    def tearDown(self):
+        for nome in os.listdir(RADICE):
+            if nome.startswith("VERIFICA_") and nome.endswith(".txt"):
+                os.remove(os.path.join(RADICE, nome))
+
+
 class TestRobustezza(unittest.TestCase):
     """Un controllo che si pianta a meta' non serve a nessuno."""
 

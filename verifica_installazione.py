@@ -85,10 +85,60 @@ def verifica_ambiente():
         import PyQt5
         esito(OK, "PyQt5 installato", "versione Qt: {}".format(QT_VERSION_STR))
     except Exception as e:
-        esito(ERRORE, "PyQt5 NON installato o non funzionante",
-              "Il programma non puo' partire senza.\n"
-              "Rimedio: apri il Prompt dei comandi e scrivi:  pip install PyQt5\n"
-              "Dettaglio tecnico: {}".format(e))
+        _pyqt5_mancante(e)
+
+
+def _altri_python_installati():
+    """Gli altri Python presenti sul computer, secondo il lanciatore 'py'.
+
+    Su Windows e' normalissimo averne piu' di uno, e i pacchetti installati in
+    uno NON si vedono dall'altro."""
+    if os.name != "nt":
+        return []
+    try:
+        import subprocess
+        esito_comando = subprocess.run(["py", "-0p"], capture_output=True, text=True, timeout=15)
+        righe = [r.strip() for r in esito_comando.stdout.splitlines() if r.strip()]
+        return [r for r in righe if ":" in r or "\\" in r]
+    except Exception:
+        return []
+
+
+def _pyqt5_mancante(errore):
+    """PyQt5 non c'e' IN QUESTO Python: non e' detto che manchi sul computer.
+
+    E' successo davvero: questo controllo e' partito con Python 3.11 mentre il
+    programma gira con il 3.13, e ha dichiarato PyQt5 non installato e otto
+    file del programma mancanti. Erano tutti falsi allarmi, ed era saltato
+    proprio il controllo delle linguette - l'unico che si puo' fare soltanto
+    qui. Uno strumento di verifica che manda a cercare un problema inesistente
+    fa danno quanto uno che tace su un problema vero."""
+    dettaglio = [
+        "PyQt5 non risulta installato in QUESTO Python:",
+        "   {}".format(sys.executable),
+        "",
+        "Attenzione: non significa che manchi sul computer. Su Windows e'",
+        "normale avere piu' versioni di Python, e i pacchetti installati in una",
+        "NON si vedono dalle altre.",
+    ]
+    altri = _altri_python_installati()
+    if altri:
+        dettaglio += ["", "Altri Python trovati su questo computer:"]
+        dettaglio += ["   " + r for r in altri]
+        dettaglio += [
+            "",
+            "Se il programma si avvia normalmente, PyQt5 e' su uno di questi:",
+            "rilancia il controllo con quello, per esempio:",
+            "   py -3.13 verifica_installazione.py",
+        ]
+    else:
+        dettaglio += [
+            "",
+            "Se il programma NON parte per niente, allora manca davvero:",
+            "apri il Prompt dei comandi e scrivi:  pip install PyQt5",
+        ]
+    dettaglio += ["", "Dettaglio tecnico: {}".format(errore)]
+    esito(ATTENZIONE, "PyQt5 non disponibile in questo Python", "\n".join(dettaglio))
 
 
 # ---------------------------------------------------------------------------
@@ -109,9 +159,21 @@ def verifica_moduli():
         "ui.visualizza_preventivi_window", "ui.anagrafica_clienti_window",
     ]
     mancanti = []
+    fermati_da_pyqt = []
     for modulo in moduli:
         try:
             __import__(modulo)
+        except ImportError as e:
+            # Distinzione che conta: un file che manca davvero e' un problema
+            # dell'installazione; un file che non si carica solo perche' manca
+            # PyQt5 e' tutt'altra cosa, ed e' successo davvero: lo strumento
+            # aveva dichiarato mancanti otto file che erano al loro posto, e
+            # consigliava di ricopiare l'aggiornamento. Un consiglio sbagliato
+            # fa perdere tempo dietro a un problema che non esiste.
+            if "PyQt5" in str(e):
+                fermati_da_pyqt.append(modulo)
+            else:
+                mancanti.append("{}  ->  {}: {}".format(modulo, type(e).__name__, e))
         except Exception as e:
             mancanti.append("{}  ->  {}: {}".format(modulo, type(e).__name__, e))
 
@@ -121,6 +183,11 @@ def verifica_moduli():
               "\n\nRimedio: potrebbe essere stato copiato solo una parte "
               "dell'aggiornamento.\nRicopia tutti i file del pacchetto e svuota "
               "le cartelle __pycache__.")
+    elif fermati_da_pyqt:
+        esito(ATTENZIONE, "I file ci sono tutti, ma {} non si aprono senza PyQt5"
+                          .format(len(fermati_da_pyqt)),
+              "Non manca nessun file: manca PyQt5 in QUESTO Python.\n"
+              "Vedi il punto 1 per sapere quale Python usare.")
     else:
         esito(OK, "Tutti i {} file del programma sono al loro posto".format(len(moduli)))
 
