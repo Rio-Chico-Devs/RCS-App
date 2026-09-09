@@ -427,8 +427,16 @@ def _copia_database(sorgente, destinazione):
     questa garanzia, soprattutto su una cartella di rete dove la copia non e'
     istantanea e un altro computer puo' scrivere nel frattempo.
 
+    Viene copiato tutto in un colpo solo (il comportamento predefinito): se la
+    copia procedesse a blocchi, ogni scrittura di un altro computer la farebbe
+    ricominciare da capo, e in un ufficio che lavora potrebbe non finire mai.
+
     Se il meccanismo di SQLite non e' utilizzabile si ripiega sulla copia del
-    file: meglio un backup imperfetto che nessun backup."""
+    file, ma TENENDO IL DATABASE BLOCCATO durante la copia: copiare un
+    database mentre qualcuno ci scrive produce un file che supera i controlli
+    ed e' comunque sbagliato - lo stesso inganno del file di appoggio lasciato
+    indietro. SQLite lo consente solo quando nessuno ha una scrittura in
+    corso, ed e' esattamente cio' che il blocco garantisce."""
     try:
         origine = sqlite3.connect(sorgente, timeout=TIMEOUT_SQLITE)
         try:
@@ -445,11 +453,23 @@ def _copia_database(sorgente, destinazione):
             "Backup: copia tramite SQLite non riuscita (%s), ripiego sulla copia del file", e)
 
     try:
-        if os.path.exists(destinazione):
-            os.remove(destinazione)
-        shutil.copy2(sorgente, destinazione)
+        guardia = sqlite3.connect(sorgente, timeout=TIMEOUT_SQLITE)
+        try:
+            guardia.execute("BEGIN IMMEDIATE")     # nessuno puo' scrivere da qui
+            if os.path.exists(destinazione):
+                os.remove(destinazione)
+            shutil.copy2(sorgente, destinazione)
+            for suffisso in ("-journal", "-wal", "-shm"):
+                if os.path.exists(sorgente + suffisso):
+                    shutil.copy2(sorgente + suffisso, destinazione + suffisso)
+            guardia.rollback()
+        finally:
+            guardia.close()
         return True
     except Exception as e:
+        # Senza il blocco la copia sarebbe di dubbia affidabilita': meglio
+        # nessun backup che uno che sembra buono e non lo e'. Chi chiama
+        # conserva i backup precedenti e avvisa l'utente.
         _log().error("Backup: copia fallita verso %s (%s)", destinazione, e)
         return False
 

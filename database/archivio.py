@@ -317,13 +317,69 @@ def ripristina_backup(db_path, percorso_backup, forza=False):
                 None)
 
     # 3. Ripristino vero e proprio
+    #
+    # La copia NON viene scritta direttamente sopra il database. Copiare un
+    # file non è un'operazione istantanea: se si interrompe a metà (e su una
+    # cartella di rete succede) resterebbe un database troncato, cioè il danno
+    # peggiore proprio mentre si sta cercando di rimediare a un danno.
+    #
+    # Si copia quindi accanto, con un nome provvisorio, e solo quando la copia
+    # è completa si mette al posto del database con os.replace. Il file
+    # provvisorio sta nella stessa cartella perché altrimenti non sarebbe uno
+    # spostamento ma un'altra copia.
+    #
+    # Onestà su os.replace: su Windows si appoggia a MoveFileEx, che Microsoft
+    # non garantisce atomico in assoluto (in casi non documentati può ripiegare
+    # su una copia). Resta comunque incomparabilmente più sicuro di scrivere
+    # dritto sul database in uso, perché il file buono viene toccato una volta
+    # sola e solo quando la copia è già completa e verificabile.
+    provvisorio = db_path + ".in_ripristino"
     try:
-        shutil.copy2(percorso_backup, db_path)
+        if os.path.exists(provvisorio):
+            os.remove(provvisorio)
+        shutil.copy2(percorso_backup, provvisorio)
+        os.replace(provvisorio, db_path)
         # Subito dopo la sostituzione: gli eventuali file di appoggio rimasti
         # appartengono al database di prima e vanno tolti (vedi la spiegazione
         # in _rimuovi_appoggi_orfani).
         _rimuovi_appoggi_orfani(db_path)
+        rimasti = _file_di_appoggio(db_path)
+        if rimasti:
+            # Su Windows un file aperto da un altro programma non si cancella.
+            # Lasciarlo li' significherebbe consegnare all'utente un database
+            # che alla prima apertura si riempie di dati sbagliati: meglio
+            # tornare indietro e dirlo.
+            _annulla_ripristino(db_path, copia_precedente)
+            return (False,
+                    "Non è stato possibile togliere un file di appoggio del "
+                    "database precedente ({}).\n\nIl ripristino è stato "
+                    "annullato e il database di prima è stato rimesso al suo "
+                    "posto. Chiudi il programma su tutti i computer e "
+                    "riprova.".format(", ".join(os.path.basename(r) for r in rimasti)),
+                    copia_precedente)
+    except PermissionError as e:
+        # Windows: non si può sostituire un file che un altro programma tiene
+        # aperto. È una protezione, non un guasto - sovrascriverlo mentre
+        # qualcuno lo legge è una delle cause di danneggiamento.
+        try:
+            if os.path.exists(provvisorio):
+                os.remove(provvisorio)
+        except OSError:
+            pass
+        _annulla_ripristino(db_path, copia_precedente)
+        return (False,
+                "Il database risulta aperto da un altro programma e non è "
+                "stato possibile sostituirlo.\n\nChiudi tutte le finestre di "
+                "questo programma (e controlla gli altri computer), poi "
+                "riprova. Non è stato modificato nulla.\n\nDettaglio: "
+                "{}".format(e),
+                copia_precedente)
     except Exception as e:
+        try:
+            if os.path.exists(provvisorio):
+                os.remove(provvisorio)      # non lasciare in giro file a metà
+        except OSError:
+            pass
         _annulla_ripristino(db_path, copia_precedente)
         return False, "Ripristino non riuscito ({}). Il database precedente è stato rimesso al suo posto.".format(e), copia_precedente
 
@@ -350,7 +406,12 @@ def _annulla_ripristino(db_path, copia_precedente):
     if not copia_precedente or not os.path.exists(copia_precedente):
         return False
     try:
-        shutil.copy2(copia_precedente, db_path)
+        # Stessa cautela dell'andata: prima accanto, poi al suo posto in un
+        # colpo solo. Questo è il percorso di emergenza, è quello in cui una
+        # copia lasciata a metà farebbe più danno.
+        provvisorio = db_path + ".in_ritorno"
+        shutil.copy2(copia_precedente, provvisorio)
+        os.replace(provvisorio, db_path)
         _rimuovi_appoggi_orfani(db_path)    # anche tornando indietro si sostituisce il file
         _log().error("Ripristino annullato: rimesso il database precedente")
         return True

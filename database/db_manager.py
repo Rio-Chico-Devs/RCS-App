@@ -203,6 +203,34 @@ class DatabaseManager:
                                isolation_level="IMMEDIATE",
                                factory=_ConnessioneChiusaAlTermine)
 
+    def _connessione_scrittura(self):
+        """Connessione per le operazioni che DECIDONO cosa scrivere in base a
+        quello che hanno appena letto.
+
+        Perché non basta la connessione normale: la libreria apre la
+        transazione solo davanti alla prima scrittura, quindi la lettura che
+        precede avviene FUORI. Due postazioni possono leggere lo stesso valore
+        e scrivere entrambe partendo da quello.
+
+        Non è teoria, è stato misurato su questo programma:
+
+        - due revisioni dello stesso preventivo salvate insieme diventavano
+          entrambe "revisione n.2";
+        - modificando lo stesso movimento di magazzino da due postazioni, la
+          giacenza restava sbagliata, perché la seconda annullava una quantità
+          che la prima aveva già annullato.
+
+        Con BEGIN IMMEDIATE la transazione comincia PRIMA della lettura: la
+        seconda postazione aspetta (fino a TIMEOUT_CONNESSIONE) e poi rilegge
+        i valori aggiornati."""
+        conn = self._connessione()
+        try:
+            conn.execute("BEGIN IMMEDIATE")
+        except Exception:
+            conn.close()
+            raise
+        return conn
+
     def _registra_conflitto(self, operazione, tentativo, fallito=False):
         """Annota nel registro che due postazioni hanno scritto insieme.
         Serve a sapere quanto spesso capita davvero."""
@@ -789,7 +817,7 @@ class DatabaseManager:
     def modifica_movimento(self, movimento_id, nuova_quantita, note):
         """Modifica un movimento: reversa il vecchio effetto su giacenza e applica il nuovo"""
         try:
-            with self._connessione() as conn:
+            with self._connessione_scrittura() as conn:
                 cursor = conn.cursor()
                 cursor.execute(
                     "SELECT materiale_id, tipo, quantita, fornitore_nome FROM movimenti_magazzino WHERE id = ?",
@@ -831,7 +859,7 @@ class DatabaseManager:
 
     def elimina_movimento(self, movimento_id):
         """Elimina un movimento e reversa il suo effetto sulla giacenza"""
-        with self._connessione() as conn:
+        with self._connessione_scrittura() as conn:
             cursor = conn.cursor()
             cursor.execute(
                 "SELECT materiale_id, tipo, quantita, fornitore_nome FROM movimenti_magazzino WHERE id = ?",
@@ -978,7 +1006,7 @@ class DatabaseManager:
     @riprova_se_occupato("update_preventivo")
     def update_preventivo(self, preventivo_id, preventivo_data):
         """AGGIORNATO: Aggiorna un preventivo esistente salvando snapshot nello storico"""
-        with self._connessione() as conn:
+        with self._connessione_scrittura() as conn:
             cursor = conn.cursor()
 
             # 1. Prima di aggiornare, salva lo snapshot corrente nello storico
@@ -1087,7 +1115,7 @@ class DatabaseManager:
 
     def ripristina_versione_preventivo(self, preventivo_id, timestamp_versione):
         """NUOVO: Ripristina una versione precedente del preventivo"""
-        with self._connessione() as conn:
+        with self._connessione_scrittura() as conn:
             cursor = conn.cursor()
 
             # Ottieni storico
@@ -1179,7 +1207,7 @@ class DatabaseManager:
 
     def add_revisione_preventivo(self, preventivo_originale_id, preventivo_data, note_revisione=""):
         """NUOVO: Aggiunge una revisione a un preventivo esistente con i nuovi campi"""
-        with self._connessione() as conn:
+        with self._connessione_scrittura() as conn:
             cursor = conn.cursor()
 
             # Trova il numero revisione successivo
@@ -1424,7 +1452,7 @@ class DatabaseManager:
         """Elimina un preventivo e tutte le sue revisioni se è l'originale,
         oppure solo la revisione se viene passato l'ID di una revisione."""
         try:
-            with self._connessione() as conn:
+            with self._connessione_scrittura() as conn:
                 cursor = conn.cursor()
 
                 # Controlla se è un originale o una revisione

@@ -87,6 +87,82 @@ class TestTransazioniImmediate(BaseDb):
                          "bloccherebbe gli altri computer senza motivo")
 
 
+class TestLettureCheDecidonoLeScritture(BaseDb):
+    """Le operazioni che decidono cosa scrivere in base a quello che hanno
+    appena letto sono l'unico punto in cui due postazioni possono davvero
+    pestarsi i piedi. Senza aprire la transazione PRIMA della lettura, la
+    libreria la apre solo davanti alla prima scrittura: entrambe leggono lo
+    stesso valore e scrivono entrambe partendo da quello.
+
+    Misurato su questo programma prima della correzione:
+      - due revisioni dello stesso preventivo diventavano entrambe "n.2";
+      - modificando lo stesso movimento da due postazioni la giacenza restava
+        sbagliata.
+    Nessun errore, nessun avviso: solo numeri sbagliati."""
+
+    def _in_parallelo(self, azione):
+        """Fa partire due postazioni nello stesso istante."""
+        pronti = threading.Barrier(2)
+        errori = []
+
+        def postazione(nome):
+            gestore = DatabaseManager(db_path=self.db)
+            try:
+                pronti.wait(timeout=10)
+                azione(gestore, nome)
+            except Exception as e:                # pragma: no cover
+                errori.append("%s: %s" % (nome, e))
+
+        fili = [threading.Thread(target=postazione, args=(n,)) for n in ("PC-1", "PC-2")]
+        for f in fili:
+            f.start()
+        for f in fili:
+            f.join(timeout=30)
+        return errori
+
+    def test_due_revisioni_insieme_hanno_numeri_diversi(self):
+        originale = self.gestore.add_preventivo(_dati_preventivo())
+
+        errori = self._in_parallelo(
+            lambda g, nome: g.add_revisione_preventivo(originale, _dati_preventivo(), nome))
+        self.assertEqual(errori, [])
+
+        conn = sqlite3.connect(self.db)
+        numeri = [r[0] for r in conn.execute(
+            "SELECT numero_revisione FROM preventivi WHERE preventivo_originale_id = ?",
+            (originale,))]
+        conn.close()
+
+        self.assertEqual(len(numeri), 2, "devono essere state create due revisioni")
+        self.assertEqual(len(set(numeri)), 2,
+                         "due revisioni non possono avere lo stesso numero: %s" % numeri)
+
+    def test_la_giacenza_resta_giusta_se_due_modificano_lo_stesso_movimento(self):
+        materiale = self.gestore.add_materiale("Fibra", 0.3, 20.0)
+        movimento = self.gestore.registra_movimento(materiale, 'carico', 10.0)
+
+        # Le due postazioni portano lo stesso movimento a quantità diverse.
+        # Qualunque delle due vinca, alla fine la giacenza deve corrispondere
+        # alla quantità rimasta scritta: è l'unica cosa che conta per chi usa
+        # il magazzino.
+        quantita = {"PC-1": 20.0, "PC-2": 30.0}
+        errori = self._in_parallelo(
+            lambda g, nome: g.modifica_movimento(movimento, quantita[nome], nome))
+        self.assertEqual(errori, [])
+
+        conn = sqlite3.connect(self.db)
+        quantita_finale = conn.execute(
+            "SELECT quantita FROM movimenti_magazzino WHERE id = ?", (movimento,)).fetchone()[0]
+        giacenza = conn.execute(
+            "SELECT giacenza FROM materiali WHERE id = ?", (materiale,)).fetchone()[0]
+        conn.close()
+
+        self.assertEqual(giacenza, quantita_finale,
+                         "la giacenza (%s) non corrisponde alla quantità registrata "
+                         "(%s): una delle due postazioni ha annullato una quantità "
+                         "che l'altra aveva già annullato" % (giacenza, quantita_finale))
+
+
 class TestAttesaConfigurata(BaseDb):
 
     def test_timeout_piu_lungo_del_predefinito(self):

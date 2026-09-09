@@ -177,7 +177,36 @@ def verifica_database():
             esito(OK, "La cartella di rete risponde in tempi normali",
                   "{:.2f} secondi".format(durata))
 
+    _controllo_antivirus(percorso, su_rete)
     return percorso
+
+
+def _controllo_antivirus(percorso, su_rete):
+    """L'antivirus e' una causa documentata di danneggiamento.
+
+    Su Windows SQLite protegge il database con LockFile/LockFileEx e da' per
+    scontato che funzionino. Un antivirus che apre il file per analizzarlo
+    mentre il programma ci scrive puo' interferire con quei blocchi: il
+    risultato va dall'errore "database occupato" fino al danneggiamento vero.
+    E' un rischio noto e la contromisura standard e' semplice: escludere dalla
+    scansione in tempo reale la cartella del database.
+
+    Qui non si prova a indovinare quale antivirus sia installato (ogni
+    prodotto risponde in modo diverso e una risposta sbagliata sarebbe
+    peggio di nessuna risposta): si dice all'utente cosa controllare e dove."""
+    cartella = os.path.dirname(percorso) or "."
+    if not su_rete:
+        return
+    esito(ATTENZIONE, "Da controllare a mano: esclusione dall'antivirus",
+          "Un antivirus che analizza il database mentre il programma ci scrive\n"
+          "puo' interferire con i blocchi di Windows e danneggiarlo: e' una\n"
+          "causa nota, non un'ipotesi.\n\n"
+          "Chiedi a chi gestisce i computer di escludere dalla scansione in\n"
+          "tempo reale questa cartella, su OGNI postazione:\n"
+          "   {}\n\n"
+          "Lo stesso vale per programmi di sincronizzazione automatica\n"
+          "(OneDrive, Dropbox, Google Drive): non devono sincronizzare\n"
+          "quella cartella mentre il programma e' in uso.".format(cartella))
 
 
 # ---------------------------------------------------------------------------

@@ -305,6 +305,77 @@ class TestRipristinoConScritturaInSospesa(BaseArchivio):
                          "nel database ripristinato non deve entrare nulla "
                          "della scrittura interrotta")
 
+    def test_se_la_copia_si_interrompe_il_database_resta_intero(self):
+        """Su una cartella di rete una copia può interrompersi a metà.
+
+        C'è già il ritorno automatico indietro, ma è una rete di sicurezza che
+        a sua volta ha bisogno della rete funzionante. Qui si prova il caso
+        peggiore: la copia si interrompe E il ritorno indietro non riesce
+        (collegamento caduto del tutto). Il database in uso deve essere ancora
+        lì, intero: ci si arriva scrivendo la copia ACCANTO e mettendola al
+        posto dell'originale solo quando è completa."""
+        backup = self._crea_backup(preventivi=PREVENTIVI_NEL_BACKUP)
+        prima = self._conta_preventivi(self.db)
+
+        originale = shutil.copy2
+        annulla_originale = archivio._annulla_ripristino
+
+        def copia_che_si_interrompe(sorgente, destinazione, *a, **k):
+            # Si interrompe la copia DEL BACKUP, dovunque venga scritta: così
+            # la prova vale sia per il metodo giusto (scrive accanto) sia per
+            # quello sbagliato (scrive dritto sul database in uso).
+            if os.path.abspath(sorgente) == os.path.abspath(backup):
+                with open(destinazione, "wb") as f:      # copia a metà
+                    with open(sorgente, "rb") as s:
+                        f.write(s.read(2048))
+                raise OSError("connessione di rete caduta durante la copia")
+            return originale(sorgente, destinazione, *a, **k)
+
+        shutil.copy2 = copia_che_si_interrompe
+        archivio._annulla_ripristino = lambda *a, **k: False    # rete caduta
+        try:
+            riuscito, _messaggio, _copia = archivio.ripristina_backup(self.db, backup)
+        finally:
+            shutil.copy2 = originale
+            archivio._annulla_ripristino = annulla_originale
+
+        self.assertFalse(riuscito)
+        integro, msg, _ms = bm.verifica_integrita(self.db)
+        self.assertTrue(integro,
+                        "il database in uso è rimasto troncato, e stavolta "
+                        "nessuno può rimetterlo a posto: %s" % msg)
+        self.assertEqual(self._conta_preventivi(self.db), prima,
+                         "il database in uso non doveva essere toccato affatto")
+        self.assertFalse(os.path.exists(self.db + ".in_ripristino"),
+                         "il file provvisorio a metà non deve restare in giro")
+
+    def test_se_il_database_e_aperto_altrove_lo_dice_in_modo_comprensibile(self):
+        """Su Windows non si può sostituire un file che un altro programma
+        tiene aperto. È una protezione, non un guasto: l'utente deve capire
+        cosa fare, non leggere un codice di errore."""
+        backup = self._crea_backup(preventivi=PREVENTIVI_NEL_BACKUP)
+        prima = self._conta_preventivi(self.db)
+
+        originale = os.replace
+
+        def replace_negato(sorgente, destinazione, *a, **k):
+            raise PermissionError(
+                32, "The process cannot access the file because it is being "
+                    "used by another process")
+
+        os.replace = replace_negato
+        try:
+            riuscito, messaggio, _copia = archivio.ripristina_backup(self.db, backup)
+        finally:
+            os.replace = originale
+
+        self.assertFalse(riuscito)
+        self.assertIn("aperto da un altro programma", messaggio)
+        self.assertIn("Chiudi", messaggio, "deve dire all'utente cosa fare")
+        self.assertEqual(self._conta_preventivi(self.db), prima,
+                         "il database non deve essere stato toccato")
+        self.assertFalse(os.path.exists(self.db + ".in_ripristino"))
+
     def test_la_copia_messa_da_parte_e_coerente(self):
         """Anche il database messo da parte deve essere leggibile: è quello a
         cui si tornerebbe se il ripristino andasse storto."""
