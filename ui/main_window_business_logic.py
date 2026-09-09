@@ -830,12 +830,11 @@ class MainWindowBusinessLogic:
     @staticmethod
     def cambia_database(window_instance):
         """Permette all'utente di selezionare un database diverso (es. cartella condivisa in rete)."""
-        if getattr(sys, 'frozen', False):
-            base_dir = os.path.dirname(sys.executable)
-        else:
-            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(
-                sys.modules[__name__].__file__
-            )))
+        # Stessa funzione usata da db_manager per CERCARE config.json: così il
+        # file viene scritto esattamente dove verrà poi letto, anche
+        # nell'eseguibile compilato.
+        from utils import percorsi
+        base_dir = percorsi.cartella_applicazione()
 
         # Mostra il percorso attuale
         config_path = os.path.join(base_dir, "config.json")

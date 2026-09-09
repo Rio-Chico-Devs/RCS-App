@@ -20,14 +20,11 @@ def setup_logger():
 
     logger.setLevel(logging.DEBUG)
 
-    # Determina la directory dei log
-    if getattr(sys, 'frozen', False):
-        base_dir = os.path.dirname(sys.executable)
-    else:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-    log_dir = os.path.join(base_dir, "logs")
-    os.makedirs(log_dir, exist_ok=True)
+    # Dove scrivere i registri: la logica dei percorsi sta in utils/percorsi.py,
+    # in un posto solo, così tutte le parti del programma scrivono e cercano
+    # negli stessi posti anche quando gira come eseguibile compilato.
+    from utils import percorsi
+    log_dir = percorsi.cartella_registri()
 
     log_file = os.path.join(log_dir, f"rcs_{datetime.now().strftime('%Y%m%d')}.log")
 
@@ -41,11 +38,16 @@ def setup_logger():
     except Exception:
         pass  # Se non riesce a creare il file di log, continua senza
 
-    # Handler console — WARNING e superiori
-    ch = logging.StreamHandler(sys.stderr)
-    ch.setLevel(logging.WARNING)
-    ch.setFormatter(logging.Formatter('[%(levelname)s] %(message)s'))
-    logger.addHandler(ch)
+    # Handler console — WARNING e superiori.
+    # Solo se una console c'è davvero: quando il programma gira come eseguibile
+    # compilato senza finestra di console, sys.stderr è None. Aggiungere lo
+    # stesso l'handler farebbe fallire in silenzio OGNI messaggio di avviso,
+    # passando ogni volta per la gestione dell'errore.
+    if getattr(sys, 'stderr', None) is not None:
+        ch = logging.StreamHandler(sys.stderr)
+        ch.setLevel(logging.WARNING)
+        ch.setFormatter(logging.Formatter('[%(levelname)s] %(message)s'))
+        logger.addHandler(ch)
 
     return logger
 

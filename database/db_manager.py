@@ -106,10 +106,8 @@ def risolvi_percorso_db():
     Ordine: 'db_path' da config.json (percorso condiviso in rete), altrimenti
     data/materiali.db accanto all'applicazione.
     Ritorna (percorso, configurazione)."""
-    if getattr(sys, 'frozen', False):
-        base_dir = os.path.dirname(sys.executable)
-    else:
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    from utils import percorsi
+    base_dir = percorsi.cartella_applicazione()
 
     predefinito = os.path.join(base_dir, "data", "materiali.db")
     config_path = os.path.join(base_dir, "config.json")
