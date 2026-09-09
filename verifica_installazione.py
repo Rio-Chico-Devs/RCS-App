@@ -388,6 +388,55 @@ def verifica_cartelle(percorso_db):
 # 6. Interfaccia: le linguette ci stanno?
 # ---------------------------------------------------------------------------
 
+def _controllo_ingrandimento_schermo(applicazione):
+    """Misura l'ingrandimento di Windows su QUESTO monitor.
+
+    Perche' interessa: in Impostazioni schermo di Windows si puo' chiedere di
+    ingrandire testo e finestre al 125% o al 150% (sui portatili e' quasi
+    sempre cosi'). Il programma non dice a Qt come comportarsi in quel caso,
+    quindi Qt riferisce una risoluzione ridotta: un monitor 1920x1080 al 150%
+    viene visto come 1280x720.
+
+    Non e' un dettaglio: ui/responsive.py decide le misure dell'interfaccia
+    guardando proprio quel numero, e sotto gli 800 punti di altezza passa a
+    caratteri e pulsanti piu' piccoli. E' la spiegazione piu' probabile del
+    perche' certi difetti (testo tagliato nelle linguette) si vedevano su
+    alcuni computer e non su altri.
+
+    Qui non si cambia niente: si MISURA e si riferisce. La correzione va
+    decisa sapendo cosa riferiscono davvero i computer dell'azienda."""
+    try:
+        schermo = applicazione.primaryScreen()
+        rapporto = float(schermo.devicePixelRatio())
+        logica = schermo.availableGeometry()
+        fisica = schermo.geometry()
+        scrivi("       Ingrandimento di Windows: {:.0f}%".format(rapporto * 100))
+        scrivi("       Risoluzione riferita a Qt: {} x {}".format(
+            fisica.width(), fisica.height()))
+        scrivi()
+
+        piccolo = logica.height() <= 800 or logica.width() <= 1400
+        if rapporto > 1.01:
+            esito(ATTENZIONE, "Lo schermo e' ingrandito da Windows",
+                  "Ingrandimento: {:.0f}%.\n"
+                  "Il programma non dice a Qt come comportarsi con "
+                  "l'ingrandimento,\nquindi le misure dell'interfaccia vengono "
+                  "decise su una risoluzione\nridotta ({} x {} invece di quella "
+                  "vera). Modalita' scelta: {}.\n\n"
+                  "Non e' un guasto e non impedisce di lavorare: e' la causa "
+                  "piu'\nprobabile dei difetti grafici che compaiono su un "
+                  "computer e non\nsu un altro. Segnala questo dato "
+                  "all'assistenza.".format(
+                      rapporto * 100, logica.width(), logica.height(),
+                      "compatta" if piccolo else "normale"))
+        else:
+            esito(OK, "Schermo senza ingrandimento",
+                  "modalita' interfaccia: {}".format(
+                      "compatta" if piccolo else "normale"))
+    except Exception as e:
+        esito(ATTENZIONE, "Non e' stato possibile misurare l'ingrandimento dello schermo", e)
+
+
 def verifica_interfaccia():
     titolo_sezione("6. L'INTERFACCIA (linguette e schermo)")
 
@@ -406,6 +455,8 @@ def verifica_interfaccia():
         scrivi()
     except Exception:
         pass
+
+    _controllo_ingrandimento_schermo(applicazione)
 
     # Le finestre vengono create su un database temporaneo VUOTO: cosi' la
     # prova non tocca in alcun modo i dati veri.

@@ -193,6 +193,44 @@ class TestPyQt5NelPythonSbagliato(unittest.TestCase):
                 os.remove(os.path.join(RADICE, nome))
 
 
+class TestIngrandimentoDelloSchermo(unittest.TestCase):
+    """Su Windows si puo' chiedere di ingrandire testo e finestre al 125% o al
+    150%, e sui portatili e' quasi sempre cosi'. Il programma non dice a Qt
+    come comportarsi, quindi Qt riferisce una risoluzione ridotta e
+    ui/responsive.py decide le misure su quella.
+
+    E' la spiegazione piu' probabile dei difetti grafici che comparivano su un
+    computer e non su un altro. Qui non si corregge: si MISURA, perche' la
+    correzione va decisa sapendo cosa riferiscono davvero le postazioni."""
+
+    def tearDown(self):
+        finto_qt._Application.ingrandimento = 1.0
+        for nome in os.listdir(RADICE):
+            if nome.startswith("VERIFICA_") and nome.endswith(".txt"):
+                os.remove(os.path.join(RADICE, nome))
+
+    def test_schermo_normale_nessuna_segnalazione(self):
+        finto_qt._Application.ingrandimento = 1.0
+        testo, _e = esegui_verifica()
+        self.assertIn("Schermo senza ingrandimento", testo)
+
+    def test_schermo_ingrandito_viene_segnalato_con_la_percentuale(self):
+        finto_qt._Application.ingrandimento = 1.5
+        testo, _e = esegui_verifica()
+        self.assertIn("Lo schermo e' ingrandito da Windows", testo)
+        self.assertIn("150%", testo,
+                      "deve riportare la percentuale esatta, non solo che c'e'")
+
+    def test_non_spaventa_l_utente(self):
+        """E' un dato da raccogliere, non un guasto: il programma funziona."""
+        finto_qt._Application.ingrandimento = 1.25
+        testo, esiti = esegui_verifica()
+        stati = {titolo: stato for stato, titolo in esiti}
+        self.assertEqual(stati.get("Lo schermo e' ingrandito da Windows"), "ATTENZIONE",
+                         "non e' un errore bloccante")
+        self.assertIn("non impedisce di lavorare", testo)
+
+
 class TestRobustezza(unittest.TestCase):
     """Un controllo che si pianta a meta' non serve a nessuno."""
 

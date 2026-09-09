@@ -273,10 +273,16 @@ class _Application(_Base):
     def instance(cls):
         return cls._istanza
 
+    # Ingrandimento di Windows (125%, 150%...) che il finto schermo riferisce.
+    # I test lo cambiano per provare i computer con lo schermo ingrandito.
+    ingrandimento = 1.0
+
     @staticmethod
     def primaryScreen():
         schermo = _Base()
         schermo.availableGeometry = lambda: _Geometria()
+        schermo.geometry = lambda: _Geometria()
+        schermo.devicePixelRatio = lambda: _Application.ingrandimento
         return schermo
 
     @staticmethod
