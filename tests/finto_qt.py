@@ -353,6 +353,16 @@ class _TabBar(_Base):
     def __init__(self, *args, **kwargs):
         super().__init__()
         self._testi = []
+        # Come in Qt: la barra disegna la propria "base" (la riga sotto le
+        # linguette, che prosegue per tutta la larghezza) se non le si dice
+        # di smettere.
+        self._base = True
+
+    def setDrawBase(self, disegna):
+        self._base = bool(disegna)
+
+    def drawBase(self):
+        return self._base
 
     def addTab(self, testo):
         self._testi.append(testo)

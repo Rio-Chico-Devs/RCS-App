@@ -285,11 +285,18 @@ class MainWindowUIComponents:
         window_instance.btn_anagrafica_clienti.setStyleSheet(style_secondary)
         window_instance.btn_anagrafica_clienti.clicked.connect(window_instance.apri_anagrafica_clienti)
 
-        # Separatore
+        # Separatore fra le azioni principali e le impostazioni.
+        #
+        # Era una linea "incassata" (QFrame.Sunken): in quello stile Qt la
+        # disegna con i colori scuri della tavolozza di sistema e ignora il
+        # colore chiaro impostato qui accanto - per questo si vedeva marcata
+        # invece che appena accennata.
+        #
+        # Adesso e' un rettangolo alto un punto, del colore che decidiamo noi.
         sep = QFrame()
-        sep.setFrameShape(QFrame.HLine)
-        sep.setFrameShadow(QFrame.Sunken)
-        sep.setStyleSheet("color: #e2e8f0;")
+        sep.setFrameShape(QFrame.NoFrame)
+        sep.setFixedHeight(1)
+        sep.setStyleSheet("background-color: #edf2f7; border: none;")
 
         # Pulsante Impostazioni di archiviazione (stato dati, copie, database)
         window_instance.btn_cambia_database = QPushButton("Impostazioni di archiviazione")

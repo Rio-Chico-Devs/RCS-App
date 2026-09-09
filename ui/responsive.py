@@ -25,11 +25,20 @@ class BarraLinguette(QTabBar):
     quindi il difetto si vede su alcuni computer e non su altri.
 
     Qui la larghezza viene ricalcolata sul testo effettivo, con un margine per
-    il riempimento laterale, e non e' mai inferiore a quella proposta da Qt."""
+    il riempimento laterale, e non e' mai inferiore a quella proposta da Qt.
+
+    Si occupa anche della RIGA che continuava a comparire sotto le linguette e
+    proseguiva verso destra oltre l'ultima: si chiama "base" della barra e la
+    disegna QTabBar stessa, per tutta la propria larghezza. Non ha niente a che
+    fare con il bordo del riquadro del contenuto - per questo toglierlo dal
+    foglio di stile non bastava, ed e' rimasta li' per tre tentativi.
+    La documentazione Qt: "se drawBase e' true la barra disegna una base,
+    altrimenti vengono disegnate solo le linguette"."""
 
     def __init__(self, margine=90, pixel_carattere=13, grassetto=True, parent=None):
         super().__init__(parent)
         self._margine = margine
+        self.setDrawBase(False)               # niente riga sotto le linguette
         # Il carattere della barra deve essere lo STESSO che il foglio di stile
         # disegnera' (dimensione e grassetto): se si misura con un carattere
         # piu' piccolo, il testo disegnato non ci sta e viene tagliato.
@@ -66,6 +75,7 @@ def adatta_linguette(tab_widget, margine=90, pixel_carattere=13, grassetto=True)
         try:
             tab_widget.tabBar().setElideMode(Qt.ElideNone)
             tab_widget.tabBar().setUsesScrollButtons(False)
+            tab_widget.tabBar().setDrawBase(False)
         except Exception:
             pass
     return tab_widget

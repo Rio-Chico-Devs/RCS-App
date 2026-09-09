@@ -377,6 +377,8 @@ def verifica_interfaccia():
 
     problemi_linguette = []
     linguette_misurate = 0
+    barre_con_riga = []          # barre che disegnano ancora la propria "base"
+    barre_controllate = 0
     for nome, costruttore in finestre:
         try:
             finestra = costruttore()
@@ -389,6 +391,16 @@ def verifica_interfaccia():
             barre = finestra.findChildren(__import__("PyQt5.QtWidgets",
                                                      fromlist=["QTabBar"]).QTabBar)
             for barra in barre:
+                # La riga che prosegue verso destra sotto le linguette: la
+                # disegna QTabBar da se', non il foglio di stile. E' proprio il
+                # difetto che dall'ambiente di sviluppo non si poteva vedere,
+                # perche' li' PyQt5 non gira ed e' Qt a disegnarla.
+                barre_controllate += 1
+                try:
+                    if barra.drawBase():
+                        barre_con_riga.append(nome)
+                except Exception:
+                    pass
                 metriche = barra.fontMetrics()
                 for indice in range(barra.count()):
                     testo = barra.tabText(indice)
@@ -408,6 +420,17 @@ def verifica_interfaccia():
         except Exception as e:
             esito(ATTENZIONE, "Non e' stato possibile provare la finestra '{}'".format(nome),
                   "{}: {}".format(type(e).__name__, e))
+
+    if barre_con_riga:
+        esito(ATTENZIONE, "Sotto le linguette viene ancora disegnata una riga",
+              "Finestre interessate: {}\n\n"
+              "E' la \"base\" della barra delle linguette: prosegue verso destra "
+              "oltre l'ultima\ne le fa sembrare legate. Si spegne dal codice, "
+              "non dal foglio di stile.\nSegnalalo all'assistenza."
+              .format(", ".join(sorted(set(barre_con_riga)))))
+    elif barre_controllate:
+        esito(OK, "Nessuna riga sotto le linguette",
+              "{} barre controllate".format(barre_controllate))
 
     if problemi_linguette:
         esito(ERRORE, "Il testo di alcune linguette NON ci sta",

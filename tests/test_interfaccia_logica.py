@@ -611,6 +611,39 @@ class TestTutteLeFinestre(BaseInterfaccia):
                       "il messaggio deve dire chiaramente che il database è danneggiato")
 
 
+class TestRigaSottoLeLinguette(BaseInterfaccia):
+    """La riga che proseguiva verso destra oltre l'ultima linguetta.
+
+    Non veniva dal riquadro del contenuto - ed e' per questo che toglierne il
+    bordo dal foglio di stile non e' bastato per tre tentativi. La disegna
+    QTabBar da se', per tutta la propria larghezza: si chiama "base" della
+    barra e si spegne solo dal codice, con setDrawBase(False)."""
+
+    def test_la_barra_non_disegna_la_propria_base(self):
+        from ui.responsive import BarraLinguette
+        self.assertFalse(BarraLinguette().drawBase(),
+                         "con la base accesa ricompare la riga sotto le linguette")
+
+    def test_in_tutte_le_finestre_con_linguette(self):
+        """Vale poco correggerlo in una sola: la riga si vedeva in tutte."""
+        from ui.gestione_materiali_window import GestioneMaterialiWindow
+        from ui.impostazioni_archiviazione_window import ImpostazioniArchiviazioneWindow
+        from ui.magazzino_window import MagazzinoWindow
+
+        finestre = [
+            ("Magazzino", lambda: MagazzinoWindow(self.gestore), "tabs"),
+            ("Gestione Materiali", lambda: GestioneMaterialiWindow(self.gestore), "tab_widget"),
+            ("Impostazioni di archiviazione",
+             lambda: ImpostazioniArchiviazioneWindow(self.gestore, None), "schede"),
+        ]
+        for nome, costruttore, attributo in finestre:
+            with self.subTest(finestra=nome):
+                finestra = costruttore()
+                barra = getattr(finestra, attributo).tabBar()
+                self.assertFalse(barra.drawBase(),
+                                 "in '%s' la barra disegna ancora la sua riga" % nome)
+
+
 class TestLinguette(BaseInterfaccia):
 
     def test_la_barra_calcola_una_larghezza_sufficiente(self):
