@@ -253,8 +253,7 @@ class MainWindowBusinessLogic:
         scelta = finestra.clickedButton()
 
         if scelta is btn_continua:
-            precedente.raise_()
-            precedente.activateWindow()
+            MainWindowBusinessLogic.porta_in_primo_piano(precedente)
             return True
 
         if scelta is btn_chiudi:
@@ -808,6 +807,36 @@ class MainWindowBusinessLogic:
                     riaperti, quante, bozze.cartella_bozze()))
 
     @staticmethod
+    def porta_in_primo_piano(finestra):
+        """Riporta davvero una finestra già aperta davanti a tutte.
+
+        raise_() e activateWindow() da soli NON bastano su Windows: il sistema
+        impedisce a un programma di rubare il primo piano, e le due chiamate
+        vengono ignorate in silenzio. Il risultato e' che l'utente riclicca sul
+        pulsante e sembra non succedere nulla.
+
+        La sequenza completa: se e' ridotta a icona va ripristinata, poi
+        mostrata, alzata e attivata. Il breve passaggio "sempre in primo piano"
+        e' quello che convince Windows a portarla davvero davanti."""
+        try:
+            from PyQt5.QtCore import Qt
+            if finestra.isMinimized():
+                finestra.showNormal()
+            finestra.show()
+            try:
+                finestra.setWindowFlags(finestra.windowFlags() | Qt.WindowStaysOnTopHint)
+                finestra.show()
+                finestra.setWindowFlags(finestra.windowFlags() & ~Qt.WindowStaysOnTopHint)
+                finestra.show()
+            except Exception:
+                pass    # se non funziona restano raise_/activateWindow qui sotto
+            finestra.raise_()
+            finestra.activateWindow()
+            return True
+        except Exception:
+            return False
+
+    @staticmethod
     def apri_impostazioni_archiviazione(window_instance):
         """Apre la schermata unica per stato dei dati, copie di sicurezza e
         scelta del database."""
@@ -817,8 +846,7 @@ class MainWindowBusinessLogic:
         try:
             if esistente and esistente.isVisible():
                 esistente.aggiorna_tutto()
-                esistente.raise_()
-                esistente.activateWindow()
+                MainWindowBusinessLogic.porta_in_primo_piano(esistente)
                 return
         except RuntimeError:
             pass   # finestra già chiusa e distrutta da Qt

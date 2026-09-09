@@ -309,6 +309,146 @@ class TestImpostazioniArchiviazione(BaseInterfaccia):
 
 
 # ---------------------------------------------------------------------------
+# Riportare davanti una finestra gia' aperta
+# ---------------------------------------------------------------------------
+
+class FinestraSpia:
+    """Sta al posto di una finestra vera e annota le chiamate ricevute.
+
+    Serve per verificare la SEQUENZA, non il singolo metodo: e' proprio
+    l'ordine che fa la differenza fra una finestra che torna davvero davanti e
+    una che sembra ignorare il clic."""
+
+    def __init__(self, ridotta_a_icona=False):
+        self.chiamate = []
+        self._ridotta = ridotta_a_icona
+        self.flag = 0
+
+    def isMinimized(self):
+        return self._ridotta
+
+    def showNormal(self):
+        self.chiamate.append("showNormal")
+        self._ridotta = False
+
+    def show(self):
+        self.chiamate.append("show")
+
+    def windowFlags(self):
+        return self.flag
+
+    def setWindowFlags(self, valore):
+        self.flag = valore
+        self.chiamate.append("setWindowFlags")
+
+    def raise_(self):
+        self.chiamate.append("raise_")
+
+    def activateWindow(self):
+        self.chiamate.append("activateWindow")
+
+
+class FinestraDistrutta:
+    """Una finestra che Qt ha gia' buttato via: ogni chiamata esplode."""
+
+    def __getattr__(self, nome):
+        def esplode(*a, **k):
+            raise RuntimeError("wrapped C/C++ object has been deleted")
+        return esplode
+
+
+class TestRiportareDavanti(BaseInterfaccia):
+    """Il difetto segnalato dall'uso reale: con la schermata delle impostazioni
+    gia' aperta, ricliccare sul pulsante nella home sembrava non fare nulla.
+
+    Su Windows raise_() e activateWindow() da soli vengono ignorati (il sistema
+    impedisce di rubare il primo piano), e la finestra restava dietro."""
+
+    def test_riclicco_non_apre_una_seconda_finestra(self):
+        MainWindowBusinessLogic.apri_impostazioni_archiviazione(self.finestra)
+        prima = self.finestra.impostazioni_archiviazione_window
+        MainWindowBusinessLogic.apri_impostazioni_archiviazione(self.finestra)
+
+        self.assertIs(self.finestra.impostazioni_archiviazione_window, prima,
+                      "deve riusare la finestra gia' aperta, non crearne un'altra")
+
+    def test_riclicco_la_riporta_davanti_e_aggiorna_i_dati(self):
+        MainWindowBusinessLogic.apri_impostazioni_archiviazione(self.finestra)
+        esistente = self.finestra.impostazioni_archiviazione_window
+
+        alzate, aggiornate = [], []
+        esistente.aggiorna_tutto = lambda: aggiornate.append(True)
+        originale = MainWindowBusinessLogic.porta_in_primo_piano
+        MainWindowBusinessLogic.porta_in_primo_piano = staticmethod(
+            lambda f: alzate.append(f))
+        try:
+            MainWindowBusinessLogic.apri_impostazioni_archiviazione(self.finestra)
+        finally:
+            MainWindowBusinessLogic.porta_in_primo_piano = originale
+
+        self.assertEqual(alzate, [esistente],
+                         "ricliccare deve riportare davanti la finestra gia' aperta")
+        self.assertTrue(aggiornate, "e mostrarne i dati aggiornati, non quelli vecchi")
+
+    def test_se_e_stata_chiusa_ne_apre_una_nuova(self):
+        MainWindowBusinessLogic.apri_impostazioni_archiviazione(self.finestra)
+        prima = self.finestra.impostazioni_archiviazione_window
+        prima.isVisible = lambda: False          # l'utente l'ha chiusa
+
+        MainWindowBusinessLogic.apri_impostazioni_archiviazione(self.finestra)
+        self.assertIsNot(self.finestra.impostazioni_archiviazione_window, prima,
+                         "chiusa la finestra, il pulsante deve riaprirla")
+
+    def test_continua_la_compilazione_riporta_davanti_il_preventivo(self):
+        MainWindowBusinessLogic.apri_preventivo(self.finestra)
+        aperta = finestre_preventivo.aperte()[0]
+
+        alzate = []
+        originale = MainWindowBusinessLogic.porta_in_primo_piano
+        MainWindowBusinessLogic.porta_in_primo_piano = staticmethod(
+            lambda f: alzate.append(f))
+        try:
+            finto_qt.RispostaAutomatica.scelta_pulsante = 1   # "Continua la compilazione"
+            MainWindowBusinessLogic.apri_preventivo(self.finestra)
+        finally:
+            MainWindowBusinessLogic.porta_in_primo_piano = originale
+
+        self.assertEqual(alzate, [aperta],
+                         "'Continua la compilazione' deve mostrare la schermata di prima")
+
+    def test_la_sequenza_finisce_con_alza_e_attiva(self):
+        finestra = FinestraSpia()
+        self.assertTrue(MainWindowBusinessLogic.porta_in_primo_piano(finestra))
+
+        self.assertEqual(finestra.chiamate[-2:], ["raise_", "activateWindow"])
+        self.assertIn("show", finestra.chiamate,
+                      "senza show() la finestra non ricompare")
+
+    def test_non_lascia_la_finestra_sempre_in_primo_piano(self):
+        """Il passaggio 'sempre davanti' serve solo a convincere Windows: se
+        restasse attivo, la finestra coprirebbe tutto per sempre."""
+        finestra = FinestraSpia()
+        MainWindowBusinessLogic.porta_in_primo_piano(finestra)
+
+        self.assertEqual(finestra.flag, 0, "il flag 'sempre in primo piano' va tolto")
+        ultimo_flag = len(finestra.chiamate) - 1 - finestra.chiamate[::-1].index("setWindowFlags")
+        ultimo_show = len(finestra.chiamate) - 1 - finestra.chiamate[::-1].index("show")
+        self.assertGreater(ultimo_show, ultimo_flag,
+                           "dopo aver cambiato i flag Qt nasconde la finestra: "
+                           "va rimostrata, altrimenti sparisce")
+
+    def test_ripristina_la_finestra_ridotta_a_icona(self):
+        finestra = FinestraSpia(ridotta_a_icona=True)
+        MainWindowBusinessLogic.porta_in_primo_piano(finestra)
+        self.assertEqual(finestra.chiamate[0], "showNormal",
+                         "se e' ridotta a icona va prima ripristinata")
+
+    def test_con_una_finestra_gia_distrutta_non_esplode(self):
+        self.assertFalse(MainWindowBusinessLogic.porta_in_primo_piano(FinestraDistrutta()),
+                         "deve rispondere 'non ci sono riuscito', non far saltare il programma")
+
+
+# ---------------------------------------------------------------------------
 # Linguette
 # ---------------------------------------------------------------------------
 
