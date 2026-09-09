@@ -154,6 +154,18 @@ class _Base(metaclass=_MetaPermissiva):
     def selectionModel(self):
         return None
 
+    def findChildren(self, tipo, *args, **kwargs):
+        """Cerca fra gli oggetti creati dentro questa finestra."""
+        trovati = []
+        for valore in vars(self).values():
+            if isinstance(valore, tipo):
+                trovati.append(valore)
+            elif isinstance(valore, _TabWidget):
+                barra = valore.tabBar()
+                if isinstance(barra, tipo):
+                    trovati.append(barra)
+        return trovati
+
     def currentItem(self):
         return None
 
@@ -241,6 +253,10 @@ class _Application(_Base):
         super().__init__()
         _Application._istanza = self
 
+    @classmethod
+    def instance(cls):
+        return cls._istanza
+
     @staticmethod
     def primaryScreen():
         schermo = _Base()
@@ -281,10 +297,64 @@ class _Size(_Base):
     def height(self): return self._a
 
 
-class _TabBar(_Base):
+class _Rettangolo(_Base):
+    def __init__(self, larghezza=0, altezza=0):
+        super().__init__()
+        self._l, self._a = larghezza, altezza
+
+    def width(self): return self._l
+    def height(self): return self._a
+
+
+class _TabWidget(_Base):
+    """Contenitore a schede: tiene davvero la sua barra, così le prove possono
+    misurarne le linguette come farebbe Qt vero."""
+
     def __init__(self, *args, **kwargs):
         super().__init__()
-        self._conteggio = 0
+        self._barra = _TabBar()
+
+    def setTabBar(self, barra):
+        self._barra = barra
+
+    def tabBar(self):
+        return self._barra
+
+    def addTab(self, contenuto, testo=""):
+        return self._barra.addTab(testo)
+
+    def count(self):
+        return self._barra.count()
+
+    def tabText(self, indice):
+        return self._barra.tabText(indice)
+
+
+class _TabBar(_Base):
+    """Barra delle linguette. Tiene i testi aggiunti e sa dire quanto spazio
+    occuperebbero, così si può provare il controllo del testo tagliato."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self._testi = []
+
+    def addTab(self, testo):
+        self._testi.append(testo)
+        return len(self._testi) - 1
+
+    def count(self):
+        return len(self._testi)
+
+    def tabText(self, indice):
+        try:
+            return self._testi[indice]
+        except IndexError:
+            return ""
+
+    def tabRect(self, indice):
+        """Larghezza effettiva della linguetta: si usa la stessa regola del
+        programma, così se un giorno cambiasse, la prova la seguirebbe."""
+        return _Rettangolo(self.tabSizeHint(indice).width(), 30)
 
     def tabSizeHint(self, indice):
         return _Size(50, 30)
@@ -319,10 +389,12 @@ def installa():
     widgets["QMessageBox"] = _MessageBox
     widgets["QApplication"] = _Application
     widgets["QTabBar"] = _TabBar
+    widgets["QTabWidget"] = _TabWidget
 
     core = {n: type(n, (_Base,), {}) for n in
             ["QDate", "QDir", "QPointF", "QRectF", "QSizeF", "QUrl"]}
     core["QSize"] = _Size
+    core["QT_VERSION_STR"] = "5.15.0-finto"
     core["QTimer"] = _Timer
     core["pyqtSignal"] = pyqtSignal
     # Qt eredita da _Base per avere anche lui le costanti "qualunque"

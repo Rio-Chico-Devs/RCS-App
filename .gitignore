@@ -221,3 +221,7 @@ data/backup/sicurezza/
 data/backup/corrotti/
 sessioni_attive.json
 logs/
+
+# Esiti della verifica dell'installazione (generati sul PC dell'utente)
+VERIFICA_*.txt
+segnalazione_RCS_*.zip
