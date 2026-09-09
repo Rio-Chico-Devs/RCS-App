@@ -1,20 +1,51 @@
 @echo off
+setlocal EnableDelayedExpansion
 echo ========================================
 echo Creazione eseguibile Gestione Preventivi
 echo ========================================
 echo.
 
-echo [1/4] Installazione dipendenze Python...
-pip install pyinstaller
-pip install PyQt5
-pip install PyQt5-sip
-pip install odfpy
-pip install reportlab
+rem ----------------------------------------------------------------
+rem  Su questo computer ci sono piu' versioni di Python, e i pacchetti
+rem  installati in una NON si vedono dalle altre. Scrivendo solo
+rem  "python" si prende la prima che capita: e' gia' successo con
+rem  VERIFICA.bat, partito con la 3.11 mentre il programma gira con la
+rem  3.13. Qui sarebbe peggio: si compilerebbe l'eseguibile con
+rem  l'interprete sbagliato, o l'installazione dei pacchetti finirebbe
+rem  in un Python diverso da quello che poi compila.
+rem
+rem  Si cerca quindi il Python che ha DAVVERO PyQt5 e si usa quello per
+rem  tutto, con "-m pip" e "-m PyInstaller": cosi' non c'e' modo che
+rem  qualche pezzo finisca altrove.
+rem ----------------------------------------------------------------
+set "PYEXE="
+for %%C in ("py -3.13" "py -3.12" "py -3.11" "py -3" "py" "python") do (
+    if not defined PYEXE (
+        %%~C -c "import PyQt5" >nul 2>&1
+        if !errorlevel! equ 0 set "PYEXE=%%~C"
+    )
+)
+if not defined PYEXE (
+    echo Nessun Python con PyQt5 gia' installato: uso quello predefinito
+    echo e lo installo io.
+    set "PYEXE=python"
+)
+echo Interprete usato per la compilazione: %PYEXE%
+%PYEXE% -c "import sys; print('   versione:', sys.version.split()[0]); print('   percorso:', sys.executable)"
+echo.
+
+echo [1/5] Installazione dipendenze Python...
+%PYEXE% -m pip install pyinstaller
+%PYEXE% -m pip install PyQt5
+%PYEXE% -m pip install PyQt5-sip
+%PYEXE% -m pip install odfpy
+%PYEXE% -m pip install reportlab
 
 echo.
-echo [2/4] Verifica dipendenze...
-python -c "import PyQt5; print('PyQt5 OK')"
-python -c "import sqlite3; print('sqlite3 OK')"
+echo [2/5] Verifica dipendenze...
+%PYEXE% -c "import PyQt5; print('PyQt5 OK')"
+%PYEXE% -c "import sqlite3; print('sqlite3 OK')"
+%PYEXE% -c "import PyInstaller; print('PyInstaller OK')"
 
 echo.
 echo [3/5] Creazione eseguibile...
@@ -23,7 +54,7 @@ rem solito li trova da solo, ma diversi vengono importati DENTRO le funzioni
 rem e non in cima al file: se ne mancasse uno, l'eseguibile si creerebbe
 rem senza errori e si pianterebbe solo al momento di usare quella funzione,
 rem magari mesi dopo. Elencarli non costa nulla e toglie il dubbio.
-pyinstaller --onefile --windowed --name="GestionePreventivi" ^
+%PYEXE% -m PyInstaller --onefile --windowed --name="GestionePreventivi" ^
     --hidden-import=PyQt5 ^
     --hidden-import=PyQt5.QtWidgets ^
     --hidden-import=PyQt5.QtCore ^
@@ -82,9 +113,17 @@ echo [5/5] Completato!
 echo.
 echo L'eseguibile si trova in: dist\GestionePreventivi.exe
 echo.
-echo IMPORTANTE: prima di distribuirlo, avvialo una volta e apri
-echo "Impostazioni di archiviazione": se quella schermata si apre e
-echo mostra lo stato dei dati, vuol dire che tutti i moduli sono
-echo stati inclusi correttamente.
+echo ATTENZIONE, l'errore piu' facile da fare adesso:
+echo.
+echo   NON avviare l'eseguibile da dentro la cartella "dist".
+echo   Da li' non trova la configurazione e ti chiede dove sta il
+echo   database, come fosse una installazione nuova.
+echo.
+echo   Copialo PRIMA nella cartella dell'applicazione, accanto a
+echo   config.json e alla cartella data, e avvialo da li'.
+echo.
+echo Poi apri "Impostazioni di archiviazione": se mostra il percorso
+echo giusto del database e il numero di preventivi che ti aspetti,
+echo l'eseguibile e' a posto.
 echo.
 pause
