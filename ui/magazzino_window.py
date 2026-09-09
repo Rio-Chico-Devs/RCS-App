@@ -126,29 +126,37 @@ class MagazzinoWindow(QMainWindow):
             QComboBox:hover {
                 border-color: #a0aec0;
             }
+            /* Linguette come pulsanti distinti: bordo chiuso su tutti e
+               quattro i lati, angoli arrotondati e spazio fra l'una e
+               l'altra. Prima erano aperte in basso e quasi attaccate, e i
+               bordi di due linguette vicine formavano una riga scura che le
+               faceva sembrare un blocco unico. */
             QTabWidget::pane {
                 border: none;
+                background-color: transparent;
+            }
+            QTabBar {
                 background-color: transparent;
             }
             QTabBar::tab {
                 background-color: #f7fafc;
                 color: #4a5568;
                 border: 1px solid #e2e8f0;
-                border-bottom: none;
-                border-radius: 6px 6px 0 0;
-                padding: 8px 24px;
+                border-radius: 6px;
+                padding: 8px 20px;
                 font-size: 13px;
                 font-weight: 600;
                 font-family: system-ui, -apple-system, sans-serif;
-                margin-right: 4px;
+                margin-right: 8px;
+                margin-bottom: 6px;
                 min-width: 110px;
             }
             QTabBar::tab:selected {
                 background-color: #ffffff;
                 color: #2d3748;
-                border-color: #e2e8f0;
+                border: 1px solid #a0aec0;
             }
-            QTabBar::tab:hover {
+            QTabBar::tab:!selected:hover {
                 background-color: #edf2f7;
             }
             QTableWidget {

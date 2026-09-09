@@ -38,14 +38,18 @@ def _std_label(text):
 
 _BASE_STYLE = """
     QMainWindow { background-color: #fafbfc; }
+    /* Linguette come pulsanti distinti: vedi la nota in magazzino_window.py */
     QTabWidget::pane { border: none; background: transparent; }
+    QTabBar { background: transparent; }
     QTabBar::tab {
-        background: #edf2f7; color: #4a5568;
-        border-radius: 6px 6px 0 0; padding: 10px 20px;
-        font-size: 14px; font-weight: 600;
-        margin-right: 4px; min-width: 140px;
+        background: #f7fafc; color: #4a5568;
+        border: 1px solid #e2e8f0; border-radius: 6px;
+        padding: 9px 20px; font-size: 14px; font-weight: 600;
+        margin-right: 8px; margin-bottom: 6px; min-width: 140px;
     }
-    QTabBar::tab:selected { background: #ffffff; color: #2d3748; }
+    QTabBar::tab:selected { background: #ffffff; color: #2d3748;
+                            border: 1px solid #a0aec0; }
+    QTabBar::tab:!selected:hover { background: #edf2f7; }
     QLabel { color: #2d3748; font-family: system-ui, -apple-system, sans-serif;
              font-size: 14px; font-weight: 500; }
     QGroupBox { font-size: 16px; font-weight: 600; color: #4a5568;

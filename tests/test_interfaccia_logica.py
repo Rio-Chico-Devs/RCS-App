@@ -309,6 +309,101 @@ class TestImpostazioniArchiviazione(BaseInterfaccia):
 
 
 # ---------------------------------------------------------------------------
+# Totali che non si riescono a calcolare
+# ---------------------------------------------------------------------------
+
+class MaterialeGuasto:
+    """Un materiale con un dato non numerico, come potrebbe arrivare da una
+    bozza di recupero rovinata."""
+    maggiorazione = None
+    scarto_mm2 = 0.0
+    materiale_nome = "guasto"
+
+    def to_dict(self):
+        return {}
+
+
+class TestTotaliNonCalcolabili(BaseInterfaccia):
+    """Prima, se il ricalcolo andava in errore, l'errore veniva ingoiato e sullo
+    schermo restavano i totali del calcolo PRECEDENTE: indistinguibili da quelli
+    giusti. Nell'eseguibile compilato nemmeno il messaggio d'errore arrivava da
+    qualche parte, perché non ha una console.
+
+    Il rimedio non è avvisare e basta: è fare in modo che al posto del totale
+    NON ci sia un numero da leggere."""
+
+    def _schermata(self):
+        from ui.preventivo_window import PreventivoWindow
+        return PreventivoWindow(self.gestore, None, modalita='nuovo')
+
+    def test_il_modello_dice_se_il_calcolo_e_riuscito(self):
+        from models.preventivo import Preventivo
+        p = Preventivo()
+        p.costi_accessori, p.minuti_taglio, p.costo_totale_materiali = 10.0, 20.0, 30.0
+        self.assertTrue(p.ricalcola_tutto())
+        self.assertEqual(p.preventivo_finale, 37.5)
+        self.assertIsNone(p.errore_calcolo)
+
+        p.materiali_calcolati = [MaterialeGuasto()]
+        self.assertFalse(p.ricalcola_tutto(), "il calcolo non può riuscire")
+        self.assertIn("TypeError", p.errore_calcolo or "")
+
+    def test_al_posto_del_totale_non_resta_un_numero(self):
+        finestra = self._schermata()
+        finestra.aggiorna_totali()
+        self.assertIn("€", finestra.lbl_preventivo_finale.text(),
+                      "con dati validi il totale si vede normalmente")
+
+        finestra.preventivo.materiali_calcolati = [MaterialeGuasto()]
+        finestra.aggiorna_totali()
+
+        for nome in ("lbl_subtotale", "lbl_maggiorazione_25", "lbl_preventivo_finale"):
+            testo = getattr(finestra, nome).text()
+            self.assertEqual(testo, "—",
+                             "%s mostra ancora '%s': un numero rimasto lì viene "
+                             "creduto buono" % (nome, testo))
+
+    def test_lavviso_spiega_cosa_sta_succedendo(self):
+        finestra = self._schermata()
+        finestra.preventivo.materiali_calcolati = [MaterialeGuasto()]
+        finestra.aggiorna_totali()
+
+        self.assertTrue(finestra.lbl_avviso_calcolo.isVisible())
+        avviso = finestra.lbl_avviso_calcolo.text()
+        self.assertIn("Non è stato possibile calcolare i totali", avviso)
+        self.assertIn("non può essere salvato", avviso,
+                      "deve dire anche che il salvataggio è bloccato")
+
+    def test_lavviso_sparisce_quando_il_calcolo_torna_a_funzionare(self):
+        finestra = self._schermata()
+        finestra.preventivo.materiali_calcolati = [MaterialeGuasto()]
+        finestra.aggiorna_totali()
+        self.assertTrue(finestra.lbl_avviso_calcolo.isVisible())
+
+        finestra.preventivo.materiali_calcolati = []
+        finestra.aggiorna_totali()
+        self.assertFalse(finestra.lbl_avviso_calcolo.isVisible())
+        self.assertIn("€", finestra.lbl_preventivo_finale.text())
+
+    def test_non_si_puo_salvare_un_preventivo_senza_totali(self):
+        """La parte che conta davvero: senza questo, il preventivo verrebbe
+        registrato con gli importi del calcolo precedente."""
+        finestra = self._schermata()
+        finestra.preventivo.materiali_calcolati = [MaterialeGuasto()]
+
+        salvati = []
+        self.gestore.save_preventivo = lambda dati: salvati.append(dati)
+        finto_qt.RispostaAutomatica.dialoghi_mostrati = []
+
+        finestra.salva_preventivo()
+
+        self.assertEqual(salvati, [], "non deve essere salvato niente")
+        testi = " ".join(finto_qt.RispostaAutomatica.dialoghi_mostrati)
+        self.assertIn("non sono calcolabili", testi,
+                      "l'utente deve sapere perché non è stato salvato")
+
+
+# ---------------------------------------------------------------------------
 # Riportare davanti una finestra gia' aperta
 # ---------------------------------------------------------------------------
 

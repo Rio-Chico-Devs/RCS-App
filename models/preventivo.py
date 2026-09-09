@@ -1,3 +1,6 @@
+import logging
+
+
 class Preventivo:
     def __init__(self):
         self.materiali_calcolati = []  # Lista di MaterialeCalcolato
@@ -17,6 +20,9 @@ class Preventivo:
         self.costo_orario = 0.0
         self.costo_totale_manodopera = 0.0  # Usato dalla UI per visualizzare il costo
         self.costo_totale_finale = 0.0      # Usato dalla UI per visualizzare il totale
+
+        # Motivo dell'ultimo calcolo fallito (None = totali validi)
+        self.errore_calcolo = None
     
     def aggiungi_materiale(self, materiale_calcolato):
         """Aggiunge un materiale calcolato al preventivo"""
@@ -79,7 +85,19 @@ class Preventivo:
         return self.scarto_totale_mm2
 
     def ricalcola_tutto(self):
-        """Ricalcola tutti i valori del preventivo"""
+        """Ricalcola tutti i valori del preventivo.
+
+        Ritorna True se i totali sono validi, False se il calcolo non e'
+        riuscito; in quel caso il motivo resta in self.errore_calcolo.
+
+        Perche' il valore di ritorno conta: prima l'errore veniva ingoiato e
+        il calcolo si fermava a meta'. I totali di PRIMA restavano dov'erano,
+        sullo schermo e in memoria, indistinguibili da quelli giusti. Chi
+        guardava vedeva un numero e lo credeva aggiornato; nell'eseguibile
+        compilato nemmeno il messaggio d'errore arrivava da qualche parte.
+        Adesso chi chiama sa che quei numeri non valgono e puo' cancellarli
+        invece di mostrarli."""
+        self.errore_calcolo = None
         try:
             self.ricalcola_costo_totale_materiali()
             self.ricalcola_scarto_totale()
@@ -87,9 +105,12 @@ class Preventivo:
             self.calcola_subtotale()
             self.calcola_maggiorazione_25()
             self.calcola_preventivo_finale()
+            return True
         except Exception as e:
-            import sys
-            print(f"[Preventivo.ricalcola_tutto] errore di calcolo: {e}", file=sys.stderr)
+            self.errore_calcolo = "{}: {}".format(type(e).__name__, e)
+            logging.getLogger('rcs').error(
+                "Calcolo del preventivo non riuscito: %s", self.errore_calcolo)
+            return False
     
     def to_dict(self):
         """Converte il preventivo in dizionario per il salvataggio"""

@@ -1,3 +1,6 @@
+import logging
+
+
 class Materiale:
     def __init__(self, nome="", spessore=0.0, prezzo=0.0, fornitore="", prezzo_fornitore=0.0, capacita_magazzino=0.0, giacenza=0.0):
         self.nome = nome
@@ -48,6 +51,9 @@ class MaterialeCalcolato:
         # Posa tela: '==' 0°, '\\' 45° sin, '//' 45° des, '||' 90°
         self.posa = '=='
 
+        # Motivo dell'ultimo calcolo fallito (None = tutto a posto)
+        self.errore_calcolo = None
+
     @property
     def stratifica(self):
         """Alias per sviluppo - per compatibilità con codice esistente"""
@@ -94,16 +100,30 @@ class MaterialeCalcolato:
         return self.maggiorazione
 
     def ricalcola_tutto(self):
-        """Ricalcola tutti i valori derivati"""
+        """Ricalcola tutti i valori derivati.
+
+        Ritorna True se il calcolo e' riuscito, False altrimenti; in caso di
+        errore il motivo resta in self.errore_calcolo.
+
+        Prima l'errore veniva soltanto stampato e il calcolo proseguiva: i
+        valori vecchi restavano al loro posto e sembravano aggiornati. Nel
+        programma compilato quella stampa non arrivava da nessuna parte
+        (l'eseguibile non ha console), quindi l'errore spariva del tutto.
+        Chi chiama deve sapere che i numeri NON sono validi."""
+        self.errore_calcolo = None
         try:
             self.calcola_diametro_finale()
             self.calcola_sviluppo()
             self.calcola_lunghezza_utilizzata()
             self.calcola_costo_totale()
             self.calcola_maggiorazione()
+            return True
         except Exception as e:
-            import sys
-            print(f"[MaterialeCalcolato.ricalcola_tutto] errore di calcolo: {e}", file=sys.stderr)
+            self.errore_calcolo = "{}: {}".format(type(e).__name__, e)
+            logging.getLogger('rcs').error(
+                "Calcolo del materiale '%s' non riuscito: %s",
+                self.materiale_nome or "(senza nome)", self.errore_calcolo)
+            return False
 
     def to_dict(self):
         """Converte l'oggetto in dizionario per il salvataggio"""

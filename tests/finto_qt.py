@@ -110,12 +110,28 @@ class _Base(metaclass=_MetaPermissiva):
     def __ge__(self, altro):
         return self._VALORE >= altro
 
-    # metodi che devono restituire qualcosa di sensato
+    # ATTENZIONE: qui NON si puo' usare getattr(self, nome, predefinito).
+    # __getattr__ qui sopra risponde a QUALUNQUE attributo mancante, quindi il
+    # valore predefinito non entra mai in gioco e si riceve un _Base al posto
+    # di una stringa. Si legge direttamente da __dict__.
     def isVisible(self):
-        return True
+        return self.__dict__.get("_visibile", True)
+
+    def show(self):
+        self._visibile = True
+
+    def hide(self):
+        self._visibile = False
+
+    # Le etichette devono RICORDARE il testo che ricevono: senza, non si puo'
+    # provare cosa l'utente legge sullo schermo - per esempio se al posto di
+    # un totale non calcolabile compare un trattino invece del numero vecchio.
+    def setText(self, testo):
+        self._testo = testo
 
     def text(self):
-        return ""
+        memorizzato = self.__dict__.get("_testo", "")
+        return memorizzato if isinstance(memorizzato, str) else ""
 
     def currentText(self):
         return ""

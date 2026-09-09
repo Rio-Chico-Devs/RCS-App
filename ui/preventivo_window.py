@@ -838,6 +838,25 @@ class PreventivoWindow(QMainWindow):
     
     def create_totals_summary(self, parent_layout):
         """Riepilogo totali"""
+        # Avviso: compare SOLO se i totali non sono calcolabili. Meglio uno
+        # spazio vuoto con una spiegazione che un numero vecchio che sembra
+        # buono.
+        self.lbl_avviso_calcolo = QLabel("")
+        self.lbl_avviso_calcolo.setWordWrap(True)
+        self.lbl_avviso_calcolo.setStyleSheet("""
+            QLabel {
+                background-color: #fffaf0;
+                border: 1px solid #f6ad55;
+                border-radius: 6px;
+                color: #7b341e;
+                font-size: 13px;
+                font-weight: 600;
+                padding: 10px;
+            }
+        """)
+        self.lbl_avviso_calcolo.hide()
+        parent_layout.addWidget(self.lbl_avviso_calcolo)
+
         # Totali intermedi
         self.create_summary_row("Subtotale:", "lbl_subtotale", "€ 0,00", parent_layout)
         self.create_summary_row("Maggiorazione 25%:", "lbl_maggiorazione_25", "€ 0,00", parent_layout)
@@ -1132,7 +1151,17 @@ class PreventivoWindow(QMainWindow):
         self.preventivo.minuti_imballaggio = self.edit_minuti_imballaggio.value()
         
         # Ricalcola totali
-        self.preventivo.ricalcola_tutto()
+        if not self.preventivo.ricalcola_tutto():
+            self.mostra_totali_non_calcolabili()
+            QMessageBox.critical(
+                self, "Impossibile salvare",
+                "I totali di questo preventivo non sono calcolabili, quindi il "
+                "salvataggio è stato annullato.\n\n"
+                "Salvarlo adesso significherebbe registrare gli importi del "
+                "calcolo precedente, che non corrispondono ai dati attuali.\n\n"
+                "Controlla i materiali inseriti e riprova.\n\n"
+                "Dettaglio tecnico: {}".format(self.preventivo.errore_calcolo))
+            return
         
         try:
             # Unisci dati preventivo con dati cliente
@@ -1178,7 +1207,17 @@ class PreventivoWindow(QMainWindow):
         self.preventivo.minuti_imballaggio = self.edit_minuti_imballaggio.value()
         
         # Ricalcola totali
-        self.preventivo.ricalcola_tutto()
+        if not self.preventivo.ricalcola_tutto():
+            self.mostra_totali_non_calcolabili()
+            QMessageBox.critical(
+                self, "Impossibile salvare",
+                "I totali di questo preventivo non sono calcolabili, quindi il "
+                "salvataggio è stato annullato.\n\n"
+                "Salvarlo adesso significherebbe registrare gli importi del "
+                "calcolo precedente, che non corrispondono ai dati attuali.\n\n"
+                "Controlla i materiali inseriti e riprova.\n\n"
+                "Dettaglio tecnico: {}".format(self.preventivo.errore_calcolo))
+            return
         
         try:
             # Unisci dati preventivo con dati cliente
@@ -1501,17 +1540,45 @@ class PreventivoWindow(QMainWindow):
         self.preventivo.minuti_rettifica = self.edit_minuti_rettifica.value()
         self.preventivo.minuti_imballaggio = self.edit_minuti_imballaggio.value()
         
-        self.preventivo.ricalcola_tutto()
-        
+        if not self.preventivo.ricalcola_tutto():
+            self.mostra_totali_non_calcolabili()
+            return
+
+        self.lbl_avviso_calcolo.hide()
+
         # Aggiorna interfaccia
         self.lbl_tot_mano_opera.setText(f"{self.preventivo.tot_mano_opera:.2f} min")
         self.lbl_subtotale.setText(f"€ {self.preventivo.subtotale:,.2f}")
         self.lbl_maggiorazione_25.setText(f"€ {self.preventivo.maggiorazione_25:,.2f}")
         self.lbl_preventivo_finale.setText(f"€ {self.preventivo.preventivo_finale:,.2f}")
-        
+
         # Aggiorna prezzo cliente se vuoto
         if self.modalita != 'visualizza' and self.edit_prezzo_cliente.value() == 0:
             self.edit_prezzo_cliente.setValue(self.preventivo.preventivo_finale)
+
+    def mostra_totali_non_calcolabili(self):
+        """Toglie i totali dallo schermo e dice perché.
+
+        Il punto non è avvisare: è fare in modo che NON ci sia un numero da
+        leggere. Finché al posto del totale c'è un importo, quell'importo
+        viene creduto - e prima restava lì quello del calcolo precedente."""
+        for etichetta in (self.lbl_subtotale, self.lbl_maggiorazione_25,
+                          self.lbl_preventivo_finale):
+            try:
+                etichetta.setText("—")
+            except Exception:
+                pass
+        try:
+            self.lbl_tot_mano_opera.setText("—")
+        except Exception:
+            pass
+        self.lbl_avviso_calcolo.setText(
+            "Non è stato possibile calcolare i totali: controlla i dati dei "
+            "materiali.\n"
+            "I numeri non vengono mostrati apposta, per non farti leggere un "
+            "importo sbagliato. Il preventivo non può essere salvato finché "
+            "il calcolo non riesce.")
+        self.lbl_avviso_calcolo.show()
     
     def aggiorna_prezzi_materiali(self):
         """Aggiorna prezzi materiali dal database"""

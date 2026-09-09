@@ -43,27 +43,27 @@ class ImpostazioniArchiviazioneWindow(QMainWindow):
         self.setStyleSheet(f"""
             QMainWindow, QWidget {{ background-color: #ffffff; color: {COLORE_TESTO}; }}
             QLabel {{ color: {COLORE_TESTO}; }}
-            /* Le linguette: separate fra loro e senza la riga scura che le
-               univa in un blocco unico. La linguetta scelta scende di un
-               pixel sopra il riquadro, così si legge come "attaccata" al suo
-               contenuto invece che tagliata da una linea. */
+            /* Linguette come pulsanti distinti: bordo chiuso su tutti e
+               quattro i lati, angoli arrotondati e spazio fra l'una e
+               l'altra. Prima erano aperte in basso e i bordi di due
+               linguette vicine formavano una riga scura che le faceva
+               sembrare un blocco unico. */
             QTabWidget::pane {{
-                border: 1px solid {COLORE_BORDO}; border-radius: 6px;
-                top: -1px;
+                border: none; background: transparent;
             }}
             QTabBar {{ background: transparent; }}
             QTabBar::tab {{
                 background: #f7fafc; border: 1px solid {COLORE_BORDO};
-                border-radius: 6px 6px 0 0;
-                padding: 9px 22px; font-size: 13px; font-weight: 600;
+                border-radius: 6px;
+                padding: 8px 20px; font-size: 13px; font-weight: 600;
                 min-width: 140px;
-                margin-right: 6px;
-                margin-bottom: 0px;
+                margin-right: 8px;
+                margin-bottom: 6px;
                 color: {COLORE_TENUE};
             }}
             QTabBar::tab:selected {{
                 background: #ffffff; color: {COLORE_TESTO};
-                border-bottom: 1px solid #ffffff;
+                border: 1px solid #a0aec0;
             }}
             QTabBar::tab:!selected:hover {{ background: #edf2f7; }}
             QPushButton {{
