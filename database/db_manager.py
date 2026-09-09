@@ -186,8 +186,21 @@ class DatabaseManager:
         poco se un altro computer sta scrivendo).
 
         La connessione si chiude da sola all'uscita dal blocco 'with', così il
-        file non resta aperto più del necessario su una cartella condivisa."""
+        file non resta aperto più del necessario su una cartella condivisa.
+
+        isolation_level='IMMEDIATE': le scritture chiedono il permesso di
+        scrivere SUBITO, non a metà strada. Il comportamento predefinito è
+        l'opposto (si comincia come lettura e si "promuove" al primo
+        salvataggio) e ha un difetto documentato: se nel frattempo un altro
+        computer ha scritto, SQLite risponde "occupato" e in quel punto
+        NON aspetta, perché l'attesa non è applicabile a metà transazione.
+        Dichiarandolo dall'inizio, l'attesa dei 20 secondi qui sopra funziona
+        davvero e due postazioni non possono bloccarsi a vicenda.
+
+        Le semplici letture non sono toccate: la libreria apre una transazione
+        solo prima di una scrittura."""
         return sqlite3.connect(self.db_path, timeout=TIMEOUT_CONNESSIONE,
+                               isolation_level="IMMEDIATE",
                                factory=_ConnessioneChiusaAlTermine)
 
     def _registra_conflitto(self, operazione, tentativo, fallito=False):

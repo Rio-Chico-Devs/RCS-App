@@ -14,6 +14,7 @@ Esegui con:  python -m unittest tests.test_archivio -v
 import os
 import shutil
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -61,6 +62,13 @@ class BaseArchivio(unittest.TestCase):
         bm.cartella_app = self._orig_app
         bm._esito_avvio_cache.clear()
         shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _conta_preventivi(self, percorso):
+        conn = sqlite3.connect(percorso)
+        try:
+            return conn.execute("SELECT COUNT(*) FROM preventivi").fetchone()[0]
+        finally:
+            conn.close()
 
     def _crea_backup(self, quando=None, preventivi=5, cartella=None, prefisso=None):
         quando = quando or datetime.now()
@@ -118,13 +126,6 @@ class TestElencoBackup(BaseArchivio):
 # ---------------------------------------------------------------------------
 
 class TestRipristino(BaseArchivio):
-
-    def _conta_preventivi(self, percorso):
-        conn = sqlite3.connect(percorso)
-        try:
-            return conn.execute("SELECT COUNT(*) FROM preventivi").fetchone()[0]
-        finally:
-            conn.close()
 
     def test_ripristino_riuscito(self):
         backup = self._crea_backup(preventivi=42)
@@ -206,6 +207,130 @@ class TestRipristino(BaseArchivio):
         self.assertIn("rimesso al suo posto", messaggio)
         self.assertEqual(self._conta_preventivi(self.db), 10,
                          "deve essere tornato al database di prima")
+
+
+# ---------------------------------------------------------------------------
+# Ripristino con una scrittura interrotta in sospeso
+# ---------------------------------------------------------------------------
+
+# Dimensioni scelte perche' RIPRODUCONO il difetto: con un backup di poche
+# pagine il journal rimasto non fa danni visibili e la prova sarebbe muta.
+PREVENTIVI_NEL_DATABASE = 600
+PREVENTIVI_NEL_BACKUP = 300
+
+
+def crea_journal_caldo(percorso_db):
+    """Lascia accanto al database un file di appoggio DAVVERO recuperabile,
+    come dopo uno spegnimento improvviso a metà di un salvataggio.
+
+    Il dettaglio che conta: la cache viene forzata a svuotarsi durante la
+    transazione. Senza, SQLite tiene tutto in memoria e scrive il database
+    solo alla conferma; il file di appoggio resta inerte e la prova non
+    riprodurrebbe la situazione vera (ci sono cascato: il primo tentativo
+    sembrava dimostrare che il problema non esisteva)."""
+    figlio = (
+        "import sqlite3, os\n"
+        "c = sqlite3.connect(%r, isolation_level=None)\n"
+        "c.execute('PRAGMA cache_size=10')\n"
+        "c.execute('PRAGMA synchronous=FULL')\n"
+        "c.execute('BEGIN IMMEDIATE')\n"
+        "c.execute(\"UPDATE preventivi SET nota='MODIFICATA'\")\n"
+        "os._exit(9)\n" % percorso_db)
+    subprocess.run([sys.executable, "-c", figlio],
+                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    appoggio = percorso_db + "-journal"
+    if not os.path.exists(appoggio):
+        return False
+    with open(appoggio, "rb") as f:
+        return f.read(8) == b"\xd9\xd5\x05\xf9\x20\xa1\x63\xd7"   # "caldo"
+
+
+class TestRipristinoConScritturaInSospesa(BaseArchivio):
+    """Il caso peggiore, e quello più probabile: si ripristina un backup
+    PROPRIO PERCHE' c'è stato un arresto improvviso, quindi accanto al
+    database c'è ancora il file di appoggio di quella scrittura.
+
+    SQLite lo dice esplicitamente: sostituendo il database bisogna assicurarsi
+    che non restino i suoi file di appoggio. Se restano, alla prima apertura
+    vengono riversati sopra il database appena ripristinato.
+
+    Misurato prima della correzione: ripristinando un backup da 300 preventivi
+    se ne ottenevano 306, e integrity_check rispondeva "ok". Dati sbagliati che
+    nessun controllo segnalava.
+
+    La dimensione del backup NON e' un dettaglio: con una copia molto piccola
+    (poche pagine) il danno non si vede, e la prima versione di questi test
+    passava identica con e senza la correzione - cioe' non provava nulla. I
+    numeri qui sotto sono quelli che riproducono il difetto davvero."""
+
+    def setUp(self):
+        super().setUp()
+        # servono abbastanza dati da far svuotare la cache durante la scrittura
+        os.remove(self.db)
+        crea_db(self.db, preventivi=PREVENTIVI_NEL_DATABASE, clienti=4)
+
+    def test_il_ripristino_non_lascia_file_di_appoggio(self):
+        if not crea_journal_caldo(self.db):
+            self.skipTest("non è stato possibile riprodurre la scrittura interrotta")
+        backup = self._crea_backup(preventivi=PREVENTIVI_NEL_BACKUP)
+
+        riuscito, messaggio, _copia = archivio.ripristina_backup(self.db, backup)
+
+        self.assertTrue(riuscito, messaggio)
+        for suffisso in archivio.SUFFISSI_APPOGGIO:
+            self.assertFalse(os.path.exists(self.db + suffisso),
+                             "il file di appoggio %s non deve restare accanto "
+                             "al database ripristinato" % suffisso)
+
+    def test_dopo_il_ripristino_ci_sono_i_dati_del_backup_e_basta(self):
+        """La verifica che conta davvero: non 'è integro', ma 'contiene
+        ESATTAMENTE quello che c'era nel backup'."""
+        if not crea_journal_caldo(self.db):
+            self.skipTest("non è stato possibile riprodurre la scrittura interrotta")
+        backup = self._crea_backup(preventivi=PREVENTIVI_NEL_BACKUP)
+
+        riuscito, messaggio, _copia = archivio.ripristina_backup(self.db, backup)
+        self.assertTrue(riuscito, messaggio)
+
+        self.assertEqual(self._conta_preventivi(self.db), PREVENTIVI_NEL_BACKUP,
+                         "devono esserci i %d preventivi del backup: né uno in "
+                         % PREVENTIVI_NEL_BACKUP +
+                         "più (righe riversate dalla scrittura interrotta) né "
+                         "uno in meno")
+        conn = sqlite3.connect(self.db)
+        modificate = conn.execute(
+            "SELECT count(*) FROM preventivi WHERE nota='MODIFICATA'").fetchone()[0]
+        conn.close()
+        self.assertEqual(modificate, 0,
+                         "nel database ripristinato non deve entrare nulla "
+                         "della scrittura interrotta")
+
+    def test_la_copia_messa_da_parte_e_coerente(self):
+        """Anche il database messo da parte deve essere leggibile: è quello a
+        cui si tornerebbe se il ripristino andasse storto."""
+        if not crea_journal_caldo(self.db):
+            self.skipTest("non è stato possibile riprodurre la scrittura interrotta")
+        backup = self._crea_backup(preventivi=PREVENTIVI_NEL_BACKUP)
+
+        _riuscito, _messaggio, copia = archivio.ripristina_backup(self.db, backup)
+        self.assertIsNotNone(copia, "il database precedente va sempre conservato")
+
+        integro, messaggio, _ms = bm.verifica_integrita(copia)
+        self.assertTrue(integro, "la copia di sicurezza non è leggibile: %s" % messaggio)
+        conn = sqlite3.connect(copia)
+        quanti = conn.execute("SELECT count(*) FROM preventivi").fetchone()[0]
+        modificate = conn.execute(
+            "SELECT count(*) FROM preventivi WHERE nota='MODIFICATA'").fetchone()[0]
+        conn.close()
+        self.assertEqual(quanti, PREVENTIVI_NEL_DATABASE,
+                         "la copia deve contenere i dati di prima")
+        # Il controllo vero: la scrittura interrotta non era stata confermata,
+        # quindi non deve comparire da nessuna parte. Se compare, la copia e'
+        # una fotografia scattata a meta' di un'operazione - e sarebbe proprio
+        # quella a cui torneremmo se il ripristino andasse storto.
+        self.assertEqual(modificate, 0,
+                         "la copia messa da parte contiene una scrittura mai "
+                         "confermata: è stata copiata a metà operazione")
 
 
 # ---------------------------------------------------------------------------

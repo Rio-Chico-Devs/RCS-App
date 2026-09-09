@@ -90,6 +90,132 @@ class TestVerificaIntegrita(BaseTemp):
 
 
 # ---------------------------------------------------------------------------
+# Il punto cieco di quick_check, e il controllo approfondito settimanale
+# ---------------------------------------------------------------------------
+
+def sballa_gli_indici(percorso):
+    """Lascia le pagine intatte ma rende un indice incoerente con la tabella.
+
+    E' il difetto che quick_check NON vede, per sua stessa definizione: non
+    verifica che il contenuto degli indici corrisponda a quello delle tabelle.
+    Il trucco: si nasconde l'indice dallo schema, si modificano le righe (SQLite
+    non lo aggiorna perche' non sa che esiste) e poi lo si rimette."""
+    conn = sqlite3.connect(percorso)
+    conn.execute("CREATE TABLE clienti (id INTEGER PRIMARY KEY, nome TEXT)")
+    conn.execute("CREATE INDEX i_nome ON clienti(nome)")
+    conn.executemany("INSERT INTO clienti (nome) VALUES (?)",
+                     [("Cliente %04d" % i,) for i in range(500)])
+    conn.commit()
+    riga = conn.execute("SELECT type,name,tbl_name,rootpage,sql FROM sqlite_master "
+                        "WHERE name='i_nome'").fetchone()
+    conn.execute("PRAGMA writable_schema=ON")
+    conn.execute("DELETE FROM sqlite_master WHERE name='i_nome'")
+    conn.commit(); conn.close()
+
+    conn = sqlite3.connect(percorso)          # schema ricaricato: l'indice non c'e'
+    conn.execute("UPDATE clienti SET nome='RIO CHICO' WHERE id<=100")
+    conn.commit(); conn.close()
+
+    conn = sqlite3.connect(percorso)
+    conn.execute("PRAGMA writable_schema=ON")
+    conn.execute("INSERT INTO sqlite_master (type,name,tbl_name,rootpage,sql) "
+                 "VALUES (?,?,?,?,?)", riga)
+    conn.commit(); conn.close()
+    return percorso
+
+
+class TestControlloApprofondito(BaseTemp):
+    """Perche' esiste il controllo settimanale.
+
+    quick_check, che gira a ogni avvio, dichiara esplicitamente di non
+    verificare la corrispondenza fra indici e tabelle. Un database con gli
+    indici sballati lo supera senza fiatare, e da quel momento certe ricerche
+    danno risultati incompleti senza che nessuno se ne accorga: qui sotto una
+    ricerca che dovrebbe trovare 100 clienti ne trova 0, e il controllo di ogni
+    avvio dice che va tutto bene."""
+
+    def test_quick_check_non_vede_gli_indici_sballati(self):
+        sballa_gli_indici(self.db)
+        ok, messaggio, _ = bm.verifica_integrita(self.db)
+        self.assertTrue(ok, "e' il punto cieco documentato di quick_check: se un "
+                            "giorno lo rilevasse, il controllo settimanale non "
+                            "servirebbe piu' e questo test va rivisto")
+        self.assertEqual(messaggio, "ok")
+
+        conn = sqlite3.connect(self.db)
+        trovati = conn.execute(
+            "SELECT count(*) FROM clienti WHERE nome='RIO CHICO'").fetchone()[0]
+        conn.close()
+        self.assertEqual(trovati, 0,
+                         "ed ecco il danno concreto: i clienti ci sono ma la "
+                         "ricerca non li trova")
+
+    def test_il_controllo_approfondito_li_trova(self):
+        sballa_gli_indici(self.db)
+        ok, messaggio, _ = bm.verifica_integrita(self.db, approfondita=True)
+        self.assertFalse(ok, "integrity_check deve accorgersene")
+        self.assertIn("index", messaggio)
+
+    def test_su_un_database_sano_passa(self):
+        crea_db_valido(self.db)
+        ok, messaggio, _ = bm.verifica_integrita(self.db, approfondita=True)
+        self.assertTrue(ok, messaggio)
+
+    def test_si_fa_la_prima_volta_e_poi_non_per_una_settimana(self):
+        os.makedirs(self.backup_dir, exist_ok=True)
+        self.assertTrue(bm._serve_controllo_approfondito(self.backup_dir),
+                        "mai fatto: si deve fare")
+
+        crea_db_valido(self.db)
+        bm.esegui_backup_avvio(self.db)
+        self.assertTrue(os.path.exists(
+            os.path.join(self.backup_dir, bm.NOME_DIARIO_APPROFONDITO)),
+            "deve restare traccia di quando e' stato fatto")
+
+        self.assertFalse(bm._serve_controllo_approfondito(self.backup_dir),
+                         "appena fatto: non si rifa' a ogni apertura")
+        fra_una_settimana = datetime.now() + timedelta(
+            days=bm.GIORNI_TRA_CONTROLLI_APPROFONDITI + 1)
+        self.assertTrue(bm._serve_controllo_approfondito(self.backup_dir, fra_una_settimana),
+                        "passata la settimana si rifa'")
+
+    def test_se_fallisce_avvisa_e_non_cancella_niente(self):
+        """Regola costante: davanti a un problema non si cancella nulla. Le
+        copie piu' vecchie potrebbero essere le ultime senza il difetto."""
+        crea_db_valido(self.db)
+        os.makedirs(self.backup_dir, exist_ok=True)
+        vecchi = []
+        for giorni in (40, 80, 120, 200):
+            percorso = os.path.join(self.backup_dir,
+                                    nome_backup(datetime.now() - timedelta(days=giorni)))
+            crea_db_valido(percorso, righe=10)
+            vecchi.append(percorso)
+
+        originale = bm.verifica_integrita
+
+        def controllo_finto(percorso, approfondita=False):
+            if approfondita:
+                return False, "integrity_check: row 1 missing from index i_nome", 1.0
+            return originale(percorso)
+
+        bm.verifica_integrita = controllo_finto
+        try:
+            bm._esito_avvio_cache.clear()
+            esito = bm.esegui_backup_avvio(self.db)
+        finally:
+            bm.verifica_integrita = originale
+            bm._esito_avvio_cache.clear()
+
+        self.assertIsNotNone(esito["avviso"], "l'utente deve essere avvisato")
+        self.assertIn("ricerca", esito["avviso"].lower(),
+                      "il messaggio deve dire cosa cambia per chi lavora")
+        for percorso in vecchi:
+            self.assertTrue(os.path.exists(percorso),
+                            "con un problema aperto la rotazione va sospesa: "
+                            "%s non doveva essere cancellato" % os.path.basename(percorso))
+
+
+# ---------------------------------------------------------------------------
 # Backup all'avvio
 # ---------------------------------------------------------------------------
 

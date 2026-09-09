@@ -90,24 +90,37 @@ def _connessione_sola_lettura(db_path):
         return sqlite3.connect(db_path, timeout=TIMEOUT_SQLITE)
 
 
-def verifica_integrita(db_path):
+def verifica_integrita(db_path, approfondita=False):
     """Controlla che il file sia un database SQLite sano.
 
-    Ritorna (ok, messaggio, millisecondi). Usa quick_check: piu' veloce di
-    integrity_check e sufficiente a rilevare le corruzioni di pagina, che sono
-    quelle causate dalle scritture interrotte."""
+    Ritorna (ok, messaggio, millisecondi).
+
+    Normalmente usa quick_check: veloce, e rileva le corruzioni di pagina -
+    quelle causate dalle scritture interrotte, come il danno del 3 settembre.
+    Va bene a ogni avvio, anche su una cartella di rete lenta.
+
+    Ma quick_check ha un punto cieco dichiarato: NON verifica che il contenuto
+    degli indici corrisponda a quello delle tabelle, ne' i vincoli di unicita'.
+    Un database con gli indici sballati lo supera senza fiatare, e da quel
+    momento certe ricerche restituirebbero risultati incompleti senza che
+    nessuno se ne accorga. 'approfondita=True' usa integrity_check, che
+    controlla anche quello: piu' lento, quindi si usa una volta a settimana e
+    non a ogni apertura."""
     inizio = datetime.now()
     if not db_path or not os.path.exists(db_path):
         return False, "file inesistente", 0.0
 
+    controllo = "integrity_check" if approfondita else "quick_check(1)"
+    etichetta = "integrity_check" if approfondita else "quick_check"
     conn = None
     try:
         conn = _connessione_sola_lettura(db_path)
-        esito = conn.execute("PRAGMA quick_check(1)").fetchone()
+        esito = conn.execute("PRAGMA " + controllo).fetchone()
         durata = (datetime.now() - inizio).total_seconds() * 1000
         if esito and esito[0] == "ok":
             return True, "ok", durata
-        return False, "quick_check: {}".format(esito[0] if esito else "nessun esito"), durata
+        return False, "{}: {}".format(
+            etichetta, esito[0] if esito else "nessun esito"), durata
     except Exception as e:
         durata = (datetime.now() - inizio).total_seconds() * 1000
         return False, "{}: {}".format(type(e).__name__, e), durata
@@ -347,13 +360,18 @@ def applica_retention(cartella_backup, adesso=None):
 
 
 def _limita_numero_file(cartella, prefisso, massimo):
-    """Tiene solo i 'massimo' file piu' recenti con quel prefisso."""
+    """Tiene solo i 'massimo' file piu' recenti con quel prefisso.
+
+    Insieme al file elimina i suoi file di appoggio: da soli non servono a
+    nulla e resterebbero li' per sempre (in quarantena vengono conservati
+    accanto al database corrotto)."""
     file_lista = elenca_backup(cartella, prefisso)
     for _ts, nome in file_lista[massimo:]:
-        try:
-            os.remove(os.path.join(cartella, nome))
-        except Exception:
-            pass
+        for suffisso in ("", "-journal", "-wal", "-shm"):
+            try:
+                os.remove(os.path.join(cartella, nome + suffisso))
+            except Exception:
+                pass
 
 
 def trova_ultimo_backup_valido(cartella_backup):
@@ -455,6 +473,53 @@ def _copia_verificata(sorgente, destinazione):
 
 
 ORE_TRA_COPIE_PROTETTE = 24
+GIORNI_TRA_CONTROLLI_APPROFONDITI = 7
+NOME_DIARIO_APPROFONDITO = "ultimo_controllo_approfondito.txt"
+
+
+def _serve_controllo_approfondito(cartella_backup, adesso=None):
+    """True se e' passata piu' di una settimana dall'ultimo controllo completo."""
+    adesso = adesso or datetime.now()
+    segnalibro = os.path.join(cartella_backup, NOME_DIARIO_APPROFONDITO)
+    try:
+        with open(segnalibro, "r", encoding="utf-8") as f:
+            ultimo = datetime.strptime(f.read().strip()[:19], "%Y-%m-%dT%H:%M:%S")
+    except Exception:
+        return True      # mai fatto, o segnalibro illeggibile: si fa
+    return (adesso - ultimo) > timedelta(days=GIORNI_TRA_CONTROLLI_APPROFONDITI)
+
+
+def _controllo_approfondito(percorso_backup, cartella_backup, esito):
+    """Controllo settimanale completo, fatto sulla COPIA appena creata.
+
+    Sulla copia e non sul database in uso per due motivi: e' identica (viene
+    dal meccanismo di copia di SQLite) e nessun altro computer la sta usando,
+    quindi il controllo non rallenta nessuno e non tiene occupato il file
+    condiviso."""
+    log = _log()
+    ok, messaggio, durata = verifica_integrita(percorso_backup, approfondita=True)
+    esito["controllo_approfondito"] = messaggio
+    if ok:
+        log.info("Controllo approfondito settimanale: ok (%d ms)", durata)
+        try:
+            with open(os.path.join(cartella_backup, NOME_DIARIO_APPROFONDITO),
+                      "w", encoding="utf-8") as f:
+                f.write(datetime.now().strftime("%Y-%m-%dT%H:%M:%S"))
+        except Exception as e:
+            log.warning("Segnalibro del controllo approfondito non scritto (%s)", e)
+        return True
+
+    # Non e' un danno alle pagine (quello quick_check lo avrebbe visto): e'
+    # tipicamente un indice che non corrisponde piu' alla sua tabella.
+    log.error("CONTROLLO APPROFONDITO FALLITO: %s", messaggio)
+    esito["avviso"] = (
+        "Il controllo settimanale approfondito ha trovato un problema nel "
+        "database ({}).\n\n"
+        "I dati ci sono e il programma funziona, ma qualche ricerca potrebbe "
+        "dare risultati incompleti. Non è urgente come un danneggiamento, però "
+        "va sistemato: segnalalo all'assistenza.\n\n"
+        "Nessun backup è stato cancellato.".format(messaggio))
+    return False
 
 
 def _serve_copia_protetta(cartella_sicurezza):
@@ -556,8 +621,20 @@ def _avvio_database_sano(db_path, esito, cartelle):
         return esito
 
     esito["backup"] = destinazione
+    tutto_bene = True
+    if _serve_controllo_approfondito(cartelle["backup"]):
+        tutto_bene = _controllo_approfondito(destinazione, cartelle["backup"], esito)
+
     esito["copia_sicura"] = _proteggi_copia_buona(destinazione, cartelle["sicurezza"])
     _mirror_locale(destinazione)
+
+    if not tutto_bene:
+        # Regola costante di tutto il modulo: se qualcosa non torna, non si
+        # cancella niente. Le copie piu' vecchie potrebbero essere le ultime
+        # senza il problema appena trovato.
+        log.error("Rotazione dei backup sospesa: controllo approfondito fallito")
+        return esito
+
     tenuti, eliminati = applica_retention(cartelle["backup"])
     log.info("Backup creato: %s | conservati %d, eliminati %d",
              os.path.basename(destinazione), tenuti, eliminati)
@@ -575,6 +652,18 @@ def _metti_in_quarantena(db_path, cartella_corrotti):
         os.makedirs(cartella_corrotti, exist_ok=True)
         quarantena = _nome_univoco(cartella_corrotti, PREFISSO_CORROTTO)
         shutil.copy2(db_path, quarantena)
+        # I file di appoggio vanno conservati INSIEME al database: la
+        # documentazione di SQLite e' esplicita, da soli non dicono nulla ma
+        # accanto al loro database contengono le pagine dell'ultima scrittura
+        # interrotta - cioe' proprio i dati piu' recenti, quelli che servirebbe
+        # recuperare. Copiati, non spostati: l'originale non si tocca.
+        for suffisso in ("-journal", "-wal", "-shm"):
+            if os.path.exists(db_path + suffisso):
+                try:
+                    shutil.copy2(db_path + suffisso, quarantena + suffisso)
+                    log.error("In quarantena anche il file di appoggio %s", suffisso)
+                except Exception as e:
+                    log.error("Copia del file di appoggio %s non riuscita (%s)", suffisso, e)
         _limita_numero_file(cartella_corrotti, PREFISSO_CORROTTO, MAX_CORROTTI)
         log.error("Copia del file corrotto messa in quarantena: %s", quarantena)
         return quarantena

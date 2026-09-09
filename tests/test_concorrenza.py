@@ -47,6 +47,46 @@ class BaseDb(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
 
+class TestTransazioniImmediate(BaseDb):
+    """Le scritture devono dichiararsi tali fin dall'inizio.
+
+    Il comportamento predefinito della libreria e' l'opposto: la transazione
+    parte come lettura e viene "promossa" a scrittura al primo salvataggio. Se
+    nel frattempo un altro computer ha scritto, SQLite risponde "occupato" - e
+    in quel punto NON applica l'attesa configurata, perche' non e' applicabile a
+    meta' transazione. Con BEGIN IMMEDIATE l'attesa dei 20 secondi funziona
+    davvero, e due postazioni non possono bloccarsi a vicenda."""
+
+    def _istruzioni(self, azione):
+        viste = []
+        originale = self.gestore._connessione
+
+        def con_spia():
+            conn = originale()
+            conn.set_trace_callback(viste.append)
+            return conn
+
+        self.gestore._connessione = con_spia
+        try:
+            azione()
+        finally:
+            self.gestore._connessione = originale
+        return [i.strip().upper() for i in viste if i.strip().upper().startswith("BEGIN")]
+
+    def test_un_salvataggio_apre_una_transazione_immediata(self):
+        istruzioni = self._istruzioni(
+            lambda: self.gestore.add_preventivo(_dati_preventivo()))
+        self.assertIn("BEGIN IMMEDIATE", istruzioni,
+                      "senza IMMEDIATE l'attesa configurata non viene applicata")
+
+    def test_una_semplice_lettura_non_blocca_niente(self):
+        self.gestore.add_preventivo(_dati_preventivo())
+        istruzioni = self._istruzioni(self.gestore.get_all_preventivi)
+        self.assertEqual(istruzioni, [],
+                         "leggere non deve prendere il diritto di scrivere: "
+                         "bloccherebbe gli altri computer senza motivo")
+
+
 class TestAttesaConfigurata(BaseDb):
 
     def test_timeout_piu_lungo_del_predefinito(self):

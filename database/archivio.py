@@ -23,6 +23,46 @@ TABELLE_DA_CONTARE = ("preventivi", "clienti", "materiali", "movimenti_magazzino
 
 PREFISSO_PRIMA_RIPRISTINO = "materiali_PRIMA_DEL_RIPRISTINO_"
 
+# I file di appoggio che SQLite tiene ACCANTO al database.
+SUFFISSI_APPOGGIO = ("-journal", "-wal", "-shm")
+
+
+def _file_di_appoggio(db_path):
+    """I file di appoggio presenti in questo momento accanto al database."""
+    return [db_path + s for s in SUFFISSI_APPOGGIO if os.path.exists(db_path + s)]
+
+
+def _rimuovi_appoggi_orfani(db_path):
+    """Toglie i file di appoggio rimasti DOPO aver sostituito il database.
+
+    ATTENZIONE, la distinzione qui è tutto:
+
+    - cancellare il '-journal' di un database che si tiene è una delle cause di
+      danneggiamento elencate da SQLite, e non va MAI fatto;
+    - ma quando il file del database viene SOSTITUITO da un altro, quel
+      '-journal' descrive pagine di un database che non esiste più. Se resta
+      lì, alla prima apertura SQLite lo riversa sopra il database appena
+      ripristinato.
+
+    Non è teoria: provato: ripristinando un backup da 5 preventivi con accanto
+    il journal di un arresto improvviso si ottengono 8 preventivi, e
+    integrity_check risponde comunque "ok". Dati sbagliati che nessun controllo
+    segnala.
+
+    Per questo la funzione si chiama solo subito dopo la sostituzione del file,
+    mai in altri momenti."""
+    tolti = []
+    for percorso in _file_di_appoggio(db_path):
+        try:
+            os.remove(percorso)
+            tolti.append(os.path.basename(percorso))
+        except OSError as e:
+            _log().error("Non è stato possibile togliere %s (%s)", percorso, e)
+    if tolti:
+        _log().warning("Ripristino: tolti i file di appoggio del database "
+                       "precedente (%s)", ", ".join(tolti))
+    return tolti
+
 
 def _log():
     return logging.getLogger('rcs')
@@ -244,6 +284,22 @@ def ripristina_backup(db_path, percorso_backup, forza=False):
                 "toccato.".format(dettagli["messaggio"]),
                 None)
 
+    # Prima di mettere da parte il database attuale bisogna far completare a
+    # SQLite un'eventuale scrittura interrotta: altrimenti la copia che
+    # conserviamo sarebbe una fotografia scattata a metà di un'operazione, e
+    # sarebbe proprio quella a cui torneremmo se il ripristino fallisse.
+    # SQLite, finito il recupero, toglie da sé il file di appoggio.
+    if os.path.exists(db_path):
+        backup_manager.recupera_dopo_arresto(db_path)
+        if _file_di_appoggio(db_path):
+            return (False,
+                    "Il database ha una scrittura ancora in sospeso e non è "
+                    "stato possibile completarla: probabilmente un altro "
+                    "computer ci sta lavorando proprio adesso.\n\n"
+                    "Non è stato toccato nulla. Chiudi l'applicazione sugli "
+                    "altri computer e riprova fra qualche secondo.",
+                    None)
+
     # 2. Da parte il database attuale
     copia_precedente = None
     try:
@@ -263,6 +319,10 @@ def ripristina_backup(db_path, percorso_backup, forza=False):
     # 3. Ripristino vero e proprio
     try:
         shutil.copy2(percorso_backup, db_path)
+        # Subito dopo la sostituzione: gli eventuali file di appoggio rimasti
+        # appartengono al database di prima e vanno tolti (vedi la spiegazione
+        # in _rimuovi_appoggi_orfani).
+        _rimuovi_appoggi_orfani(db_path)
     except Exception as e:
         _annulla_ripristino(db_path, copia_precedente)
         return False, "Ripristino non riuscito ({}). Il database precedente è stato rimesso al suo posto.".format(e), copia_precedente
@@ -291,6 +351,7 @@ def _annulla_ripristino(db_path, copia_precedente):
         return False
     try:
         shutil.copy2(copia_precedente, db_path)
+        _rimuovi_appoggi_orfani(db_path)    # anche tornando indietro si sostituisce il file
         _log().error("Ripristino annullato: rimesso il database precedente")
         return True
     except Exception as e:
