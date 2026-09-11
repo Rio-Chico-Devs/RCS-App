@@ -67,6 +67,11 @@ class _Base(metaclass=_MetaPermissiva):
 
     def __init__(self, *args, **kwargs):
         self._figli = []
+        # Come in Qt: QLabel("ciao").text() risponde "ciao". Senza, un test che
+        # legge cosa c'e' scritto su un'etichetta trova sempre la stringa vuota
+        # e non prova niente.
+        if args and isinstance(args[0], str):
+            self._testo = args[0]
 
     def __getattr__(self, nome):
         # Deve valere sia per i metodi (widget.setText("x")) sia per i segnali

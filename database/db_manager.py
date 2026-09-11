@@ -39,6 +39,10 @@ class DatabaseOccupato(Exception):
     """Un altro computer sta scrivendo sul database in questo momento."""
 
 
+class DatabaseInSolaLettura(Exception):
+    """Si e' tentata una modifica mentre la modalità protetta e' attiva."""
+
+
 class _ConnessioneChiusaAlTermine(sqlite3.Connection):
     """Connessione che si CHIUDE davvero all'uscita dal blocco 'with'.
 
@@ -76,6 +80,15 @@ def riprova_se_occupato(operazione):
     def decoratore(funzione):
         @wraps(funzione)
         def involucro(self, *args, **kwargs):
+            if getattr(self, "modalita_protetta", False):
+                raise DatabaseInSolaLettura(
+                    "Il programma è aperto in MODALITÀ PROTETTA perché il "
+                    "database risulta danneggiato.\n\n"
+                    "Le modifiche sono bloccate apposta, per non peggiorare il "
+                    "danno. Si possono consultare i dati, non cambiarli.\n\n"
+                    "Per tornare a lavorare: apri 'Impostazioni di "
+                    "archiviazione' e scegli un database sano oppure ripristina "
+                    "una copia di sicurezza.")
             for tentativo in range(1, TENTATIVI_SCRITTURA + 1):
                 try:
                     return funzione(self, *args, **kwargs)
@@ -141,12 +154,25 @@ class DatabaseManager:
         self.verifica_dopo_scrittura = bool(config.get("verifica_dopo_scrittura", True))
         # True se il database è danneggiato al punto da non poter essere usato.
         self.database_inutilizzabile = False
+        # MODALITÀ PROTETTA: il database si legge ma non si tocca. Si attiva da
+        # sola quando il database risulta danneggiato, e si spegne quando se ne
+        # sceglie uno sano (il programma si riavvia e riparte normale).
+        self.modalita_protetta = False
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
         # IMPORTANTE: verifica e backup vanno PRIMA di init_database(). Su un
         # database danneggiato le migrazioni fallirebbero con un errore tecnico,
         # impedendo di mettere al sicuro i backup buoni e di avvisare l'utente.
         self._backup_database()
+
+        if self.modalita_protetta:
+            # Database rovinato: non si tocca. Niente init_database(), che
+            # creerebbe tabelle e colonne su un file gia' malato, e niente
+            # scritture di alcun tipo (ci pensa _connessione, qui sotto).
+            logging.getLogger('rcs').warning(
+                "MODALITA' PROTETTA attiva: database aperto in sola lettura (%s)",
+                self.db_path)
+            return
 
         try:
             self.init_database()
@@ -169,6 +195,8 @@ class DatabaseManager:
         try:
             esito = backup_manager.esegui_backup_avvio(self.db_path)
             self.avviso_integrita = esito.get("avviso")
+            if not esito.get("integro", True):
+                self.modalita_protetta = True
 
             # Rete di sicurezza in formato leggibile: una volta al mese i dati
             # vengono scritti anche in file apribili con Excel, che non
@@ -198,7 +226,17 @@ class DatabaseManager:
         davvero e due postazioni non possono bloccarsi a vicenda.
 
         Le semplici letture non sono toccate: la libreria apre una transazione
-        solo prima di una scrittura."""
+        solo prima di una scrittura.
+
+        In MODALITÀ PROTETTA il database viene aperto in SOLA LETTURA. È la
+        scelta piu' sicura possibile: nel programma ci sono 45 istruzioni di
+        scrittura sparse in decine di metodi, e proteggerle una per una
+        vorrebbe dire dimenticarne qualcuna. Cosi' invece e' SQLite stessa a
+        rifiutarle tutte, comprese quelle che venissero aggiunte domani."""
+        if self.modalita_protetta:
+            return sqlite3.connect(
+                backup_manager.uri_sola_lettura(self.db_path), uri=True,
+                timeout=TIMEOUT_CONNESSIONE, factory=_ConnessioneChiusaAlTermine)
         return sqlite3.connect(self.db_path, timeout=TIMEOUT_CONNESSIONE,
                                isolation_level="IMMEDIATE",
                                factory=_ConnessioneChiusaAlTermine)

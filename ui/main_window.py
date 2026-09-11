@@ -56,6 +56,12 @@ class MainWindow(QMainWindow):
         # Inizializzazione UI delegata al modulo
         MainWindowUIComponents.init_ui(self)
 
+        # Se il programma è partito in modalità protetta, deve VEDERSI sempre:
+        # un messaggio che si chiude e poi più niente lascerebbe credere di
+        # star lavorando normalmente, e i salvataggi fallirebbero senza che si
+        # capisca perché.
+        self.mostra_banner_modalita_protetta()
+
         # Se il controllo di integrità all'avvio ha rilevato un problema,
         # avvisa subito l'utente invece di lasciarlo lavorare su dati rovinati.
         if getattr(self.db_manager, "avviso_integrita", None):
@@ -72,6 +78,44 @@ class MainWindow(QMainWindow):
             # non si vede proporre il lavoro non salvato e non lo sa nessuno.
             logging.getLogger('rcs').error(
                 "Proposta di recupero delle bozze non riuscita: %s", e)
+
+    def mostra_banner_modalita_protetta(self):
+        """Fascia rossa in cima, se il programma è in sola lettura.
+
+        Resta sempre visibile: un avviso che si chiude e poi sparisce
+        lascerebbe credere di star lavorando normalmente, e i salvataggi
+        fallirebbero senza che si capisca perché."""
+        if not getattr(self.db_manager, "modalita_protetta", False):
+            return
+        try:
+            from PyQt5.QtWidgets import QLabel
+            banner = QLabel(
+                "⚠  MODALITÀ PROTETTA — il database risulta danneggiato, "
+                "quindi le modifiche sono bloccate.\n"
+                "Puoi consultare i dati ma non cambiarli. Per tornare a "
+                "lavorare apri «Impostazioni di archiviazione» e scegli un "
+                "database sano oppure ripristina una copia di sicurezza.")
+            banner.setWordWrap(True)
+            banner.setStyleSheet("""
+                QLabel {
+                    background-color: #fff5f5;
+                    border: 2px solid #fc8181;
+                    border-radius: 8px;
+                    color: #822727;
+                    font-size: 14px;
+                    font-weight: 600;
+                    padding: 12px 16px;
+                    margin: 0px 0px 8px 0px;
+                }
+            """)
+            contenitore = self.centralWidget()
+            disposizione = contenitore.layout() if contenitore is not None else None
+            if disposizione is not None:
+                disposizione.insertWidget(0, banner)
+            self.banner_modalita_protetta = banner
+        except Exception as e:
+            logging.getLogger('rcs').error(
+                "Banner della modalità protetta non mostrato: %s", e)
 
     def closeEvent(self, event):
         """Chiusura regolare: toglie questo PC dall'elenco delle sessioni aperte

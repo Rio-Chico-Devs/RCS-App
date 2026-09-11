@@ -577,7 +577,12 @@ class TestIntegrazioneDatabaseManager(BaseTemp):
         bm._esito_avvio_cache.clear()
 
         gestore = self._db_manager()   # non deve sollevare eccezioni
-        self.assertTrue(gestore.database_inutilizzabile)
+        # Prima il programma dichiarava il database "inutilizzabile" e si
+        # chiudeva. Adesso entra in MODALITÀ PROTETTA: si legge ma non si
+        # scrive, cosi' si puo' almeno consultare e stampare mentre si
+        # ripristina una copia.
+        self.assertTrue(gestore.modalita_protetta,
+                        "un database danneggiato deve far partire la modalità protetta")
         self.assertIsNotNone(gestore.avviso_integrita)
         self.assertFalse(buoni_prima - set(os.listdir(self.backup_dir)),
                          "nessun backup buono deve essere stato cancellato")

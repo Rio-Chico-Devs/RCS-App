@@ -266,7 +266,7 @@ def _come_procedere_col_database_danneggiato(base_dir, percorso_db, avviso):
     finestra.setWindowTitle("Database danneggiato")
     finestra.setText(testo)
     btn_scegli = finestra.addButton("Scegli un altro database", QMessageBox.AcceptRole)
-    btn_apri = finestra.addButton("Apri comunque, per ripristinare una copia",
+    btn_apri = finestra.addButton("Apri in sola lettura (modalità protetta)",
                                   QMessageBox.ActionRole)
     btn_chiudi = finestra.addButton("Chiudi il programma", QMessageBox.RejectRole)
     finestra.setDefaultButton(btn_scegli)
@@ -277,8 +277,10 @@ def _come_procedere_col_database_danneggiato(base_dir, percorso_db, avviso):
         return False
 
     if scelta is btn_apri:
-        # Il programma si apre lo stesso: da "Impostazioni di archiviazione" si
-        # puo' ripristinare una copia di sicurezza o cambiare database.
+        # Il programma si apre in MODALITÀ PROTETTA: i dati si leggono ma non si
+        # toccano (il database viene aperto in sola lettura). Serve quando non
+        # c'e' nessun database sano ne' un backup su cui contare: meglio poter
+        # almeno consultare e stampare, che restare fuori del tutto.
         return True
 
     return _scegli_un_altro_database(base_dir, percorso_db)
@@ -302,8 +304,9 @@ def _scegli_un_altro_database(base_dir, percorso_attuale):
         QMessageBox.warning(
             None, "Anche questo database e' danneggiato",
             "Il file scelto non e' utilizzabile ({}).\n\n"
-            "Il programma si apre comunque: da 'Impostazioni di archiviazione' "
-            "puoi ripristinare una copia di sicurezza.".format(messaggio))
+            "Il programma si apre in MODALITÀ PROTETTA: potrai consultare i "
+            "dati ma non modificarli, e da 'Impostazioni di archiviazione' "
+            "ripristinare una copia di sicurezza.".format(messaggio))
         return True
 
     try:
