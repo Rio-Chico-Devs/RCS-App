@@ -9,6 +9,7 @@ Version: 1.0.0
 Last Updated: 2026-02-16
 """
 
+import logging
 from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
                              QWidget, QLabel, QMessageBox, QGroupBox, QFrame,
                              QSizePolicy, QGraphicsDropShadowEffect, QScrollArea,
@@ -976,7 +977,40 @@ class MagazzinoWindow(QMainWindow):
         self.combo_periodo.addItem("Anno scorso", "anno_scorso")
         self.combo_periodo.addItem("Ultimi 3 mesi", "ultimi_3_mesi")
         self.combo_periodo.addItem("Ultimi 6 mesi", "ultimi_6_mesi")
+        self.combo_periodo.addItem("Ultimi 12 mesi", "ultimi_12_mesi")
+        self.combo_periodo.addItem("Tutto lo storico", "tutto")
         self.combo_periodo.currentIndexChanged.connect(self.carica_consumi)
+
+        # Gli altri tre filtri. Si combinano fra loro: si puo' chiedere
+        # "tutti gli scarichi di CK204 da FIBERTECH nell'ultimo anno".
+        lbl_tipo = QLabel("Tipo:")
+        lbl_tipo.setStyleSheet("font-weight: 600;")
+        self.combo_tipo_mov = QComboBox()
+        self.combo_tipo_mov.addItem("Tutti", None)
+        self.combo_tipo_mov.addItem("Solo carichi", "carico")
+        self.combo_tipo_mov.addItem("Solo scarichi", "scarico")
+        self.combo_tipo_mov.currentIndexChanged.connect(self.carica_consumi)
+
+        lbl_fornitore = QLabel("Fornitore:")
+        lbl_fornitore.setStyleSheet("font-weight: 600;")
+        self.combo_fornitore_mov = QComboBox()
+        self.combo_fornitore_mov.currentIndexChanged.connect(self.carica_consumi)
+
+        lbl_materiale = QLabel("Materiale:")
+        lbl_materiale.setStyleSheet("font-weight: 600;")
+        self.combo_materiale_mov = QComboBox()
+        self.combo_materiale_mov.currentIndexChanged.connect(self.carica_consumi)
+
+        self._riempi_filtri_movimenti()
+
+        btn_azzera = QPushButton("Azzera filtri")
+        btn_azzera.setStyleSheet("""
+            QPushButton { background-color: #f7fafc; color: #4a5568;
+                          border: 1px solid #e2e8f0; border-radius: 6px;
+                          min-height: 36px; padding: 0px 14px; font-weight: 600; }
+            QPushButton:hover { background-color: #edf2f7; }
+        """)
+        btn_azzera.clicked.connect(self.azzera_filtri_movimenti)
 
         btn_aggiorna = QPushButton("Aggiorna")
         btn_aggiorna.setStyleSheet("""
@@ -985,9 +1019,13 @@ class MagazzinoWindow(QMainWindow):
         """)
         btn_aggiorna.clicked.connect(self.carica_consumi)
 
-        filtri_layout.addWidget(lbl_periodo)
-        filtri_layout.addWidget(self.combo_periodo)
+        for widget in (lbl_periodo, self.combo_periodo,
+                       lbl_tipo, self.combo_tipo_mov,
+                       lbl_fornitore, self.combo_fornitore_mov,
+                       lbl_materiale, self.combo_materiale_mov):
+            filtri_layout.addWidget(widget)
         filtri_layout.addStretch()
+        filtri_layout.addWidget(btn_azzera)
         filtri_layout.addWidget(btn_aggiorna)
 
         layout.addLayout(filtri_layout)
@@ -1026,17 +1064,83 @@ class MagazzinoWindow(QMainWindow):
 
         layout.addWidget(self.tabella_consumi, 1)
 
+    def _riempi_filtri_movimenti(self):
+        """Riempie le tendine fornitore e materiale con quello che c'e' davvero.
+
+        Si leggono dai movimenti, non dall'anagrafica: cosi' compaiono anche i
+        fornitori di una volta, che nell'elenco attuale non ci sono piu' ma
+        nello storico si'."""
+        def ricarica(combo, valori, etichetta_tutti):
+            scelto = combo.currentData() if combo.count() else None
+            combo.blockSignals(True)
+            combo.clear()
+            combo.addItem(etichetta_tutti, None)
+            for v in valori:
+                combo.addItem(str(v), v)
+            if scelto is not None:
+                indice = combo.findData(scelto)
+                if indice >= 0:
+                    combo.setCurrentIndex(indice)
+            combo.blockSignals(False)
+
+        fornitori, materiali = [], []
+        try:
+            fornitori = self.db_manager.fornitori_nei_movimenti()
+            materiali = self.db_manager.materiali_nei_movimenti()
+        except Exception as e:
+            logging.getLogger('rcs').warning(
+                "Elenchi dei filtri movimenti non caricati: %s", e)
+
+        ricarica(self.combo_fornitore_mov, fornitori, "Tutti i fornitori")
+        ricarica(self.combo_materiale_mov, materiali, "Tutti i materiali")
+
+    def azzera_filtri_movimenti(self):
+        """Rimette tutti i filtri su 'tutti', tranne il periodo."""
+        for combo in (self.combo_tipo_mov, self.combo_fornitore_mov,
+                      self.combo_materiale_mov):
+            combo.blockSignals(True)
+            combo.setCurrentIndex(0)
+            combo.blockSignals(False)
+        self.carica_consumi()
+
+    def _filtra_movimenti(self, movimenti):
+        """Tiene solo i movimenti che rispettano tipo, fornitore e materiale.
+
+        I tre filtri si combinano: lasciarne uno su 'tutti' significa non
+        restringere su quella voce."""
+        tipo = self.combo_tipo_mov.currentData()
+        fornitore = self.combo_fornitore_mov.currentData()
+        materiale = self.combo_materiale_mov.currentData()
+        if tipo is None and fornitore is None and materiale is None:
+            return list(movimenti)
+
+        tenuti = []
+        for mov in movimenti:
+            _id, nome, suo_tipo, _q, _data, _note, suo_fornitore, _mid = mov
+            if tipo is not None and suo_tipo != tipo:
+                continue
+            if fornitore is not None and (suo_fornitore or "") != fornitore:
+                continue
+            if materiale is not None and nome != materiale:
+                continue
+            tenuti.append(mov)
+        return tenuti
+
     def carica_consumi(self):
-        """Carica e visualizza i movimenti individuali per il periodo selezionato"""
+        """Carica e visualizza i movimenti individuali, applicando i filtri."""
         periodo = self.combo_periodo.currentData() or 'mese_corrente'
         data_inizio, data_fine = self._calcola_date_periodo(periodo)
 
-        movimenti = self.db_manager.get_movimenti_periodo(data_inizio, data_fine)
+        trovati = self.db_manager.get_movimenti_periodo(data_inizio, data_fine)
+        movimenti = self._filtra_movimenti(trovati)
+        self._movimenti_nel_periodo = len(trovati)
 
         self.tabella_consumi.setRowCount(len(movimenti))
 
         totale_scarico = 0.0
         n_scarichi = 0
+        totale_carico = 0.0
+        n_carichi = 0
 
         for row, mov in enumerate(movimenti):
             mov_id, nome, tipo, quantita, data, note, fornitore_nome, mat_id = mov
@@ -1044,6 +1148,9 @@ class MagazzinoWindow(QMainWindow):
             if tipo == 'scarico':
                 totale_scarico += quantita
                 n_scarichi += 1
+            else:
+                totale_carico += quantita
+                n_carichi += 1
 
             # Data
             data_str = data[:10] if len(data) >= 10 else data
@@ -1095,17 +1202,44 @@ class MagazzinoWindow(QMainWindow):
             self.tabella_consumi.setCellWidget(row, 6, btn_frame)
             self.tabella_consumi.setRowHeight(row, 44)
 
-        # Aggiorna riepilogo
+        self._aggiorna_riepilogo_movimenti(
+            len(movimenti), totale_carico, n_carichi, totale_scarico, n_scarichi)
+
+    def _aggiorna_riepilogo_movimenti(self, quanti, tot_carico, n_carichi,
+                                      tot_scarico, n_scarichi):
+        """La riga di riepilogo sopra la tabella.
+
+        Mostra caricato, scaricato E saldo: con i soli scarichi non si
+        capiva se il materiale entrato e uscito tornassero. E' proprio il
+        confronto che serve quando la giacenza a video non coincide con
+        quella sullo scaffale."""
         periodo_testo = self.combo_periodo.currentText()
-        if movimenti:
-            self.lbl_riepilogo_consumi.setText(
-                f"{periodo_testo}:  {len(movimenti)} movimenti  |  "
-                f"Totale scaricato: {totale_scarico:.2f} m²  ({n_scarichi} scarichi)"
-            )
-        else:
-            self.lbl_riepilogo_consumi.setText(
-                f"{periodo_testo}:  Nessun movimento registrato nel periodo selezionato"
-            )
+        filtri = []
+        if self.combo_tipo_mov.currentData() is not None:
+            filtri.append(self.combo_tipo_mov.currentText().lower())
+        if self.combo_fornitore_mov.currentData() is not None:
+            filtri.append(self.combo_fornitore_mov.currentText())
+        if self.combo_materiale_mov.currentData() is not None:
+            filtri.append(self.combo_materiale_mov.currentText())
+        descrizione = periodo_testo + ((" · " + " · ".join(filtri)) if filtri else "")
+
+        if not quanti:
+            totali = self._movimenti_nel_periodo
+            if filtri and totali:
+                self.lbl_riepilogo_consumi.setText(
+                    f"{descrizione}:  nessun movimento con questi filtri "
+                    f"(nel periodo ce ne sono {totali} in tutto)")
+            else:
+                self.lbl_riepilogo_consumi.setText(
+                    f"{descrizione}:  nessun movimento registrato")
+            return
+
+        saldo = tot_carico - tot_scarico
+        self.lbl_riepilogo_consumi.setText(
+            f"{descrizione}:  {quanti} movimenti  |  "
+            f"caricato {tot_carico:.2f} m² ({n_carichi})  |  "
+            f"scaricato {tot_scarico:.2f} m² ({n_scarichi})  |  "
+            f"saldo {saldo:+.2f} m²")
 
     def _modifica_movimento(self, movimento_id, quantita_attuale, note_attuale):
         """Dialog per modificare quantità e note di un movimento"""
@@ -1206,6 +1340,15 @@ class MagazzinoWindow(QMainWindow):
             fine = oggi
         elif periodo == 'ultimi_6_mesi':
             inizio = oggi - timedelta(days=180)
+            fine = oggi
+        elif periodo == 'ultimi_12_mesi':
+            inizio = oggi - timedelta(days=365)
+            fine = oggi
+        elif periodo == 'tutto':
+            # Tutto lo storico. Serve quando si cerca da dove viene una
+            # differenza fra quello che dice il programma e quello che c'e'
+            # davvero a magazzino: la riga sbagliata puo' essere di due anni fa.
+            inizio = datetime(2000, 1, 1)
             fine = oggi
         else:
             inizio = oggi.replace(day=1)

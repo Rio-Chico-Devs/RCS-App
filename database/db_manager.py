@@ -784,6 +784,38 @@ class DatabaseManager:
             logging.getLogger('rcs').error(f"DB error in get_movimenti_per_materiale: {e}")
             return []
 
+    def fornitori_nei_movimenti(self):
+        """I fornitori che compaiono nello storico dei movimenti.
+
+        Non si usa l'elenco dei fornitori attuali: uno con cui non si lavora
+        piu' sparirebbe dal filtro, e con lui la possibilita' di ritrovare i
+        suoi movimenti di due anni fa - che e' esattamente quando un filtro
+        serve."""
+        try:
+            with self._connessione() as conn:
+                return [r[0] for r in conn.execute("""
+                    SELECT DISTINCT fornitore_nome FROM movimenti_magazzino
+                    WHERE fornitore_nome IS NOT NULL AND TRIM(fornitore_nome) <> ''
+                    ORDER BY fornitore_nome COLLATE NOCASE
+                """)]
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in fornitori_nei_movimenti: {e}")
+            return []
+
+    def materiali_nei_movimenti(self):
+        """I materiali che compaiono nello storico dei movimenti."""
+        try:
+            with self._connessione() as conn:
+                return [r[0] for r in conn.execute("""
+                    SELECT DISTINCT m.nome
+                    FROM movimenti_magazzino mov JOIN materiali m ON m.id = mov.materiale_id
+                    WHERE m.nome IS NOT NULL AND TRIM(m.nome) <> ''
+                    ORDER BY m.nome COLLATE NOCASE
+                """)]
+        except sqlite3.Error as e:
+            logging.getLogger('rcs').error(f"DB error in materiali_nei_movimenti: {e}")
+            return []
+
     def get_movimenti_periodo(self, data_inizio, data_fine):
         """Restituisce tutti i movimenti individuali in un periodo (non aggregati)"""
         try:

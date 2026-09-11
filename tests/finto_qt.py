@@ -39,15 +39,27 @@ class RispostaAutomatica:
 
 class _MetaPermissiva(type):
     """Permette anche le costanti di classe (QComboBox.NoInsert, QFrame.HLine,
-    QHeaderView.Stretch...): sono decine e non ha senso elencarle."""
+    QHeaderView.Stretch...): sono decine e non ha senso elencarle.
+
+    Il valore e' inventato ma COSTANTE: la stessa costante letta due volte
+    deve dare lo stesso numero. Prima non era cosi' - il contatore avanzava a
+    ogni lettura - e il codice che accende un flag e poi lo spegne
+    (windowFlags() | X ... & ~X) non tornava mai al punto di partenza. Il
+    difetto era mascherato dal caso: con certi numeri consecutivi il conto
+    tornava per combinazione, e bastava aggiungere una classe qui dentro per
+    far fallire un test che non c'entrava niente."""
 
     _contatore = [0]
+    _costanti = {}
 
     def __getattr__(cls, nome):
         if nome.startswith("__"):
             raise AttributeError(nome)
-        cls._contatore[0] += 1
-        return cls._contatore[0]      # un valore qualunque, ma stabile
+        chiave = (cls.__name__, nome)
+        if chiave not in cls._costanti:
+            cls._contatore[0] += 1
+            cls._costanti[chiave] = cls._contatore[0]
+        return cls._costanti[chiave]
 
 
 class _Base(metaclass=_MetaPermissiva):
@@ -396,6 +408,133 @@ class _TabBar(_Base):
     def setUsesScrollButtons(self, b): pass
 
 
+
+class _ComboBox(_Base):
+    """Una tendina che tiene davvero le voci e la scelta.
+
+    Serve per provare i filtri: con una tendina finta che risponde sempre
+    "nessuna scelta" si proverebbe solo il caso "nessun filtro", cioe' proprio
+    quello in cui il filtro non fa niente."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self._voci = []          # (testo, dato)
+        self._indice = 0
+        self._muto = False
+        self.currentIndexChanged = _Segnale()
+
+    def addItem(self, testo, dato=None):
+        self._voci.append((testo, dato))
+
+    def clear(self):
+        self._voci = []
+        self._indice = 0
+
+    def count(self):
+        return len(self._voci)
+
+    def currentIndex(self):
+        return self._indice
+
+    def setCurrentIndex(self, indice):
+        if 0 <= indice < len(self._voci):
+            self._indice = indice
+            if not self._muto:
+                self.currentIndexChanged.emit()
+
+    def currentText(self):
+        return self._voci[self._indice][0] if self._voci else ""
+
+    def currentData(self):
+        return self._voci[self._indice][1] if self._voci else None
+
+    def itemText(self, indice):
+        return self._voci[indice][0] if 0 <= indice < len(self._voci) else ""
+
+    def itemData(self, indice):
+        return self._voci[indice][1] if 0 <= indice < len(self._voci) else None
+
+    def findData(self, dato):
+        for i, (_t, d) in enumerate(self._voci):
+            if d == dato:
+                return i
+        return -1
+
+    def findText(self, testo, *modalita):
+        # Qt accetta anche un secondo argomento (Qt.MatchFixedString e simili):
+        # qui il confronto e' sempre esatto, ma l'argomento va accettato.
+        for i, (t, _d) in enumerate(self._voci):
+            if t == testo:
+                return i
+        return -1
+
+    def addItems(self, elenco):
+        for voce in elenco:
+            self.addItem(voce)
+
+    def setCurrentText(self, testo):
+        indice = self.findText(testo)
+        if indice >= 0:
+            self.setCurrentIndex(indice)
+        else:
+            self._voci.append((testo, None))
+            self.setCurrentIndex(len(self._voci) - 1)
+
+    def blockSignals(self, muto):
+        self._muto = bool(muto)
+
+    def scegli(self, dato):
+        """Comodita' per i test: sceglie la voce con quel dato."""
+        indice = self.findData(dato)
+        if indice < 0:
+            raise AssertionError("voce non presente nella tendina: %r" % (dato,))
+        self.setCurrentIndex(indice)
+
+
+
+class _TableWidget(_Base):
+    """Tabella che tiene conto di quante righe le vengono messe.
+
+    Senza, rowCount() risponde sempre 0 e un test che conta le righe mostrate
+    misura una costante: passerebbe qualunque cosa faccia il programma.
+    E' successo scrivendo i test dei filtri di magazzino."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self._righe = 0
+        self._colonne = 0
+        self._celle = {}
+
+    def setRowCount(self, n):
+        self._righe = int(n)
+
+    def rowCount(self):
+        return self._righe
+
+    def setColumnCount(self, n):
+        self._colonne = int(n)
+
+    def columnCount(self):
+        return self._colonne
+
+    def setItem(self, riga, colonna, elemento):
+        self._celle[(riga, colonna)] = elemento
+
+    def item(self, riga, colonna):
+        return self._celle.get((riga, colonna))
+
+    def setCellWidget(self, riga, colonna, widget):
+        self._celle[(riga, colonna, "w")] = widget
+
+    def cellWidget(self, riga, colonna):
+        return self._celle.get((riga, colonna, "w"))
+
+    def testo_cella(self, riga, colonna):
+        """Comodita' per i test: il testo mostrato in quella cella."""
+        elemento = self.item(riga, colonna)
+        return elemento.text() if elemento is not None else ""
+
+
 def _crea_modulo(nome, simboli):
     modulo = types.ModuleType(nome)
     for simbolo, valore in simboli.items():
@@ -422,6 +561,8 @@ def installa():
     widgets["QApplication"] = _Application
     widgets["QTabBar"] = _TabBar
     widgets["QTabWidget"] = _TabWidget
+    widgets["QComboBox"] = _ComboBox
+    widgets["QTableWidget"] = _TableWidget
 
     core = {n: type(n, (_Base,), {}) for n in
             ["QDate", "QDir", "QPointF", "QRectF", "QSizeF", "QUrl"]}
