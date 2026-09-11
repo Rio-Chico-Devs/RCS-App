@@ -535,6 +535,28 @@ class _TableWidget(_Base):
         return elemento.text() if elemento is not None else ""
 
 
+
+class FileDialog(_Base):
+    """Finta finestra "scegli un file".
+
+    I test impostano prossimo_file con il percorso da far "scegliere"
+    all'utente; stringa vuota significa che ha annullato."""
+
+    prossimo_file = ""
+
+    @staticmethod
+    def getOpenFileName(*args, **kwargs):
+        return FileDialog.prossimo_file, ""
+
+    @staticmethod
+    def getSaveFileName(*args, **kwargs):
+        return FileDialog.prossimo_file, ""
+
+    @staticmethod
+    def getExistingDirectory(*args, **kwargs):
+        return FileDialog.prossimo_file
+
+
 def _crea_modulo(nome, simboli):
     modulo = types.ModuleType(nome)
     for simbolo, valore in simboli.items():
@@ -563,6 +585,7 @@ def installa():
     widgets["QTabWidget"] = _TabWidget
     widgets["QComboBox"] = _ComboBox
     widgets["QTableWidget"] = _TableWidget
+    widgets["QFileDialog"] = FileDialog
 
     core = {n: type(n, (_Base,), {}) for n in
             ["QDate", "QDir", "QPointF", "QRectF", "QSizeF", "QUrl"]}

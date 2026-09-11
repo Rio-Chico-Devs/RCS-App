@@ -225,6 +225,102 @@ def _mostra_dialogo_primo_avvio(base_dir):
     return risultato["ok"]
 
 
+def scrivi_percorso_database(base_dir, nuovo_percorso):
+    """Scrive in config.json quale database usare, conservando il resto."""
+    config_path = os.path.join(base_dir, "config.json")
+    config = {}
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                letto = json.load(f)
+            if isinstance(letto, dict):
+                config = letto
+        except Exception as e:
+            logging.getLogger('rcs').warning(
+                "config.json illeggibile, viene riscritto: %s", e)
+    config["db_path"] = nuovo_percorso
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+    return config_path
+
+
+def _come_procedere_col_database_danneggiato(base_dir, percorso_db, avviso):
+    """Cosa fare quando il database configurato e' danneggiato.
+
+    Perche' esiste questa funzione: prima il programma mostrava il messaggio e
+    si CHIUDEVA. Ma il database da usare e' scritto in config.json, e
+    config.json si cambia solo da dentro il programma: chi apriva per sbaglio
+    un database rovinato restava chiuso fuori per sempre, e a ogni riavvio
+    rivedeva lo stesso messaggio. E' successo davvero.
+
+    La regola: un programma non deve mai bloccare l'unica strada che porta
+    alla soluzione del problema che sta segnalando.
+
+    Ritorna True se si puo' proseguire, False se l'utente ha scelto di uscire."""
+    testo = (avviso or "Il database risulta danneggiato.")
+    testo += ("\n\nDatabase attualmente in uso:\n{}\n\n"
+              "Come vuoi procedere?".format(percorso_db))
+
+    finestra = QMessageBox()
+    finestra.setIcon(QMessageBox.Critical)
+    finestra.setWindowTitle("Database danneggiato")
+    finestra.setText(testo)
+    btn_scegli = finestra.addButton("Scegli un altro database", QMessageBox.AcceptRole)
+    btn_apri = finestra.addButton("Apri comunque, per ripristinare una copia",
+                                  QMessageBox.ActionRole)
+    btn_chiudi = finestra.addButton("Chiudi il programma", QMessageBox.RejectRole)
+    finestra.setDefaultButton(btn_scegli)
+    finestra.exec_()
+    scelta = finestra.clickedButton()
+
+    if scelta is btn_chiudi:
+        return False
+
+    if scelta is btn_apri:
+        # Il programma si apre lo stesso: da "Impostazioni di archiviazione" si
+        # puo' ripristinare una copia di sicurezza o cambiare database.
+        return True
+
+    return _scegli_un_altro_database(base_dir, percorso_db)
+
+
+def _scegli_un_altro_database(base_dir, percorso_attuale):
+    """Fa scegliere un altro file di database e lo scrive in config.json."""
+    from database import backup_manager
+
+    cartella = os.path.dirname(percorso_attuale) or base_dir
+    scelto, _filtro = QFileDialog.getOpenFileName(
+        None, "Scegli il database da usare", cartella,
+        "Database SQLite (*.db);;Tutti i file (*)")
+    if not scelto:
+        # Ha annullato: si apre comunque il programma, cosi' resta la strada
+        # delle impostazioni. Chiuderlo qui lo rimetterebbe in trappola.
+        return True
+
+    integro, messaggio, _ms = backup_manager.verifica_integrita(scelto)
+    if not integro:
+        QMessageBox.warning(
+            None, "Anche questo database e' danneggiato",
+            "Il file scelto non e' utilizzabile ({}).\n\n"
+            "Il programma si apre comunque: da 'Impostazioni di archiviazione' "
+            "puoi ripristinare una copia di sicurezza.".format(messaggio))
+        return True
+
+    try:
+        scrivi_percorso_database(base_dir, scelto)
+    except Exception as e:
+        QMessageBox.critical(
+            None, "Impostazione non salvata",
+            "Non e' stato possibile salvare la scelta ({}).\n\n"
+            "Il programma si apre comunque.".format(e))
+        return True
+
+    QMessageBox.information(
+        None, "Database cambiato",
+        "Da adesso viene usato:\n{}".format(scelto))
+    return True
+
+
 def _controlla_sessione_precedente():
     """Verifica com'è finita la sessione precedente e, se è stata interrotta di
     colpo (aggiornamento di Windows, mancanza di corrente, blocco), spiega
@@ -302,12 +398,13 @@ def main():
         percorso_db, _configurazione = risolvi_percorso_db()
         esito_verifica = backup_manager.esegui_backup_avvio(percorso_db)
         if not esito_verifica.get("integro", True):
-            QMessageBox.critical(None, "Database danneggiato",
-                                 esito_verifica.get("avviso") or
-                                 "Il database risulta danneggiato.")
-            sys.exit(1)
-    except Exception:
-        pass  # un problema nel controllo non deve impedire l'avvio dell'app
+            if not _come_procedere_col_database_danneggiato(
+                    base_dir, percorso_db, esito_verifica.get("avviso")):
+                sys.exit(1)
+    except Exception as e:
+        # Un problema nel controllo non deve impedire l'avvio dell'app.
+        logging.getLogger('rcs').error(
+            "Controllo preliminare del database non riuscito: %s", e)
 
     try:
         # Crea e mostra la finestra principale massimizzata
