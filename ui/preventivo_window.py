@@ -29,6 +29,7 @@ v2.3.0 (22/09/2025):
 # type: ignore
 # pyright: reportUnknownLambdaType=false
 
+import logging
 from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton,
                              QWidget, QLabel, QLineEdit, QFormLayout, QMessageBox,
                              QScrollArea, QGroupBox, QSpinBox, QDoubleSpinBox,
@@ -156,8 +157,13 @@ class PreventivoWindow(QMainWindow):
             dati.update(self.get_dati_cliente())
             bozze.salva_bozza(self._chiave_bozza, dati,
                               modalita=self.modalita, preventivo_id=self.preventivo_id)
-        except Exception:
-            pass  # la bozza non deve mai disturbare il lavoro in corso
+        except Exception as e:
+            # La bozza non deve mai disturbare il lavoro in corso, quindi
+            # l'errore non si propaga. Ma va ANNOTATO: questa e' la rete che
+            # salva il lavoro dopo uno spegnimento improvviso, e una rete che
+            # smette di funzionare in silenzio e' peggio di nessuna rete.
+            logging.getLogger('rcs').warning(
+                "Salvataggio automatico della bozza non riuscito: %s", e)
 
     def _togliti_dal_registro(self):
         """Si toglie dall'elenco delle schermate aperte, liberando le risorse.
@@ -166,8 +172,9 @@ class PreventivoWindow(QMainWindow):
         try:
             from ui import finestre_preventivo
             finestre_preventivo.dimentica(self)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger('rcs').warning(
+                "Schermata non tolta dall'elenco delle aperte: %s", e)
 
     def _elimina_bozza(self):
         """Toglie la bozza: il preventivo è stato salvato o chiuso di proposito."""
@@ -180,8 +187,9 @@ class PreventivoWindow(QMainWindow):
             if chiave:
                 from utils import bozze
                 bozze.elimina_bozza(chiave)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger('rcs').warning(
+                "Bozza non eliminata dopo la chiusura: %s", e)
     
     def carica_preventivo_esistente(self):
         """Carica un preventivo esistente dal database"""

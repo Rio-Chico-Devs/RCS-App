@@ -255,8 +255,8 @@ def chiudi_sessione(db_path):
         sessioni = _leggi_sessioni(percorso)
         sessioni.pop(_chiave_sessione(), None)
         _scrivi_sessioni(percorso, _pulisci_sessioni_scadute(sessioni))
-    except Exception:
-        pass
+    except Exception as e:
+        _log().warning("Sessione non rimossa dall'elenco condiviso: %s", e)
 
 
 # ---------------------------------------------------------------------------
@@ -803,6 +803,9 @@ def verifica_dopo_scrittura(db_path, operazione):
         if buono:
             _proteggi_copia_buona(
                 buono, os.path.join(cartella_backup, "sicurezza"), sempre=True)
-    except Exception:
-        pass
+    except Exception as e:
+        # Siamo gia' dentro il percorso "qualcosa e' andato storto": se anche
+        # la messa al sicuro dell'ultima copia buona fallisce, e' la cosa piu'
+        # importante da sapere di tutta la giornata.
+        _log().error("Messa al sicuro dell'ultimo backup valido NON riuscita: %s", e)
     return False

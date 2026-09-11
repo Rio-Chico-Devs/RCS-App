@@ -71,8 +71,8 @@ def elimina_bozza(chiave):
         percorso = _percorso(chiave)
         if os.path.exists(percorso):
             os.remove(percorso)
-    except Exception:
-        pass
+    except Exception as e:
+        logging.getLogger('rcs').warning("Bozza non eliminata (%s): %s", chiave, e)
 
 
 def elimina_bozza_da_file(bozza):

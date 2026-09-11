@@ -36,6 +36,10 @@ def setup_logger():
         fh.setFormatter(fmt)
         logger.addHandler(fh)
     except Exception:
+        # UNICO punto in cui tacere e' giusto: qui si sta costruendo il
+        # registro stesso. Segnalare l'errore vorrebbe dire scrivere nel
+        # registro che non funziona. Il programma prosegue senza registro su
+        # file, che e' meglio che non partire.
         pass  # Se non riesce a creare il file di log, continua senza
 
     # Handler console — WARNING e superiori.

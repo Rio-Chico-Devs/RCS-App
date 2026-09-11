@@ -239,8 +239,9 @@ class DatabaseManager:
             diagnostica.registra_scrittura(
                 operazione, f"tentativo {tentativo}",
                 "NON RIUSCITO: database occupato" if fallito else "database occupato, riprovo")
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger('rcs').warning(
+                "Conflitto fra postazioni non annotato nel diario: %s", e)
 
     def verifica_integrita(self):
         """Controllo di integrità su richiesta. Ritorna (ok, messaggio)."""
@@ -265,8 +266,9 @@ class DatabaseManager:
             diagnostica.registra_scrittura(
                 operazione, dettaglio,
                 "ok" if integro else "DATABASE DANNEGGIATO", durata)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger('rcs').warning(
+                "Esito della scrittura non annotato nel diario: %s", e)
         return integro
 
     def init_database(self):

@@ -144,8 +144,8 @@ def _scrivi_riepilogo(destinazione, db_path, conteggi):
         with open(os.path.join(destinazione, "LEGGIMI.txt"), "w",
                   encoding="utf-8") as f:
             f.write("\n".join(righe))
-    except Exception:
-        pass
+    except Exception as e:
+        _log().warning("Foglio di istruzioni dell'esportazione non scritto: %s", e)
 
 
 # ---------------------------------------------------------------------------

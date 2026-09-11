@@ -26,6 +26,7 @@ v2.3.0 (24/09/2025):
 # type: ignore
 # pyright: reportUnusedImport=false
 
+import logging
 from PyQt5.QtWidgets import (QMainWindow, QVBoxLayout, QHBoxLayout, QPushButton, 
                              QWidget, QLabel, QListWidget, QMessageBox, QListWidgetItem,
                              QGroupBox, QFrame, QSizePolicy, QGraphicsDropShadowEffect,
@@ -66,8 +67,11 @@ class MainWindow(QMainWindow):
         # l'interfaccia già pronta per poterli riaprire davvero.
         try:
             MainWindowBusinessLogic.proponi_recupero_bozze(self)
-        except Exception:
-            pass   # il recupero non deve mai impedire l'uso del programma
+        except Exception as e:
+            # Non deve impedire l'uso del programma, ma se fallisce l'utente
+            # non si vede proporre il lavoro non salvato e non lo sa nessuno.
+            logging.getLogger('rcs').error(
+                "Proposta di recupero delle bozze non riuscita: %s", e)
 
     def closeEvent(self, event):
         """Chiusura regolare: toglie questo PC dall'elenco delle sessioni aperte
@@ -76,13 +80,18 @@ class MainWindow(QMainWindow):
         try:
             from database import backup_manager
             backup_manager.chiudi_sessione(self.db_manager.db_path)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger('rcs').warning(
+                "Sessione non chiusa regolarmente nell'elenco condiviso: %s", e)
         try:
             from utils import diagnostica
             diagnostica.segna_chiusura_regolare()
-        except Exception:
-            pass
+        except Exception as e:
+            # Se fallisce, al prossimo avvio il programma segnala una chiusura
+            # anomala che in realta' non c'e' stata: un falso allarme che fa
+            # perdere fiducia in tutti gli altri avvisi.
+            logging.getLogger('rcs').error(
+                "Chiusura regolare non registrata: %s", e)
         super().closeEvent(event)
 
     # =============================================================================

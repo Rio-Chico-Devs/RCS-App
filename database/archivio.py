@@ -228,7 +228,13 @@ def altri_computer_collegati(db_path):
             backup_manager._leggi_sessioni(backup_manager._percorso_sessioni(db_path)))
         mia = backup_manager._chiave_sessione()
         return [chiave for chiave in sessioni if chiave != mia]
-    except Exception:
+    except Exception as e:
+        # Rispondere "nessuno" quando non si riesce a sapere chi e' collegato
+        # e' la risposta piu' pericolosa possibile: e' questo il controllo che
+        # impedisce al ripristino di sovrascrivere il database mentre un'altra
+        # postazione ci sta scrivendo. Deve almeno lasciare traccia.
+        _log().error("Non si riesce a sapere quali computer sono collegati "
+                     "(il ripristino procedera' come se fossimo soli): %s", e)
         return []
 
 
@@ -466,16 +472,20 @@ def riepilogo_stato(db_path):
             backup_manager._leggi_sessioni(percorso_sessioni))
         mia = backup_manager._chiave_sessione()
         stato["altri_pc"] = [k for k in sessioni if k != mia]
-    except Exception:
-        pass
+    except Exception as e:
+        # Si annota e si prosegue: il resto del riepilogo e' comunque utile.
+        # NON si torna indietro con un valore: questa funzione deve sempre
+        # restituire il dizionario dello stato, e un "return []" qui dentro
+        # farebbe saltare la schermata delle impostazioni.
+        _log().warning("Elenco dei computer collegati non leggibile: %s", e)
 
     try:
         from utils import diagnostica
         stato["ultime_scritture"] = diagnostica.ultime_scritture(10)
         stato["chiusura_precedente_regolare"] = not os.path.exists(
             os.path.join(diagnostica.cartella_locale(), diagnostica.NOME_MARCATORE))
-    except Exception:
-        pass
+    except Exception as e:
+        _log().warning("Ultime scritture non leggibili per la schermata di stato: %s", e)
 
     return stato
 

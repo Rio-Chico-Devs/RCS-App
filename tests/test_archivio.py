@@ -405,6 +405,56 @@ class TestRipristinoConScritturaInSospesa(BaseArchivio):
 
 
 # ---------------------------------------------------------------------------
+# Le protezioni non devono rompersi in silenzio
+# ---------------------------------------------------------------------------
+
+class TestErroriCheNonDevonoSparire(BaseArchivio):
+    """Un errore ingoiato dentro una protezione e' peggio di nessuna
+    protezione: si continua a lavorare credendo di essere coperti.
+
+    MITRE lo cataloga come debolezza a se': CWE-390, "rilevare una condizione
+    di errore senza fare niente". Qui si verifica che le funzioni di sicurezza
+    non spariscano in silenzio e che, fallendo, restituiscano comunque
+    qualcosa di sensato a chi le ha chiamate."""
+
+    def _rompi(self, modulo, nome):
+        def esplode(*a, **k):
+            raise RuntimeError("guasto simulato")
+        originale = getattr(modulo, nome)
+        setattr(modulo, nome, esplode)
+        return lambda: setattr(modulo, nome, originale)
+
+    def test_se_non_si_sa_chi_e_collegato_resta_traccia(self):
+        ripristina = self._rompi(bm, "_leggi_sessioni")
+        try:
+            with self.assertLogs("rcs", level="ERROR") as registro:
+                risultato = archivio.altri_computer_collegati(self.db)
+        finally:
+            ripristina()
+
+        self.assertEqual(risultato, [], "deve rispondere qualcosa di usabile")
+        self.assertTrue(any("computer sono collegati" in r for r in registro.output),
+                        "rispondere 'nessuno' senza dirlo è la risposta più "
+                        "pericolosa: è il controllo che protegge il ripristino")
+
+    def test_il_riepilogo_resta_un_dizionario_anche_se_qualcosa_fallisce(self):
+        """Nato da un errore mio: avevo messo un 'return []' dentro questa
+        funzione, che deve restituire un dizionario. I test passavano lo
+        stesso, perché quel ramo non veniva mai percorso."""
+        ripristina = self._rompi(bm, "_leggi_sessioni")
+        try:
+            stato = archivio.riepilogo_stato(self.db)
+        finally:
+            ripristina()
+
+        self.assertIsInstance(stato, dict,
+                              "la schermata delle impostazioni si aspetta un "
+                              "dizionario: qualsiasi altra cosa la fa saltare")
+        self.assertIn("integro", stato, "il resto del riepilogo deve esserci comunque")
+        archivio.testo_riepilogo(stato)   # non deve sollevare eccezioni
+
+
+# ---------------------------------------------------------------------------
 # Riepilogo dello stato
 # ---------------------------------------------------------------------------
 

@@ -385,6 +385,30 @@ class TestTotaliNonCalcolabili(BaseInterfaccia):
         self.assertFalse(finestra.lbl_avviso_calcolo.isVisible())
         self.assertIn("€", finestra.lbl_preventivo_finale.text())
 
+    def test_il_salvataggio_automatico_della_bozza_non_fallisce_in_silenzio(self):
+        """La bozza ogni 15 secondi è la rete che salva il lavoro dopo uno
+        spegnimento improvviso. Se smettesse di funzionare senza dirlo, si
+        continuerebbe a lavorare credendo di essere coperti: è il caso peggiore
+        di tutti, perché il danno si scopre solo quando serve la rete."""
+        finestra = self._schermata()
+        finestra._chiave_bozza = "prova"
+        finestra.modalita = 'nuovo'
+        finestra._ha_contenuto_da_salvare = lambda: True
+
+        def esplode(*a, **k):
+            raise OSError("cartella non raggiungibile")
+
+        originale = bozze.salva_bozza
+        bozze.salva_bozza = esplode
+        try:
+            with self.assertLogs("rcs", level="WARNING") as registro:
+                finestra._salva_bozza_automatica()      # non deve sollevare nulla
+        finally:
+            bozze.salva_bozza = originale
+
+        self.assertTrue(any("bozza" in r.lower() for r in registro.output),
+                        "deve restare traccia: %s" % registro.output)
+
     def test_non_si_puo_salvare_un_preventivo_senza_totali(self):
         """La parte che conta davvero: senza questo, il preventivo verrebbe
         registrato con gli importi del calcolo precedente."""

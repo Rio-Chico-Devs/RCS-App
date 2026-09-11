@@ -165,8 +165,11 @@ def registra_scrittura(operazione, dettaglio="", esito="ok", durata_ms=None):
             " | {} ms".format(round(durata_ms)) if durata_ms is not None else "")
         with open(_percorso_registro(), "a", encoding="utf-8") as f:
             f.write(riga)
-    except Exception:
-        pass  # il registro non deve mai bloccare un salvataggio
+    except Exception as e:
+        # Il diario delle scritture non deve MAI bloccare un salvataggio, ma se
+        # smette di scrivere in silenzio la prossima volta che qualcosa va
+        # storto saremo di nuovo senza prove - come il 3 settembre.
+        _log().error("Riga non scritta nel diario delle scritture: %s", e)
 
 
 def ultime_scritture(quante=10):

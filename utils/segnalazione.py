@@ -67,8 +67,8 @@ def _informazioni_sistema(db_path):
     try:
         from utils import diagnostica
         info["ultimo_avvio"] = diagnostica.esito_avvio_precedente()
-    except Exception:
-        pass
+    except Exception as e:
+        _log().warning("Esito dell'avvio precedente non incluso nella segnalazione: %s", e)
     return info
 
 
