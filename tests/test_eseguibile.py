@@ -91,20 +91,82 @@ class TestElencoModuli(unittest.TestCase):
                            "PyQt5.QtGui", "sqlite3"):
             self.assertIn(necessaria, elencati)
 
-    def test_il_bat_installa_le_dipendenze(self):
-        with open(os.path.join(RADICE, "pyexecreator.bat"),
-                  encoding="utf-8", errors="replace") as f:
-            contenuto = f.read()
-        for pacchetto in ("pyinstaller", "PyQt5"):
-            self.assertIn("pip install " + pacchetto, contenuto)
+    def test_ogni_libreria_usata_dal_codice_finisce_nelleseguibile(self):
+        """Difetto trovato davvero: il codice usa python-docx per generare la
+        scheda di taglio in DOCX, ma pyexecreator.bat installava odfpy e
+        reportlab (mai usate) e NON python-docx. L'eseguibile si creava senza
+        errori e l'opzione DOCX rispondeva "installa python-docx" - cosa che
+        dentro un .exe non si puo' fare.
 
-    def test_il_bat_verifica_che_leseguibile_sia_stato_creato(self):
-        """Senza questo controllo, un errore di creazione passerebbe
-        inosservato e si distribuirebbe l'eseguibile vecchio."""
+        Sfuggiva perche' l'import e' dentro una funzione, quindi non si vede
+        in cima al file e PyInstaller da solo non lo trova."""
+        import ast
+        interne = {"ui", "database", "utils", "models", "tests"}
+        standard = set(getattr(sys, "stdlib_module_names", ()))
+        elencati = moduli_elencati_nel_bat()
+
+        esterne = {}
+        for percorso in moduli_dellapplicazione():
+            assoluto = os.path.join(RADICE, percorso.replace(".", os.sep) + ".py")
+            if not os.path.exists(assoluto):
+                continue
+            with open(assoluto, encoding="utf-8") as f:
+                albero = ast.parse(f.read())
+            for nodo in ast.walk(albero):
+                nomi = []
+                if isinstance(nodo, ast.Import):
+                    nomi = [a.name for a in nodo.names]
+                elif isinstance(nodo, ast.ImportFrom) and nodo.module and nodo.level == 0:
+                    nomi = [nodo.module]
+                for nome in nomi:
+                    radice_nome = nome.split(".")[0]
+                    if radice_nome in interne or radice_nome in standard:
+                        continue
+                    esterne.setdefault(radice_nome, set()).add(percorso)
+
+        mancanti = {n: sorted(d) for n, d in esterne.items()
+                    if not any(e == n or e.startswith(n + ".") for e in elencati)}
+        self.assertEqual(
+            mancanti, {},
+            "Queste librerie esterne sono usate dal codice ma non sono "
+            "dichiarate in pyexecreator.bat:\n  {}\n\n"
+            "Nell'eseguibile compilato non ci saranno, e la funzione che le usa "
+            "smettera' di funzionare\nsenza che la compilazione dia alcun "
+            "errore.".format(mancanti))
+
+    def test_non_si_installano_librerie_che_nessuno_usa(self):
+        """Installare roba inutile allunga la compilazione e fa credere che
+        serva. odfpy e reportlab erano li' da tempo con zero riferimenti nel
+        codice, mentre python-docx - quella davvero usata - mancava."""
+        import re
+        # Il nome con cui si installa un pacchetto non e' sempre quello con cui
+        # lo si importa: meglio scriverlo che provare a indovinarlo.
+        NOME_PER_IMPORT = {"python-docx": "docx", "PyQt5-sip": "PyQt5"}
+        # Dipendenze che servono ad altre librerie, non importate direttamente.
+        TRANSITIVE = {"PyQt5-sip"}
+
         with open(os.path.join(RADICE, "pyexecreator.bat"),
                   encoding="utf-8", errors="replace") as f:
             contenuto = f.read()
-        self.assertIn("if not exist", contenuto)
+        installate = set(re.findall(r"pip install ([\w\-]+)", contenuto))
+        installate -= {"pyinstaller"} | TRANSITIVE   # servono a compilare, non al programma
+
+        sorgente = ""
+        for percorso in moduli_dellapplicazione():
+            assoluto = os.path.join(RADICE, percorso.replace(".", os.sep) + ".py")
+            if os.path.exists(assoluto):
+                with open(assoluto, encoding="utf-8") as f:
+                    sorgente += f.read()
+
+        inutili = []
+        for pacchetto in installate:
+            nome = NOME_PER_IMPORT.get(pacchetto, pacchetto)
+            usato = ("import %s" % nome) in sorgente or ("from %s" % nome) in sorgente
+            if not usato:
+                inutili.append(pacchetto)
+        self.assertEqual(sorted(inutili), [],
+                         "installate da pyexecreator.bat ma mai importate dal "
+                         "codice: {}".format(sorted(inutili)))
 
 
 class TestCompatibilitaEseguibile(unittest.TestCase):

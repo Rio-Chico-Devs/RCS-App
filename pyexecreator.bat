@@ -38,14 +38,19 @@ echo [1/5] Installazione dipendenze Python...
 %PYEXE% -m pip install pyinstaller
 %PYEXE% -m pip install PyQt5
 %PYEXE% -m pip install PyQt5-sip
-%PYEXE% -m pip install odfpy
-%PYEXE% -m pip install reportlab
+rem python-docx serve per il formato DOCX della scheda di taglio. Mancava:
+rem l'eseguibile si creava lo stesso e l'opzione DOCX rispondeva "installa
+rem python-docx", cosa che dentro un .exe non si puo' fare.
+rem Tolte odfpy e reportlab: erano installate ma il codice non le usa mai
+rem (l'ODT viene costruito a mano con zipfile). Verificato: zero riferimenti.
+%PYEXE% -m pip install python-docx
 
 echo.
 echo [2/5] Verifica dipendenze...
 %PYEXE% -c "import PyQt5; print('PyQt5 OK')"
 %PYEXE% -c "import sqlite3; print('sqlite3 OK')"
 %PYEXE% -c "import PyInstaller; print('PyInstaller OK')"
+%PYEXE% -c "import docx; print('python-docx OK')"
 
 echo.
 echo [3/5] Creazione eseguibile...
@@ -61,6 +66,11 @@ rem magari mesi dopo. Elencarli non costa nulla e toglie il dubbio.
     --hidden-import=PyQt5.QtGui ^
     --hidden-import=PyQt5.QtPrintSupport ^
     --hidden-import=sqlite3 ^
+    --hidden-import=docx ^
+    --hidden-import=docx.shared ^
+    --hidden-import=docx.enum.text ^
+    --hidden-import=docx.oxml.shared ^
+    --hidden-import=docx.oxml.ns ^
     --hidden-import=database ^
     --hidden-import=database.db_manager ^
     --hidden-import=database.backup_manager ^
