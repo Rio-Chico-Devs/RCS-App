@@ -244,6 +244,45 @@ def scrivi_percorso_database(base_dir, nuovo_percorso):
     return config_path
 
 
+def _come_procedere_senza_la_cartella_di_rete(base_dir, percorso_db):
+    """La cartella condivisa non risponde: cosa fare.
+
+    Succede tipicamente la mattina, quando Windows non ha ancora ristabilito
+    il collegamento. Il programma ha gia' insistito per una decina di secondi:
+    se ancora non c'e', si chiede all'utente invece di chiudersi.
+
+    Ritorna True se si puo' proseguire, False se si esce."""
+    from database import backup_manager
+
+    while True:
+        finestra = QMessageBox()
+        finestra.setIcon(QMessageBox.Warning)
+        finestra.setWindowTitle("Cartella di rete non raggiungibile")
+        finestra.setText(
+            "Non si riesce a raggiungere la cartella dove si trova il "
+            "database:\n{}\n\n"
+            "Di solito succede la mattina, quando il collegamento di rete non "
+            "è ancora pronto: spesso basta riprovare fra qualche secondo. "
+            "Controlla anche che il computer che condivide la cartella sia "
+            "acceso.\n\nCome vuoi procedere?".format(percorso_db))
+        btn_riprova = finestra.addButton("Riprova", QMessageBox.AcceptRole)
+        btn_scegli = finestra.addButton("Scegli un altro database",
+                                        QMessageBox.ActionRole)
+        btn_chiudi = finestra.addButton("Chiudi il programma",
+                                        QMessageBox.RejectRole)
+        finestra.setDefaultButton(btn_riprova)
+        finestra.exec_()
+        scelta = finestra.clickedButton()
+
+        if scelta is btn_chiudi:
+            return False
+        if scelta is btn_scegli:
+            return _scegli_un_altro_database(base_dir, percorso_db)
+        if backup_manager.attendi_cartella_di_rete(percorso_db):
+            return True
+        # altrimenti si richiede: non si chiude mai la porta da soli
+
+
 def _come_procedere_col_database_danneggiato(base_dir, percorso_db, avviso):
     """Cosa fare quando il database configurato e' danneggiato.
 
@@ -399,6 +438,14 @@ def main():
         from database.db_manager import risolvi_percorso_db
         from database import backup_manager
         percorso_db, _configurazione = risolvi_percorso_db()
+
+        # Al mattino la cartella condivisa spesso non risponde ancora: si
+        # aspetta qualche secondo insistendo, invece di dare subito errore su
+        # un database che sta benissimo.
+        if not backup_manager.attendi_cartella_di_rete(percorso_db):
+            if not _come_procedere_senza_la_cartella_di_rete(base_dir, percorso_db):
+                sys.exit(1)
+
         esito_verifica = backup_manager.esegui_backup_avvio(percorso_db)
         if not esito_verifica.get("integro", True):
             if not _come_procedere_col_database_danneggiato(

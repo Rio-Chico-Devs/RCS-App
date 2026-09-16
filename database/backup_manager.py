@@ -154,6 +154,56 @@ def _e_percorso_di_rete(percorso):
     return False
 
 
+TENTATIVI_RETE = 6
+ATTESA_RETE = 2.0
+
+
+def attendi_cartella_di_rete(db_path, tentativi=TENTATIVI_RETE,
+                             attesa=ATTESA_RETE, pausa=None):
+    """Aspetta che la cartella di rete risponda, invece di arrendersi subito.
+
+    Perche' serve: al mattino, dopo l'accensione, Windows spesso non ha ancora
+    ristabilito il collegamento alla cartella condivisa quando il programma
+    parte. Il risultato e' un errore di "database non raggiungibile" su un
+    database che sta benissimo, e che diventa raggiungibile trenta secondi
+    dopo - infatti basta aprire la cartella da Esplora file perche' funzioni
+    tutto.
+
+    Quel gesto non ripara niente: forza semplicemente un nuovo collegamento.
+    Qui si fa la stessa cosa dal programma, qualche volta e a distanza di
+    pochi secondi. Sui percorsi locali non fa nulla e non costa nulla.
+
+    'pausa' esiste per i test, che non possono stare ad aspettare davvero."""
+    if not db_path or not _e_percorso_di_rete(db_path):
+        return True
+
+    import time
+    pausa = pausa or time.sleep
+    cartella = os.path.dirname(db_path)
+
+    for tentativo in range(1, max(1, tentativi) + 1):
+        if os.path.exists(db_path):
+            if tentativo > 1:
+                _log().warning(
+                    "Cartella di rete raggiungibile al tentativo %d", tentativo)
+            return True
+        try:
+            # Elencare la cartella e' proprio cio' che fa Esplora file: obbliga
+            # Windows a ristabilire il collegamento.
+            os.listdir(cartella)
+        except Exception as e:
+            _log().info("Cartella di rete non ancora pronta (tentativo %d): %s",
+                        tentativo, e)
+        if tentativo < tentativi:
+            pausa(attesa)
+
+    raggiungibile = os.path.exists(db_path)
+    if not raggiungibile:
+        _log().error("Cartella di rete non raggiungibile dopo %d tentativi: %s",
+                     tentativi, cartella)
+    return raggiungibile
+
+
 def diagnostica_ambiente(db_path):
     """Raccoglie i dati utili a capire dove/quando avviene una corruzione."""
     info = {

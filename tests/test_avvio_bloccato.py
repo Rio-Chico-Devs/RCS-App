@@ -192,6 +192,66 @@ class TestLaViaDUscitaEDAVVERO_COLLEGATA(unittest.TestCase):
             "database da usare si\ncambia solo da dentro. E' successo davvero.")
 
 
+class TestCartellaDiReteNonPronta(BaseAvvio):
+    """Al mattino Windows spesso non ha ancora ristabilito il collegamento
+    alla cartella condivisa quando il programma parte: il database sta
+    benissimo, ma risulta irraggiungibile.
+
+    Aprire la cartella da Esplora file "risolve" solo perché forza un nuovo
+    collegamento. Qui lo fa il programma, insistendo qualche secondo."""
+
+    def test_su_un_percorso_locale_non_aspetta_niente(self):
+        """Non deve rallentare l'avvio di chi lavora sul proprio disco."""
+        attese = []
+        riuscito = bm.attendi_cartella_di_rete(
+            self.buono, pausa=lambda s: attese.append(s))
+        self.assertTrue(riuscito)
+        self.assertEqual(attese, [], "su disco locale non si aspetta")
+
+    def test_su_percorso_di_rete_insiste_prima_di_arrendersi(self):
+        finto = r"\\SERVER-SPENTO\condivisa\materiali.db"
+        attese = []
+        riuscito = bm.attendi_cartella_di_rete(
+            finto, tentativi=4, attesa=1.5, pausa=lambda s: attese.append(s))
+        self.assertFalse(riuscito)
+        self.assertEqual(len(attese), 3,
+                         "quattro tentativi separati da tre attese")
+        self.assertEqual(set(attese), {1.5})
+
+    def test_appena_la_cartella_risponde_smette_di_aspettare(self):
+        """Il caso normale: al secondo tentativo il collegamento c'è."""
+        percorso = os.path.join(self.tmp, "ritardatario.db")
+        attese = []
+
+        def crea_al_primo_giro(_secondi):
+            attese.append(_secondi)
+            with open(percorso, "w") as f:
+                f.write("x")
+
+        originale = bm._e_percorso_di_rete
+        bm._e_percorso_di_rete = lambda p: True     # fa finta che sia in rete
+        try:
+            riuscito = bm.attendi_cartella_di_rete(
+                percorso, tentativi=5, pausa=crea_al_primo_giro)
+        finally:
+            bm._e_percorso_di_rete = originale
+
+        self.assertTrue(riuscito)
+        self.assertEqual(len(attese), 1,
+                         "deve fermarsi appena il file compare, non fare "
+                         "tutti i tentativi a vuoto")
+
+    def test_il_messaggio_spiega_cosa_controllare(self):
+        finto_qt.RispostaAutomatica.scelta_pulsante = 2      # "Chiudi"
+        prosegue = programma._come_procedere_senza_la_cartella_di_rete(
+            self.tmp, r"\\SERVER\condivisa\materiali.db")
+        self.assertFalse(prosegue)
+        testi = " ".join(finto_qt.RispostaAutomatica.dialoghi_mostrati)
+        self.assertIn("SERVER", testi, "va detto quale cartella non risponde")
+        self.assertIn("acceso", testi,
+                      "va suggerito di controllare il computer che condivide")
+
+
 class TestScritturaConfigurazione(BaseAvvio):
 
     def test_conserva_le_altre_impostazioni(self):
